@@ -7,22 +7,21 @@
 .
 |-- !KRT
 |   |-- Controllers
-|   |   |-- Changes.lua
 |   |   |-- Logger.lua
 |   |   |-- Master.lua
 |   |   |-- README.md
 |   |   |-- Spammer.lua
 |   |   \\-- Warnings.lua
-|   |-- Core
+|   |-- Database
 |   |   |-- DB.lua
 |   |   |-- DBManager.lua
+|   |   |-- DBOptions.lua
 |   |   |-- DBRaidMigrations.lua
 |   |   |-- DBRaidQueries.lua
 |   |   |-- DBRaidStore.lua
 |   |   |-- DBRaidValidator.lua
 |   |   |-- DBSchema.lua
-|   |   |-- DBSyncer.lua
-|   |   \\-- Options.lua
+|   |   \\-- DBSyncer.lua
 |   |-- EntryPoints
 |   |   |-- Minimap.lua
 |   |   |-- README.md
@@ -136,7 +135,6 @@
 |   |-- UI
 |   |   |-- Templates
 |   |   |   \\-- Common.xml
-|   |   |-- Changes.xml
 |   |   |-- Config.xml
 |   |   |-- Logger.xml
 |   |   |-- LootCounter.xml
@@ -157,21 +155,31 @@
 |   \\-- KRT.xml
 |-- .agents
 |   \\-- skills
-|       |-- k-docs
-|       |   \\-- SKILL.md
-|       |-- s-audit
-|       |   \\-- SKILL.md
-|       |-- s-clean
-|       |   \\-- SKILL.md
-|       |-- s-debug
-|       |   |-- references
+|       |-- OLD
+|       |   |-- k-docs
 |       |   |   \\-- ...
-|       |   \\-- SKILL.md
-|       |-- s-lint
-|       |   \\-- SKILL.md
-|       |-- s-release
-|       |   \\-- SKILL.md
-|       \\-- s-working
+|       |   |-- s-audit
+|       |   |   \\-- ...
+|       |   |-- s-clean
+|       |   |   \\-- ...
+|       |   |-- s-debug
+|       |   |   \\-- ...
+|       |   |-- s-lint
+|       |   |   \\-- ...
+|       |   |-- s-release
+|       |   |   \\-- ...
+|       |   \\-- s-working
+|       |       \\-- ...
+|       \\-- wow-addon-dev-wotlk-v335a
+|           |-- agents
+|           |   \\-- ...
+|           |-- assets
+|           |   \\-- ...
+|           |-- references
+|           |   \\-- ...
+|           |-- scripts
+|           |   \\-- ...
+|           |-- LICENSE
 |           \\-- SKILL.md
 |-- .githooks
 |   |-- pre-commit
@@ -185,23 +193,6 @@
 |   |-- mcp.json
 |   \\-- settings.json
 |-- docs
-|   |-- superpowers
-|   |   |-- plans
-|   |   |   |-- 2026-05-08-raid-loot-source-resolver.md
-|   |   |   |-- 2026-05-18-passive-group-loot-rollid-first.md
-|   |   |   |-- 2026-05-23-logger-list-visual-refresh.md
-|   |   |   |-- 2026-05-25-total-rework-foundation.md
-|   |   |   |-- 2026-05-27-core-persistence-sync-performance.md
-|   |   |   |-- 2026-05-27-legacy-sunset-cleanup.md
-|   |   |   |-- 2026-05-27-softres-roll-sync-scavenging.md
-|   |   |   \\-- 2026-05-29-whole-addon-sequential-uniformization.md
-|   |   \\-- specs
-|   |       |-- 2026-04-28-options-timer-refactor-design.md
-|   |       |-- 2026-05-08-raid-loot-source-resolver-design.md
-|   |       |-- 2026-05-18-passive-group-loot-rollid-first-design.md
-|   |       |-- 2026-05-23-logger-list-visual-refresh-design.md
-|   |       |-- 2026-05-27-core-persistence-sync-performance-design.md
-|   |       \\-- 2026-05-29-whole-addon-sequential-uniformization-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY.csv
@@ -229,7 +220,7 @@
 |   |   \\-- sv
 |   |       \\-- canonical-minimal-01.lua
 |   |-- logger_visual_refresh_spec.lua
-|   |-- module_registry_core_spec.lua
+|   |-- module_registry_database_spec.lua
 |   |-- module_registry_modules_spec.lua
 |   |-- module_registry_services_spec.lua
 |   |-- module_registry_spec.lua

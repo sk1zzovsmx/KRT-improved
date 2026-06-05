@@ -1,14 +1,14 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
 
-local Core = feature.Core
+local Database = feature.Database
 local Strings = feature.Strings
 local Time = feature.Time
 local Services = feature.Services
@@ -72,7 +72,7 @@ do
     end
 
     local function getCurrentRaidId()
-        return Core.GetCurrentRaid and Core.GetCurrentRaid() or nil
+        return Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
     end
 
     local function getCurrentRaid()
@@ -80,7 +80,7 @@ do
         if not raidId then
             return nil, nil
         end
-        return Core.EnsureRaidById(raidId), raidId
+        return Database.EnsureRaidById(raidId), raidId
     end
 
     local function getSyntheticStateForRaid(raidId, create)
@@ -201,7 +201,7 @@ do
         if not raidId or type(raid) ~= "table" then
             return nil, nil, "no_current_raid"
         end
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
         return raid, raidId, nil
     end
 
@@ -338,9 +338,6 @@ do
 
             if existingIndex and existing and existing.name ~= player.name then
                 tremove(raid.players, existingIndex)
-                if type(raid.changes) == "table" then
-                    raid.changes[existing.name] = nil
-                end
                 if raidService and raidService.InvalidateRaidRuntime then
                     raidService:InvalidateRaidRuntime(raidId)
                 end
@@ -360,7 +357,7 @@ do
             end
         end
 
-        raid = Core.EnsureRaidById(raidId)
+        raid = Database.EnsureRaidById(raidId)
         rebuildSyntheticState(raid, raidId)
         publishSyntheticDelta(delta, raidId)
 
@@ -405,9 +402,6 @@ do
                     removed = removed + 1
                     tinsert(delta.left, buildRosterDeltaEntry(player))
                     tremove(raid.players, i)
-                    if type(raid.changes) == "table" then
-                        raid.changes[player.name] = nil
-                    end
                     if isDebugEnabled() then
                         addon:debug(Diag.D.LogDebugRaidClearRemoved:format(tostring(raidId), player.name, tostring(playerNid)))
                     end

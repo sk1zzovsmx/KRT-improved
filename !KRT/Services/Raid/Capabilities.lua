@@ -1,12 +1,12 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
-local Core = feature.Core
+local Database = feature.Database
 local L = feature.L
 
 local select = select
@@ -66,7 +66,7 @@ do
 
     function module:GetPlayerRoleState()
         local inRaid = type(module.IsPlayerInRaid) == "function" and module:IsPlayerInRaid() or false
-        local rank = Core.GetUnitRank and (tonumber(Core.GetUnitRank("player", 0)) or 0) or 0
+        local rank = Database.GetUnitRank and (tonumber(Database.GetUnitRank("player", 0)) or 0) or 0
         local isLeader = rank >= 2
         local isAssistant = rank == 1
         return {
@@ -99,7 +99,7 @@ do
             return state
         end
 
-        if capability == "raid_leadership" or capability == "changes_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
+        if capability == "raid_leadership" or capability == "loot_counter_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
             if not role.inRaid then
                 state.reason = "not_in_raid"
             elseif role.hasRaidLeadership then
@@ -143,11 +143,6 @@ do
             return module:CanUseCapability("loot")
         end
         return isPassiveGroupLootMethod(method)
-    end
-
-    function module:CanBroadcastChanges()
-        local state = module:GetCapabilityState("changes_broadcast")
-        return state and state.allowed == true, state and state.reason or "missing_state"
     end
 end
 

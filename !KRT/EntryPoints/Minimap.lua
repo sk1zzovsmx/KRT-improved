@@ -1,17 +1,17 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 
 local Options = feature.Options
 local Frames = feature.Frames
 local Colors = feature.Colors
-local Core = feature.Core
+local Database = feature.Database
 local Services = feature.Services
 local K_COLOR = feature.K_COLOR
 
@@ -73,7 +73,6 @@ local function buildMenu()
     local hasRaidGroup = raid and raid.IsPlayerInRaid and raid:IsPlayerInRaid() or false
     local hasLootAccess = raid and raid.CanUseCapability and raid:CanUseCapability("loot") or false
     local hasRaidIconsAccess = raid and raid.CanUseCapability and raid:CanUseCapability("raid_icons") or false
-    local hasChangesBroadcastAccess = raid and raid.CanUseCapability and raid:CanUseCapability("changes_broadcast") or false
     local canOpenLootFrame = (not hasRaidGroup) or hasLootAccess
     if hasRaidGroup and raid and raid.CanObservePassiveLoot and raid:CanObservePassiveLoot() then
         canOpenLootFrame = true
@@ -90,20 +89,28 @@ local function buildMenu()
     if hasRaidGroup then
         disableLootRaidActions = nil
     end
-    local disableChangesBroadcastActions = nil
-    if not hasChangesBroadcastAccess then
-        disableChangesBroadcastActions = 1
+    local disableReservesActions = nil
+    if not isWidgetAvailable("Reserves") then
+        disableReservesActions = 1
     end
-
     return {
         {
             text = MASTER_LOOTER,
             notCheckable = 1,
             disabled = disableLootActions,
             func = function()
-                Core.RequestControllerMethod("Master", "Toggle")
+                Database.RequestControllerMethod("Master", "Toggle")
             end,
         },
+        {
+            text = L.StrRaidReserves,
+            notCheckable = 1,
+            disabled = disableReservesActions,
+            func = function()
+                callWidgetMethod("Reserves", "Toggle")
+            end,
+        },
+        { text = " ", disabled = 1, notCheckable = 1 },
         {
             text = L.StrLootCounter,
             notCheckable = 1,
@@ -119,7 +126,23 @@ local function buildMenu()
             text = L.StrLootLogger,
             notCheckable = 1,
             func = function()
-                Core.RequestControllerMethod("Logger", "Toggle")
+                Database.RequestControllerMethod("Logger", "Toggle")
+            end,
+        },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        {
+            text = RAID_WARNING,
+            notCheckable = 1,
+            func = function()
+                Database.RequestControllerMethod("Warnings", "Toggle")
+            end,
+        },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        {
+            text = L.StrLFMSpam,
+            notCheckable = 1,
+            func = function()
+                Database.RequestControllerMethod("Spammer", "Toggle")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -131,53 +154,6 @@ local function buildMenu()
                 if raid and raid.ClearRaidIcons then
                     raid:ClearRaidIcons()
                 end
-            end,
-        },
-        { text = " ", disabled = 1, notCheckable = 1 },
-        {
-            text = RAID_WARNING,
-            notCheckable = 1,
-            func = function()
-                Core.RequestControllerMethod("Warnings", "Toggle")
-            end,
-        },
-        { text = " ", disabled = 1, notCheckable = 1 },
-        {
-            text = L.StrMSChanges,
-            notCheckable = 1,
-            hasArrow = 1,
-            menuList = {
-                {
-                    text = L.BtnOpen,
-                    notCheckable = 1,
-                    func = function()
-                        Core.RequestControllerMethod("Changes", "Toggle")
-                    end,
-                },
-                {
-                    text = L.BtnDemand,
-                    notCheckable = 1,
-                    disabled = disableChangesBroadcastActions,
-                    func = function()
-                        Core.RequestControllerMethod("Changes", "Demand")
-                    end,
-                },
-                {
-                    text = CHAT_ANNOUNCE,
-                    notCheckable = 1,
-                    disabled = disableChangesBroadcastActions,
-                    func = function()
-                        Core.RequestControllerMethod("Changes", "Announce")
-                    end,
-                },
-            },
-        },
-        { text = " ", disabled = 1, notCheckable = 1 },
-        {
-            text = L.StrLFMSpam,
-            notCheckable = 1,
-            func = function()
-                Core.RequestControllerMethod("Spammer", "Toggle")
             end,
         },
     }
@@ -374,7 +350,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Colors",
             "Modules/UI/Frames",

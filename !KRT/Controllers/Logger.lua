@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
@@ -14,7 +14,7 @@ local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events
 local C = feature.C
-local Core = feature.Core
+local Database = feature.Database
 local Options = feature.Options
 local Bus = feature.Bus
 local ListController = feature.ListController
@@ -622,11 +622,11 @@ local function buildRaidListRow(raid, seq, queries)
 end
 
 local function fillRaidListData(out, contextTag)
-    local raidStore = Core.GetRaidStoreOrNil(contextTag, { "GetAllRaids", "GetRaidByIndex" })
+    local raidStore = Database.GetRaidStoreOrNil(contextTag, { "GetAllRaids", "GetRaidByIndex" })
     local raids = raidStore and raidStore:GetAllRaids() or {}
-    local queries = Core.GetRaidQueries and Core.GetRaidQueries() or nil
+    local queries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
     for i = 1, #raids do
-        local raid = raidStore and raidStore:GetRaidByIndex(i) or Core.EnsureRaidById(i)
+        local raid = raidStore and raidStore:GetRaidByIndex(i) or Database.EnsureRaidById(i)
         local row = buildRaidListRow(raid, i, queries)
         if row then
             out[i] = row
@@ -1123,7 +1123,7 @@ do
         if not (frame and frame.IsShown and frame:IsShown()) then
             return false
         end
-        local currentRaid = Core.GetCurrentRaid()
+        local currentRaid = Database.GetCurrentRaid()
         return currentRaid and module.selectedRaid and tonumber(module.selectedRaid) == tonumber(currentRaid)
     end
 
@@ -1406,14 +1406,14 @@ do
             enableDrag = true,
             hookOnShow = function()
                 if not module.selectedRaid then
-                    SetSelectedRaid(Core.GetCurrentRaid())
+                    SetSelectedRaid(Database.GetCurrentRaid())
                 end
                 clearSelections()
                 refreshLoggerTabLayout()
                 triggerSelectionEvent(module, "selectedRaid", "ui")
             end,
             hookOnHide = function()
-                SetSelectedRaid(Core.GetCurrentRaid())
+                SetSelectedRaid(Database.GetCurrentRaid())
                 clearSelections()
             end,
         }) or UI.FrameName
@@ -1430,7 +1430,7 @@ do
             return
         end
         if not module.selectedRaid then
-            SetSelectedRaid(Core.GetCurrentRaid())
+            SetSelectedRaid(Database.GetCurrentRaid())
         end
         clearSelections()
         refreshLoggerTabLayout()
@@ -1502,7 +1502,7 @@ do
         if not raidNid then
             return
         end
-        local raidIndex = raidNid and Core.GetRaidIdByNid(raidNid) or nil
+        local raidIndex = raidNid and Database.GetRaidIdByNid(raidNid) or nil
         if not raidIndex then
             return
         end
@@ -1524,10 +1524,10 @@ do
             allowDeselect = opts and opts.allowDeselect,
             setFocus = SetSelectedRaid,
             mapSelectedToFocus = function(nid)
-                return nid and Core.GetRaidIdByNid(nid) or nil
+                return nid and Database.GetRaidIdByNid(nid) or nil
             end,
             isClickedFocused = function(clickedNid)
-                local selectedRaidNid = module.selectedRaid and Core.GetRaidNidById(module.selectedRaid) or nil
+                local selectedRaidNid = module.selectedRaid and Database.GetRaidNidById(module.selectedRaid) or nil
                 return selectedRaidNid == clickedNid
             end,
         })
@@ -2110,11 +2110,11 @@ do
                 applyRaidListColumnWidths(n)
 
                 local sel = module.selectedRaid
-                local raid = sel and Core.EnsureRaidById(sel) or nil
+                local raid = sel and Database.EnsureRaidById(sel) or nil
                 local count = controller and controller.data and #controller.data or 0
 
                 local canSetCurrent = false
-                if sel and raid and sel ~= Core.GetCurrentRaid() then
+                if sel and raid and sel ~= Database.GetCurrentRaid() then
                     -- This button is intended to resolve duplicate raid creation while actively raiding.
                     if not addon.IsInRaid() then
                         canSetCurrent = false
@@ -2142,8 +2142,8 @@ do
                 local ctx = module._msRaidCtx
                 local selCount = MultiSelect.GetCount(ctx)
                 local canDelete = (selCount and selCount > 0) or false
-                if canDelete and Core.GetCurrentRaid() then
-                    local currentRaidNid = Core.GetRaidNidById(Core.GetCurrentRaid())
+                if canDelete and Database.GetCurrentRaid() then
+                    local currentRaidNid = Database.GetRaidNidById(Database.GetCurrentRaid())
                     local ids = MultiSelect.GetSelected(ctx)
                     for i = 1, #ids do
                         if currentRaidNid and tonumber(ids[i]) == tonumber(currentRaidNid) then
@@ -2178,7 +2178,7 @@ do
         "_msRaidCtx",
         {
             transform = function(id)
-                return Core.GetRaidNidById(id)
+                return Database.GetRaidNidById(id)
             end,
         }
     )
@@ -2224,7 +2224,7 @@ do
             end
 
             -- Safety: never delete the current raid
-            local currentRaidNid = Core.GetRaidNidById(Core.GetCurrentRaid())
+            local currentRaidNid = Database.GetRaidNidById(Database.GetCurrentRaid())
             if currentRaidNid then
                 for i = 1, #raidNids do
                     if tonumber(raidNids[i]) == tonumber(currentRaidNid) then
@@ -2234,19 +2234,19 @@ do
             end
 
             local prevFocus = module.selectedRaid
-            local prevFocusNid = prevFocus and Core.GetRaidNidById(prevFocus) or nil
+            local prevFocusNid = prevFocus and Database.GetRaidNidById(prevFocus) or nil
             for i = 1, #raidNids do
                 module.Actions:DeleteRaidByNid(raidNids[i])
             end
 
             MultiSelect.EnsureState(ctx)
 
-            local raidStore = Core.GetRaidStoreOrNil("Logger.Raids.DeleteRaids", { "GetAllRaids" })
+            local raidStore = Database.GetRaidStoreOrNil("Logger.Raids.DeleteRaids", { "GetAllRaids" })
             local raids = raidStore and raidStore:GetAllRaids() or {}
             local n = #raids
             local newFocus = nil
             if n > 0 then
-                newFocus = prevFocusNid and Core.GetRaidIdByNid(prevFocusNid) or nil
+                newFocus = prevFocusNid and Database.GetRaidIdByNid(prevFocusNid) or nil
                 if not newFocus then
                     local base = tonumber(prevFocus) or n
                     if base > n then
@@ -2796,7 +2796,7 @@ do
             local addBtn = _G[n .. "AddBtn"]
             if addBtn then
                 -- Update is only meaningful for the current raid session while actively raiding.
-                local can = addon.IsInRaid() and Core.GetCurrentRaid() and module.selectedRaid and (tonumber(Core.GetCurrentRaid()) == tonumber(module.selectedRaid))
+                local can = addon.IsInRaid() and Database.GetCurrentRaid() and module.selectedRaid and (tonumber(Database.GetCurrentRaid()) == tonumber(module.selectedRaid))
                 UIPrimitives.EnableDisable(addBtn, can)
             end
         end,
@@ -2832,7 +2832,7 @@ do
                 return
             end
 
-            if not (Core.GetCurrentRaid() and tonumber(Core.GetCurrentRaid()) == sel) then
+            if not (Database.GetCurrentRaid() and tonumber(Database.GetCurrentRaid()) == sel) then
                 addon:warn(Diag.W.ErrLoggerUpdateRosterNotCurrent)
                 return
             end
@@ -3222,13 +3222,13 @@ do
         end
 
         -- If the module window is open and browsing an old raid, selectedRaid may
-        -- differ from Core.GetCurrentRaid(). Runtime sources must always write
+        -- differ from Database.GetCurrentRaid(). Runtime sources must always write
         -- into the current raid session; Logger UI edits target selectedRaid.
         local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
         if isLoggerSource then
-            return module.selectedRaid or Core.GetCurrentRaid()
+            return module.selectedRaid or Database.GetCurrentRaid()
         end
-        return Core.GetCurrentRaid() or module.selectedRaid
+        return Database.GetCurrentRaid() or module.selectedRaid
     end
 
     setLootEntry = function(lootNid, looter, rollType, rollValue, source, raidIDOverride)
@@ -3588,7 +3588,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Timer",
             "Modules/Events",

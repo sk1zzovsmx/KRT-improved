@@ -1,102 +1,69 @@
-# Agent Skills and Mechanic Workflow
+# Agent Skills
 
-This repository maintains AI skills under `.agents/skills`, customized for KRT addon development.
+This repository keeps repo-local AI skills under `.agents/skills`.
 
-## Policy
+## Active Skill
 
-- Skills are KRT-native: content is tailored for KRT addon architecture, WoW 3.3.5a, and Lua 5.1.
-- Upstream Mechanic skill snapshots serve as structural templates; content is overridden locally.
-- Pin every imported skill to an explicit commit SHA for structural reference.
-- Do not introduce Mechanic/Fen/AFD-specific guidance in skills; keep all references KRT-relevant.
+- `wow-addon-dev-wotlk-v335a`
 
-## Source of Truth
+The active skill is a Codex adaptation of:
 
-- Manifest: `tools/agent-skills.manifest.json`
-- Sync script: `tools/sync-agent-skills.ps1`
-- Cross-platform entrypoint: `tools/krt.py`
+- Repo: `Kirchlive/WoW-Addon-Dev-Wotlk-v335a-Claude-Skill`
+- Commit: `2e1f0a37595d181427be5caeb29d76288f9c452c`
+- Local path: `.agents/skills/wow-addon-dev-wotlk-v335a`
 
-## Pinned Skill Sources
+Adaptation notes:
 
-- `Falkicon/Mechanic` @ `41ef25dcfcd7c1450577b5826fbba9c571c7c75d`
+- Converted the routing and workflow language to Codex.
+- Added `agents/openai.yaml` metadata generated through `skill-creator`.
+- Preserved useful references, scripts, and addon templates from the source.
+- Added KRT priority rules so `AGENTS.md` overrides generic WotLK guidance.
+- Normalized imported text to ASCII for this repository.
 
-Managed skills from the manifest:
+## Archived Legacy Skills
 
-- `s-clean`
+The old KRT/Mechanic-derived skills are archived under `.agents/skills/OLD`:
+
+- `k-docs`
 - `s-audit`
+- `s-clean`
 - `s-debug`
-- `s-working`
 - `s-lint`
 - `s-release`
-- `k-docs`
+- `s-working`
 
-## Recommended Command Flow
+They are kept for reference, not as the active repo-local skill set. Their
+`SKILL.md` files are intentionally renamed to `SKILL.md.disabled` so Codex does
+not discover or invoke them as skills.
 
-1. Inspect local readiness.
-2. Verify or sync vendored skills.
-3. Install skills locally if needed.
-4. Bootstrap Mechanic (once per machine).
-5. Run Mechanic-backed addon checks.
-6. Start MCP when agent workflows need a tool endpoint.
+## Manifest
 
-## Cross-Platform Commands (`tools/krt.py`)
+- Manifest: `tools/agent-skills.manifest.json`
+- The active Codex-adapted skill is listed under `sources` with
+  `verifyPolicy: local-presence`.
+- Archived legacy skill names are listed under `archivedSkills`.
+
+The sync script verifies the adapted skill exists locally. It does not regenerate
+it from upstream because that would overwrite the Codex adaptation.
+
+## Useful Commands
 
 Windows:
 
 ```powershell
-py -3 tools/krt.py dev-stack-status
 py -3 tools/krt.py skills-manifest
 py -3 tools/krt.py skills-sync --verify-only
-py -3 tools/krt.py skills-sync
-py -3 tools/krt.py skills-sync --install-local
-py -3 tools/krt.py mechanic-bootstrap --pull
-py -3 tools/krt.py mech AddonValidate --json
-py -3 tools/krt.py run-krt-mcp
 ```
 
 Linux:
 
 ```bash
-python3 tools/krt.py dev-stack-status
 python3 tools/krt.py skills-manifest
 python3 tools/krt.py skills-sync --verify-only
-python3 tools/krt.py skills-sync
-python3 tools/krt.py skills-sync --install-local
-python3 tools/krt.py mechanic-bootstrap --pull
-python3 tools/krt.py mech AddonValidate --json
-python3 tools/krt.py run-krt-mcp
 ```
 
-## Direct Script Equivalents
-
-These remain valid and are what `krt.py` wraps:
-
-- `tools/sync-agent-skills.ps1`
-- `tools/mech-bootstrap.ps1`
-- `tools/mech-krt.ps1`
-- `tools/dev-stack-status.ps1`
-- `tools/run-krt-mcp.ps1`
-
-## Multi-Device Mechanic Companion
-
-Keep Mechanic external to this repo, bootstrap per device.
-
-Default roots:
-
-- Windows: `C:\dev\Mechanic`
-- Linux: `~/dev/Mechanic`
-
-Environment overrides:
-
-- `KRT_MECHANIC_ROOT`
-- `KRT_MECHANIC_EXE`
-- `KRT_LOCAL_SKILLS_ROOT`
-- `KRT_POWERSHELL_EXE`
-
-## Safety Boundaries
-
-- Sync cleanup is limited to managed destination paths from the manifest.
-- `.system` skills are never touched by repo sync.
-- Local install overwrites only managed skill names listed in the manifest.
+Use `skills-sync --install-local` only when you intentionally want to copy the
+active repo-local skill into your user-level Codex skills directory.
 
 ## Related Docs
 

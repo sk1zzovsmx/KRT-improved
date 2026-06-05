@@ -378,52 +378,6 @@ local function raidApi(tbl)
         end
     end
 
-    if type(tbl.ClearRaidChanges) ~= "function" then
-        function tbl:ClearRaidChanges()
-            return true, 0
-        end
-    end
-
-    if type(tbl.DeleteRaidChange) ~= "function" then
-        function tbl:DeleteRaidChange()
-            return true, false
-        end
-    end
-
-    if type(tbl.CanBroadcastChanges) ~= "function" then
-        function tbl:CanBroadcastChanges()
-            return true, nil
-        end
-    end
-
-    if type(tbl.BuildRaidChangesDemandText) ~= "function" then
-        function tbl:BuildRaidChangesDemandText()
-            return "Demand"
-        end
-    end
-
-    if type(tbl.BuildRaidChangesAnnouncement) ~= "function" then
-        function tbl:BuildRaidChangesAnnouncement(changesByName)
-            local count = 0
-            for _ in pairs(changesByName or {}) do
-                count = count + 1
-            end
-            return count > 0 and "Announce" or "None", count
-        end
-    end
-
-    if type(tbl.GetRaidChanges) ~= "function" then
-        function tbl:GetRaidChanges()
-            return {}
-        end
-    end
-
-    if type(tbl.UpsertRaidChange) ~= "function" then
-        function tbl:UpsertRaidChange(_, playerName, spec)
-            return true, playerName, spec
-        end
-    end
-
     if type(tbl.GetRosterVersion) ~= "function" then
         function tbl:GetRosterVersion()
             return 0
@@ -872,7 +826,7 @@ local function newHarness()
             return state
         end
 
-        if capability == "raid_leadership" or capability == "changes_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
+        if capability == "raid_leadership" or capability == "loot_counter_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
             if not role.inRaid then
                 state.reason = "not_in_raid"
             elseif role.hasRaidLeadership then
@@ -1449,7 +1403,7 @@ local function newHarness()
         end,
     }
 
-    local Core = {}
+    local Database = {}
 
     local function ensureNamespace(root, ...)
         assert(type(root) == "table", "ensureNamespace requires a root table")
@@ -1476,7 +1430,7 @@ local function newHarness()
         Frames = addon.Frames,
         Events = Events,
         C = C,
-        Core = Core,
+        Database = Database,
         Options = (function()
             -- Stub matching the namespace registry API. Registered options live
             -- in `addon.options` (a flat table in tests) and in a key-to-namespace
@@ -1640,7 +1594,7 @@ local function newHarness()
         OptionsTable = {},
     }
 
-    Core.EnsureServiceNamespace = function(...)
+    Database.EnsureServiceNamespace = function(...)
         return ensureNamespace(addon.Services, ...)
     end
 
@@ -1650,7 +1604,7 @@ local function newHarness()
         feature.Frames = addon.Frames or feature.Frames
         feature.Events = addon.Events or feature.Events
         feature.C = addon.C or feature.C
-        feature.Core = addon.Core or Core
+        feature.Database = addon.Database or Database
         feature.Options = addon.Options or feature.Options
         feature.Bus = addon.Bus or feature.Bus
         feature.Strings = addon.Strings or feature.Strings
@@ -1668,44 +1622,44 @@ local function newHarness()
         feature.Controllers = addon.Controllers or feature.Controllers
         feature.Widgets = addon.Widgets or feature.Widgets
         feature.Time = addon.Time or feature.Time
-        feature.EnsureServiceNamespace = Core.EnsureServiceNamespace
+        feature.EnsureServiceNamespace = Database.EnsureServiceNamespace
         return feature
     end
 
     addon.Options = feature.Options
     addon.Time = feature.Time
     addon.Bus = Bus
-    addon.Core = Core
-    addon.Core.GetFeatureShared = function()
+    addon.Database = Database
+    addon.Database.GetFeatureShared = function()
         return hydrateFeatureShared()
     end
-    Core.GetFeatureShared = addon.Core.GetFeatureShared
-    Core.GetCurrentRaid = function()
+    Database.GetFeatureShared = addon.Database.GetFeatureShared
+    Database.GetCurrentRaid = function()
         return addon.State.currentRaid
     end
-    Core.GetLastBoss = function()
+    Database.GetLastBoss = function()
         return addon.State.lastBoss
     end
-    Core.SetLastBoss = function(bossNid)
+    Database.SetLastBoss = function(bossNid)
         addon.State.lastBoss = bossNid
         return addon.State.lastBoss
     end
-    Core.GetPlayerName = function()
+    Database.GetPlayerName = function()
         return "Tester"
     end
-    Core.GetRaidSchemaVersion = function()
+    Database.GetRaidSchemaVersion = function()
         return 1
     end
-    Core.GetRaidMigrations = function()
+    Database.GetRaidMigrations = function()
         return nil
     end
-    Core.GetRaidQueries = function()
+    Database.GetRaidQueries = function()
         return nil
     end
-    Core.GetRaidStoreOrNil = function()
+    Database.GetRaidStoreOrNil = function()
         return nil
     end
-    Core.RequireServiceMethod = function(serviceName, serviceTable, methodName)
+    Database.RequireServiceMethod = function(serviceName, serviceTable, methodName)
         assert(type(serviceTable) == "table", "KRT missing service: " .. tostring(serviceName))
         local method = serviceTable[methodName]
         assert(type(method) == "function", "KRT missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
@@ -2114,7 +2068,7 @@ local function newHarness()
 
     local harness = {
         addon = addon,
-        Core = Core,
+        Database = Database,
         feature = feature,
         Bus = Bus,
         logs = logs,
@@ -2226,7 +2180,7 @@ local function newHarness()
                 })
             end
 
-            if path == "!KRT/Controllers/Logger.lua" or path == "!KRT/Core/DBRaidValidator.lua" then
+            if path == "!KRT/Controllers/Logger.lua" or path == "!KRT/Database/DBRaidValidator.lua" then
                 loadFiles({ "!KRT/Modules/Dataset/IgnoredMobs.lua" })
             end
 
@@ -2266,27 +2220,27 @@ local function newHarness()
 
     function harness:installRaidStore(seedRaids)
         _G.KRT_Raids = seedRaids or {}
-        self:load("!KRT/Core/DBRaidStore.lua")
+        self:load("!KRT/Database/DBRaidStore.lua")
         local store = self.addon.DB.RaidStore
         store:NormalizeAllRaids()
         self.store = store
-        self.Core.GetRaidStoreOrNil = function()
+        self.Database.GetRaidStoreOrNil = function()
             return store
         end
-        self.Core.EnsureRaidSchema = function(raid)
+        self.Database.EnsureRaidSchema = function(raid)
             return store:NormalizeRaidRecord(raid)
         end
-        self.Core.StripRuntimeRaidCaches = function(raid)
+        self.Database.StripRuntimeRaidCaches = function(raid)
             return store:StripRuntime(raid)
         end
-        self.Core.EnsureRaidById = function(raidId)
+        self.Database.EnsureRaidById = function(raidId)
             if not raidId then
                 return nil
             end
             local raid = store:GetRaidByIndex(raidId)
             return raid and store:NormalizeRaidRecord(raid) or nil
         end
-        self.Core.EnsureRaidByNid = function(raidNid)
+        self.Database.EnsureRaidByNid = function(raidNid)
             if not raidNid then
                 return nil
             end
@@ -2338,13 +2292,13 @@ local function setupLoggerExportHarness(seedRaids)
         return tostring(itemName or itemLink or itemId or "")
     end
     h:installRaidStore(seedRaids)
-    h:load("!KRT/Core/DBRaidQueries.lua")
-    h.Core.GetRaidQueries = function()
+    h:load("!KRT/Database/DBRaidQueries.lua")
+    h.Database.GetRaidQueries = function()
         return h.addon.DB.RaidQueries
     end
     h:load("!KRT/Services/Logger/Store.lua")
     h:load("!KRT/Services/Logger/Export.lua")
-    return h, h.Core.EnsureRaidById(1), h.addon.Services.Logger.Export
+    return h, h.Database.EnsureRaidById(1), h.addon.Services.Logger.Export
 end
 
 local function loadMasterController(h)
@@ -3035,7 +2989,7 @@ end
 
 test("runtime cache reuses runtime until invalidated", function()
     local h = newHarness()
-    h:load("!KRT/Core/DBRaidStore.lua")
+    h:load("!KRT/Database/DBRaidStore.lua")
     local store = h.addon.DB.RaidStore
     local raid = {
         schemaVersion = 1,
@@ -3068,7 +3022,7 @@ end)
 
 test("runtime cache indexes appended loot without rebuilding runtime", function()
     local h = newHarness()
-    h:load("!KRT/Core/DBRaidStore.lua")
+    h:load("!KRT/Database/DBRaidStore.lua")
     local store = h.addon.DB.RaidStore
     local raid = {
         schemaVersion = 1,
@@ -3102,7 +3056,7 @@ end)
 
 test("runtime cache rebuilds when signature changes without explicit strip", function()
     local h = newHarness()
-    h:load("!KRT/Core/DBRaidStore.lua")
+    h:load("!KRT/Database/DBRaidStore.lua")
     local store = h.addon.DB.RaidStore
     local raid = {
         schemaVersion = 1,
@@ -3153,7 +3107,7 @@ test("raid insert preserves unique raid nid and replaces duplicate raid nid", fu
             nextLootNid = 1,
         },
     }
-    h:load("!KRT/Core/DBRaidStore.lua")
+    h:load("!KRT/Database/DBRaidStore.lua")
     local store = h.addon.DB.RaidStore
 
     local uniqueRaid = store:CreateRaidRecord({ raidNid = 42 })
@@ -3254,10 +3208,10 @@ test("raid validator skips runtime clone and reports root runtime keys", functio
             return raid
         end,
     }
-    h.Core.GetRaidStoreOrNil = function()
+    h.Database.GetRaidStoreOrNil = function()
         return fakeStore
     end
-    h:load("!KRT/Core/DBRaidValidator.lua")
+    h:load("!KRT/Database/DBRaidValidator.lua")
 
     local result = h.addon.DB.RaidValidator:GetRaidRecordValidation({
         schemaVersion = 1,
@@ -3307,12 +3261,12 @@ test("feature shared hydrates addon dependencies and namespace helpers", functio
     h.feature.Strings = nil
     h.addon.Services.Rolls = nil
 
-    local feature = h.Core.GetFeatureShared()
+    local feature = h.Database.GetFeatureShared()
     local rolls = feature.EnsureServiceNamespace("Rolls")
 
     assertTrue(feature.Strings == strings, "expected shared feature table to hydrate addon dependency")
     assertTrue(rolls == h.addon.Services.Rolls, "expected service namespace helper to create addon.Services.Rolls")
-    assertTrue(h.Core.EnsureServiceNamespace("Rolls") == rolls, "expected Core helper to return the same service namespace")
+    assertTrue(h.Database.EnsureServiceNamespace("Rolls") == rolls, "expected Database helper to return the same service namespace")
 end)
 
 test("raid roster update records joins leaves and player metadata", function()
@@ -3337,10 +3291,10 @@ test("raid roster update records joins leaves and player metadata", function()
             changes = {},
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetRealmName = function()
+    h.Database.GetRealmName = function()
         return "TestRealm"
     end
     h.addon.IsInRaid = function()
@@ -3379,7 +3333,7 @@ test("raid roster update records joins leaves and player metadata", function()
 
     local Raid = h.addon.Services.Raid
     local rosterChanged, delta = Raid:UpdateRaidRoster()
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
 
     assertTrue(rosterChanged == true, "expected roster update to report a join/leave change")
     assertEqual(delta.joined[1].name, "Cara", "expected Cara to be reported as joined")
@@ -3414,10 +3368,10 @@ test("raid roster update preserves previous names for temporary unknown units", 
             changes = {},
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetRealmName = function()
+    h.Database.GetRealmName = function()
         return "TestRealm"
     end
     h.addon.IsInRaid = function()
@@ -3449,7 +3403,7 @@ test("raid roster update preserves previous names for temporary unknown units", 
 
     rosterName = _G.UNKNOWNOBJECT
     local secondChanged, delta = Raid:UpdateRaidRoster()
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
 
     assertTrue(secondChanged ~= true, "expected temporary unknown unit to avoid roster churn")
     assertEqual(delta.unresolved[1].unitID, "raid1", "expected unresolved unit to be reported")
@@ -3508,7 +3462,7 @@ test("raid attendance records roster delta segments by player nid", function()
         },
     }, 3, 1)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     local Raid = h.addon.Services.Raid
     local entry = Raid:GetAttendanceEntry(raid, 1)
     assertTrue(entry ~= nil, "expected attendance entry to be created for Alice")
@@ -3544,7 +3498,7 @@ test("db syncer routes requests through whisper and group transports", function(
     local whisperMessages = {}
     local groupMessages = {}
 
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h.addon.IsInGroup = function()
@@ -3566,7 +3520,7 @@ test("db syncer routes requests through whisper and group transports", function(
     end
     h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/Modules/Base64.lua")
-    h:load("!KRT/Core/DBSyncer.lua")
+    h:load("!KRT/Database/DBSyncer.lua")
     h.addon.Comms.Sync = function(prefix, payload)
         groupMessages[#groupMessages + 1] = {
             prefix = prefix,
@@ -3632,7 +3586,7 @@ test("db syncer skips base64 work for empty snapshot text fields", function()
         return originalEncode(value)
     end
 
-    h:load("!KRT/Core/DBSyncer.lua")
+    h:load("!KRT/Database/DBSyncer.lua")
 
     assertTrue(h.addon.DB.Syncer:BroadcastLoggerPush(77, "Alice") == true, "expected snapshot push to send")
     assertEqual(emptyEncodeCalls, 0, "expected empty snapshot fields to avoid Base64 encoding work")
@@ -3671,7 +3625,7 @@ test("db syncer throttles passive cleanup but keeps request setup cleanup immedi
     end
     h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/Modules/Base64.lua")
-    h:load("!KRT/Core/DBSyncer.lua")
+    h:load("!KRT/Database/DBSyncer.lua")
 
     local syncer = h.addon.DB.Syncer
     syncer:OnAddonMessage("KRTLogSync", table.concat({ "RQ", "1", "prime", "BAD" }, "\t"), "WHISPER", "Alice")
@@ -3775,7 +3729,7 @@ test("db syncer rejects malformed snapshot payloads without importing", function
         end
         h:load("!KRT/Modules/Comms.lua")
         h:load("!KRT/Modules/Base64.lua")
-        h:load("!KRT/Core/DBSyncer.lua")
+        h:load("!KRT/Database/DBSyncer.lua")
 
         local function enc(value)
             return h.addon.Base64.Encode(value)
@@ -3860,7 +3814,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
 
     source:load("!KRT/Modules/Comms.lua")
     source:load("!KRT/Modules/Base64.lua")
-    source:load("!KRT/Core/DBSyncer.lua")
+    source:load("!KRT/Database/DBSyncer.lua")
     assertTrue(source.addon.DB.Syncer:BroadcastLoggerPush(77, "Bob") == true, "expected source push snapshot to send")
     assertTrue(#snapshotMessages > 1, "expected source snapshot to be chunked")
 
@@ -3886,7 +3840,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     end
     pushTarget:load("!KRT/Modules/Comms.lua")
     pushTarget:load("!KRT/Modules/Base64.lua")
-    pushTarget:load("!KRT/Core/DBSyncer.lua")
+    pushTarget:load("!KRT/Database/DBSyncer.lua")
 
     local badChunk = table.concat({ "SN", "1", "bad", "PUSH", "77", "2", "1", "corrupt" }, "\t")
     pushTarget.addon.DB.Syncer:OnAddonMessage("KRTLogSync", badChunk, "WHISPER", "Alice")
@@ -3909,7 +3863,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     assertEqual(#_G.KRT_Raids, 1, "expected push snapshot to import one raid")
     assertEqual(_G.KRT_Raids[1].players[1].name, "Alice", "expected imported push snapshot to preserve players")
     assertEqual(_G.KRT_Raids[1].loot[1].rollValue, 98, "expected imported push snapshot to preserve loot roll values")
-    assertEqual(_G.KRT_Raids[1].changes.Alice, "Fire", "expected imported push snapshot to preserve changes")
+    assertEqual(_G.KRT_Raids[1].changes.Alice, nil, "expected imported push snapshot to drop retired changes data")
 
     local syncTarget = newHarness()
     syncTarget:installRaidStore({
@@ -3930,7 +3884,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
             nextLootNid = 1,
         },
     })
-    syncTarget.Core.GetCurrentRaid = function()
+    syncTarget.Database.GetCurrentRaid = function()
         return 1
     end
     syncTarget.addon.IsInGroup = function()
@@ -3941,7 +3895,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     end
     syncTarget:load("!KRT/Modules/Comms.lua")
     syncTarget:load("!KRT/Modules/Base64.lua")
-    syncTarget:load("!KRT/Core/DBSyncer.lua")
+    syncTarget:load("!KRT/Database/DBSyncer.lua")
 
     local groupMessages = {}
     syncTarget.addon.Comms.Sync = function(prefix, payload)
@@ -3971,7 +3925,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     assertEqual(mergedRaid.raidNid, 700, "expected requested sync to preserve the local raid nid")
     assertEqual(mergedRaid.players[1].name, "Alice", "expected requested sync to merge players")
     assertEqual(mergedRaid.loot[1].lootNid, 101, "expected requested sync to merge loot by nid")
-    assertEqual(mergedRaid.changes.Alice, "Fire", "expected requested sync to merge changes")
+    assertEqual(mergedRaid.changes.Alice, nil, "expected requested sync to ignore retired changes data")
     assertTrue(syncTarget.addon.DB.Syncer._pendingRequests[syncRequestId] == nil, "expected successful sync merge to complete the pending request")
 end)
 
@@ -4123,7 +4077,7 @@ test("logger view lists only bosses attended by selected raid player", function(
     h:load("!KRT/Services/Logger/Store.lua")
     h:load("!KRT/Services/Logger/View.lua")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     local rows = {}
     h.addon.Services.Logger.View:GetPlayerBossParticipationList(rows, raid, 1)
 
@@ -4174,10 +4128,10 @@ test("logger updates duplicate item entries by lootNid only", function()
             nextLootNid = 103,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     h:load("!KRT/Services/Logger/Store.lua")
@@ -4186,7 +4140,7 @@ test("logger updates duplicate item entries by lootNid only", function()
     h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
 
     local request = {
         lootNid = 102,
@@ -4258,13 +4212,13 @@ test("logger actions resolve edit winner against boss attendees", function()
     assertEqual(winner, "Bob", "expected editor winner resolution to use boss attendees")
 end)
 
-test("loot context helpers stay service-owned without Core backdoor", function()
+test("loot context helpers stay service-owned without Database backdoor", function()
     local h = newHarness()
 
     h:load("!KRT/Services/Loot.lua")
 
     assertTrue(type(h.addon.Services.Loot._Context) == "table", "expected service-owned loot context helpers")
-    assertTrue(h.addon.Core._LootContext == nil, "expected no Core loot context backdoor")
+    assertTrue(h.addon.Database._LootContext == nil, "expected no Database loot context backdoor")
 end)
 
 test("loot workflow shadow state records transitions and recent receipts", function()
@@ -4414,10 +4368,10 @@ test("trade-only loot creates a reusable lootNid", function()
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
 
@@ -4446,7 +4400,7 @@ test("trade-only loot creates a reusable lootNid", function()
     local ok = request.ok
     assertTrue(ok == true, "expected logger update to reuse trade-only lootNid")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(raid.loot[1].lootNid, lootNid, "expected trade-only entry to keep its lootNid")
     assertEqual(raid.loot[1].rollType, h.rollTypes.RESERVED, "expected logger update to mutate same entry")
     assertEqual(raid.loot[1].rollValue, 77, "expected logger update to keep same entry")
@@ -4477,7 +4431,7 @@ test("trade-only loot reuses matching fallback rows instead of duplicating", fun
     local first = Loot:LogTradeOnlyLoot(link, "Trader", h.rollTypes.MAINSPEC, 91, 1, "TRADE_ONLY", 1, 0, "ROLL:MERGE")
     local second = Loot:LogTradeOnlyLoot(link, "Trader", h.rollTypes.MAINSPEC, 97, 1, "TRADE_ONLY", 1, 0, "ROLL:MERGE")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(first, second, "expected matching trade-only fallback to reuse the original lootNid")
     assertEqual(#raid.loot, 1, "expected matching trade-only fallback to avoid duplicate records")
     assertEqual(raid.loot[1].rollValue, 97, "expected reused fallback row to keep the stronger resolved roll value")
@@ -4504,7 +4458,7 @@ test("trade-only loot append patches runtime without full cache invalidation", f
     })
     h.addon.State.currentRaid = 1
     h:load("!KRT/Services/Raid.lua")
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     local runtimeBefore = h.store:EnsureRaidRuntime(raid)
 
     local lootNid = h.addon.Services.Loot:LogTradeOnlyLoot(link, "Alice", h.rollTypes.MAINSPEC, 98, 1, "TRADE_ONLY_TEST", 1, 10, "roll-session-1")
@@ -4799,10 +4753,10 @@ test("group loot need selections log passive NE history on loot receipt", functi
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -4828,7 +4782,7 @@ test("group loot need selections log passive NE history on loot receipt", functi
 
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected group loot receipt to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected queued need selection to classify the loot as NE")
     assertEqual(raid.loot[1].rollValue, 0, "expected passive group loot entries to default rollValue to 0")
@@ -4870,7 +4824,7 @@ test("loot receipts without scoped context fall back to trash", function()
 
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 2, "expected missing scoped context to create a TrashMob bucket")
     assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected loot fallback to create the canonical TrashMob boss entry")
     assertEqual(raid.loot[1].bossNid, 11, "expected loot without scoped context to attach to TrashMob")
@@ -4919,14 +4873,14 @@ test("loot receipts reuse short-lived boss event context even if lastBoss is cle
     local Raid = h.addon.Services.Raid
 
     assertEqual(Raid:AddBoss("Sapphiron"), 1, "expected the boss event to materialize a boss kill")
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
 
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected event-context recovery to reuse the boss kill instead of creating TrashMob")
     assertEqual(raid.loot[1].bossNid, 1, "expected loot logging to attach to the boss carried by the event context")
-    assertEqual(h.Core.GetLastBoss(), 1, "expected event-context recovery to restore lastBoss after an explicit clear")
+    assertEqual(h.Database.GetLastBoss(), 1, "expected event-context recovery to restore lastBoss after an explicit clear")
 end)
 
 test("loot window snapshot keeps first boss loot after event context expires", function()
@@ -4986,10 +4940,10 @@ test("loot window snapshot keeps first boss loot after event context expires", f
     currentTime = 1040
     h.feature.lootState.opened = true
     h.feature.raidState.bossEventContext = nil
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected the first delayed boss loot to avoid creating TrashMob")
     assertEqual(raid.loot[1].bossNid, 1, "expected the delayed first boss loot to reuse the window snapshot")
 end)
@@ -5062,7 +5016,7 @@ test("loot window source persists boss snapshot metadata into loot rows", functi
     currentTime = 1006
     Raid:AddLoot("source-loot-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected the boss loot receipt to log one row")
     assertTrue(type(raid.loot[1].lootSource) == "table", "expected the logged loot row to persist lootSource metadata")
     assertEqual(raid.loot[1].lootSource.kind, "boss", "expected the logged loot row to keep the boss source kind")
@@ -5123,10 +5077,10 @@ test("loot window keeps boss association for later boss items after event contex
     Raid:AddLoot("loot-receive-first")
 
     currentTime = 1031
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
     Raid:AddLoot("loot-receive-second")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected later boss loot in the same window to avoid creating TrashMob")
     assertEqual(#raid.loot, 2, "expected both boss loot items to be recorded")
     assertEqual(raid.loot[1].bossNid, 1, "expected the first boss loot item to attach to the boss")
@@ -5195,7 +5149,7 @@ test("trade-only loot reuses boss context captured for the award session", funct
     currentTime = 1045
     local lootNid = Raid:LogTradeOnlyLoot(link, "Tester", h.rollTypes.HOLD, 0, 1, "TRADE_ONLY_TEST", 1, nil, "RS:trade")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertTrue((tonumber(lootNid) or 0) > 0, "expected the trade-only path to create a loot entry")
     assertEqual(#raid.loot, 1, "expected the trade-only path to create one loot entry")
     assertEqual(raid.loot[1].bossNid, 1, "expected the trade-only path to reuse the session boss context")
@@ -5279,17 +5233,17 @@ test("reopening a partially looted boss corpse after trash reuses the original b
     h.feature.lootState.opened = true
     currentTime = 1040
     h.feature.raidState.bossEventContext = nil
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
     Raid:AddLoot("trash-loot-one")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected trash loot in the middle to be recorded")
     assertEqual(raid.loot[1].bossNid, 2, "expected the interleaved trash loot to use TrashMob")
 
     Raid:ClearLootWindowBossContext()
     currentTime = 1025
     h.feature.raidState.bossEventContext = nil
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
     assertEqual(
         Raid:_EnsureLootWindowItemContext(1, {
             { itemKey = bossKey3, count = 1 },
@@ -5396,7 +5350,7 @@ test("loot window opened on trash blocks recent boss event recovery", function()
 
     Raid:AddLoot("trash-loot-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 2, "expected trash loot to create a TrashMob bucket instead of reusing the boss")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected the original boss entry to stay intact")
     assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected the opened trash corpse to stay on TrashMob")
@@ -5493,7 +5447,7 @@ test("loot window source classifies blocked non-boss opens as trash", function()
     h.feature.lootState.opened = true
     Raid:AddLoot("trash-source-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(raid.loot[1].lootSource.kind, "trash", "expected trash loot rows to persist the trash source kind")
     assertEqual(raid.loot[1].lootSource.bossNid, 1, "expected trash loot rows to bind lootSource to the TrashMob boss bucket")
     assertEqual(raid.loot[1].lootSource.sourceNpcId, 0, "expected fallback trash provenance to avoid stale source npc metadata")
@@ -5583,7 +5537,7 @@ test("loot window recent trash death blocks boss event recovery without unit pro
     h.feature.lootState.opened = true
     Raid:AddLoot("recent-trash-loot-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 2, "expected recent trash loot to create a TrashMob bucket")
     assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected recent trash loot to avoid the boss context")
     assertEqual(raid.loot[1].bossNid, 2, "expected recent trash loot to bind to TrashMob")
@@ -5706,7 +5660,7 @@ test("loot window recent boss death resolves boss context without raid target pr
     h.feature.lootState.opened = true
     Raid:AddLoot("boss-source-loot-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected recent boss death resolution to create one boss kill")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected the boss kill to use the death context boss name")
     assertEqual(raid.bossKills[1].sourceNpcId, 15953, "expected the boss kill to preserve the death context npc id")
@@ -5790,7 +5744,7 @@ test("loot window mouseover boss resolves boss context without event recovery", 
 
     currentTime = 1040
     h.feature.raidState.bossEventContext = nil
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
     h.feature.lootState.opened = true
 
     assertEqual(
@@ -5806,7 +5760,7 @@ test("loot window mouseover boss resolves boss context without event recovery", 
 
     Raid:AddLoot("boss-loot-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected no TrashMob fallback for a boss corpse open")
     assertEqual(raid.loot[1].bossNid, 1, "expected the loot to stay attached to Grand Widow Faerlina")
 end)
@@ -5900,7 +5854,7 @@ test("loot window does not scan dead raid targets during source recovery", funct
     local Raid = h.addon.Services.Raid
 
     h.feature.raidState.bossEventContext = nil
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
     h.feature.lootState.opened = true
 
     assertEqual(
@@ -5922,7 +5876,7 @@ test("loot window does not scan dead raid targets during source recovery", funct
 
     Raid:AddLoot("raid-target-boss-loot-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected raid target-only source recovery to avoid creating a boss kill")
     assertEqual(raid.bossKills[1].name, "_TrashMob_", "expected raid target-only source recovery to fall back to trash")
     assertEqual(#raid.loot, 1, "expected raid target boss loot to log one row")
@@ -5996,7 +5950,7 @@ test("loot window source marks context-free openings as object", function()
     h.feature.lootState.opened = true
     Raid:AddLoot("object-source-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected object-source loot to log one row")
     assertEqual(raid.loot[1].lootSource.kind, "trash", "expected object-source loot rows to persist fallback trash provenance")
     assertEqual(raid.loot[1].lootSource.bossNid, 1, "expected object-source loot rows to bind fallback provenance to the TrashMob boss nid")
@@ -6069,7 +6023,7 @@ test("loot receipts do not recover boss context from the current target", functi
 
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected loot logging to fall back to TrashMob when no scoped boss context exists")
     assertEqual(raid.bossKills[1].name, "_TrashMob_", "expected target heuristic recovery to stay disabled")
     assertEqual(raid.loot[1].bossNid, 1, "expected loot without scoped context to attach to TrashMob")
@@ -6127,12 +6081,12 @@ test("group loot sessions skip boss association without relying on lastBoss", fu
 
     Raid:AddPassiveLootRoll(91, 45000)
     h.feature.raidState.bossEventContext = nil
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
 
     assertEqual(Raid:AddGroupLootMessage("greed-win-self"), "winner", "expected passive winner message to be recognized")
     Raid:AddLoot("greed-win-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating TrashMob")
     assertEqual(raid.loot[1].bossNid, 0, "expected passive group loot to avoid source binding")
     assertEqual(raid.loot[1].lootSource, nil, "expected passive group loot to avoid source provenance")
@@ -6182,7 +6136,7 @@ test("passive group loot parsed winner result is reused when logging loot", func
     assertEqual(observedType, "winner", "expected passive winner message to be recognized")
     Loot:AddLoot("greed-win-self", nil, nil, parsedLoot)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected parsed winner message to be logged")
     assertEqual(raid.loot[1].rollValue, 88, "expected parsed winner roll value to be reused")
     assertEqual(winnerPatternCalls, 1, "expected winner message to be parsed once across observe and log")
@@ -6270,7 +6224,7 @@ test("passive group loot failed winner parse is reused when logging normal loot"
     assertEqual(observedType, nil, "expected normal loot receipt to avoid passive winner classification")
     Loot:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected normal receipt to be logged")
     assertEqual(winnerPatternCalls, 1, "expected failed passive winner parse to be reused by AddLoot")
 end)
@@ -6392,7 +6346,7 @@ test("passive group loot need greed and disenchant skip loot counter count calls
     assertEqual(observedType, "winner", "expected passive need winner to be observed")
     Loot:AddLoot("need-win-self", nil, nil, parsedLoot)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected passive need winner to still be logged")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected passive need winner to keep NE roll type")
     assertEqual(countCalls, 0, "expected uncounted passive group-loot roll types to avoid LootCounter count calls")
@@ -6445,7 +6399,7 @@ local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, messa
     local resolverCalls = {}
     local findSource = h.addon.LootSources.FindSource
     h.addon.LootSources.FindSource = function(activeItemId, context)
-        local raid = h.Core.EnsureRaidById(1)
+        local raid = h.Database.EnsureRaidById(1)
         resolverCalls[#resolverCalls + 1] = {
             itemId = activeItemId,
             context = context,
@@ -6471,7 +6425,7 @@ test("group loot source resolver attributes passive boss item from static source
     assertEqual(Loot:AddGroupLootMessage("resolver-boss-win"), "winner", "expected winner message")
     Raid:AddLoot("resolver-boss-win")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
     assertEqual(#raid.bossKills, 1, "expected passive group loot to create the static source boss")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected static source boss name")
@@ -6501,7 +6455,7 @@ test("group loot source resolver prefers static source over recent boss context"
         return currentTime
     end
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     raid.bossKills = {
         { bossNid = 10, name = "Sapphiron", time = 990 },
     }
@@ -6513,13 +6467,13 @@ test("group loot source resolver prefers static source over recent boss context"
         source = "UNIT_DIED",
         seenAt = currentTime,
     }
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
 
     Raid:AddPassiveLootRoll(305, 45000)
     assertEqual(Loot:AddGroupLootMessage("resolver-conflict-win"), "winner", "expected winner message")
     Raid:AddLoot("resolver-conflict-win")
 
-    raid = h.Core.EnsureRaidById(1)
+    raid = h.Database.EnsureRaidById(1)
     assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
     assertEqual(#raid.bossKills, 2, "expected passive group loot to add the static source boss")
     assertEqual(raid.bossKills[1].name, "Sapphiron", "expected stale context boss to stay intact")
@@ -6544,12 +6498,12 @@ test("group loot source resolver attributes passive trash item from static sourc
     assertEqual(Loot:AddGroupLootMessage("resolver-trash-win"), "winner", "expected winner message")
     Raid:AddLoot("resolver-trash-win")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
     assertEqual(#raid.bossKills, 1, "expected passive group loot to create the static trash source")
     assertEqual(raid.bossKills[1].name, "Naxxramas Cultist", "expected static trash source name")
     assertEqual(raid.bossKills[1].sourceKind, "trash", "expected static trash source kind")
-    assertEqual(h.Core.GetLastBoss(), nil, "expected named trash source not to become lastBoss")
+    assertEqual(h.Database.GetLastBoss(), nil, "expected named trash source not to become lastBoss")
     assertEqual(#raid.loot, 1, "expected trash item to create one loot row")
     assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected passive loot row to bind the static trash source")
     assertTrue(type(raid.loot[1].lootSource) == "table", "expected passive loot row to persist static source provenance")
@@ -6619,7 +6573,7 @@ test("group loot source resolver records shared static source for passive item",
     assertEqual(Loot:AddGroupLootMessage("resolver-ambiguous-win"), "winner", "expected winner message")
     Raid:AddLoot("resolver-ambiguous-win")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#resolverCalls, 2, "expected passive group loot to resolve both static source items")
     assertEqual(#raid.bossKills, 2, "expected passive group loot to create static source records")
     assertEqual(#raid.loot, 2, "expected seed and ambiguous item sources to create loot rows")
@@ -6652,7 +6606,7 @@ test("group loot source resolver records shared passive source despite recent co
         return currentTime
     end
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     raid.bossKills = {
         { bossNid = 10, name = "Grand Widow Faerlina", sourceNpcId = 15953, time = 990 },
     }
@@ -6664,13 +6618,13 @@ test("group loot source resolver records shared passive source despite recent co
         source = "UNIT_DIED",
         seenAt = currentTime,
     }
-    h.Core.SetLastBoss(nil)
+    h.Database.SetLastBoss(nil)
 
     Raid:AddPassiveLootRoll(306, 45000)
     assertEqual(Loot:AddGroupLootMessage("resolver-ambiguous-context-win"), "winner", "expected winner message")
     Raid:AddLoot("resolver-ambiguous-context-win")
 
-    raid = h.Core.EnsureRaidById(1)
+    raid = h.Database.EnsureRaidById(1)
     assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
     assertEqual(#raid.bossKills, 2, "expected passive group loot to add a shared static source record")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected recent context boss to stay intact")
@@ -6771,7 +6725,7 @@ test("group loot trash rolls do not inherit previous boss death context", functi
     assertEqual(Raid:AddGroupLootMessage("trash-greed-win-self"), "winner", "expected trash group loot winner to be recognized")
     Raid:AddLoot("trash-greed-win-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 2, "expected boss and trash group loot rows")
     assertEqual(raid.loot[1].bossNid, 0, "expected first group loot row to avoid source binding")
     assertEqual(raid.loot[1].lootSource, nil, "expected first group loot row to avoid source provenance")
@@ -6959,7 +6913,7 @@ test("trash UNIT_DIED without recent boss context is ignored", function()
     Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, ctx.trashGuid, "Naxxramas Cultist", 0)
 
     assertEqual(ctx.h.feature.raidState.recentLootDeathContext, nil, "expected irrelevant trash death to avoid seeding recent context")
-    assertEqual(#ctx.h.Core.EnsureRaidById(1).bossKills, 0, "expected irrelevant trash death to avoid creating boss kills")
+    assertEqual(#ctx.h.Database.EnsureRaidById(1).bossKills, 0, "expected irrelevant trash death to avoid creating boss kills")
 end)
 
 test("trash UNIT_DIED after expired boss context is ignored", function()
@@ -6972,7 +6926,7 @@ test("trash UNIT_DIED after expired boss context is ignored", function()
 
     local recent = ctx.h.feature.raidState.recentLootDeathContext
     assertTrue(recent == nil or recent.kind ~= "trash", "expected trash death after expired boss context to avoid seeding trash context")
-    assertEqual(#ctx.h.Core.EnsureRaidById(1).bossKills, 1, "expected expired boss context check to avoid creating TrashMob")
+    assertEqual(#ctx.h.Database.EnsureRaidById(1).bossKills, 1, "expected expired boss context check to avoid creating TrashMob")
 end)
 
 test("recent trash death is ignored by lightweight passive group loot", function()
@@ -6990,7 +6944,7 @@ test("recent trash death is ignored by lightweight passive group loot", function
     assertEqual(Raid:AddGroupLootMessage("recent-trash-greed-win-self"), "winner", "expected trash group loot winner to be recognized")
     Raid:AddLoot("recent-trash-greed-win-self")
 
-    local raid = ctx.h.Core.EnsureRaidById(1)
+    local raid = ctx.h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected one recent trash group-loot row")
     assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating a TrashMob bucket")
     assertEqual(raid.loot[1].bossNid, 0, "expected recent trash passive loot to avoid source binding")
@@ -7012,7 +6966,7 @@ test("trash burst context is ignored by lightweight passive group loot", functio
     assertEqual(Raid:AddGroupLootMessage("recent-trash-greed-win-self"), "winner", "expected throttled burst winner to be recognized")
     Raid:AddLoot("recent-trash-greed-win-self")
 
-    local raid = ctx.h.Core.EnsureRaidById(1)
+    local raid = ctx.h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected one throttled burst group-loot row")
     assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating a TrashMob bucket")
     assertEqual(raid.loot[1].bossNid, 0, "expected throttled burst passive loot to avoid source binding")
@@ -7032,7 +6986,7 @@ test("recent trash expiry does not restore source binding for lightweight passiv
     assertEqual(Raid:AddGroupLootMessage("recent-trash-greed-win-self"), "winner", "expected delayed group loot winner to be recognized")
     Raid:AddLoot("recent-trash-greed-win-self")
 
-    local raid = ctx.h.Core.EnsureRaidById(1)
+    local raid = ctx.h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected one delayed group-loot row")
     assertEqual(#raid.bossKills, 1, "expected expired recent trash context to avoid creating TrashMob")
     assertEqual(raid.loot[1].bossNid, 0, "expected delayed passive loot to avoid source binding")
@@ -7056,10 +7010,10 @@ test("group loot winner messages log passive GR history directly", function()
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -7081,7 +7035,7 @@ test("group loot winner messages log passive GR history directly", function()
     assertEqual(Raid:AddGroupLootMessage("greed-win-self"), "winner", "expected self greed winner message to be recognized")
     Raid:AddLoot("greed-win-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected self winner message to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.GREED, "expected self winner message to classify the loot as GR")
     assertEqual(raid.loot[1].rollValue, 88, "expected self winner message to preserve the greed roll value")
@@ -7176,7 +7130,7 @@ test("group loot logger skips green gem and recipe drops", function()
     Raid:AddGroupLootMessage("keep-win-self")
     Raid:AddLoot("keep-win-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected group loot logger to skip green gem and recipe drops")
     assertEqual(raid.loot[1].itemId, 91723, "expected group loot logger to keep normal blue equipment")
     assertEqual(raid.loot[1].rollValue, 88, "expected kept group loot to retain roll metadata")
@@ -7199,10 +7153,10 @@ test("group loot direct winner logs suppress later duplicate loot receipts", fun
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -7229,7 +7183,7 @@ test("group loot direct winner logs suppress later duplicate loot receipts", fun
     Raid:AddLoot("need-win-self")
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected later duplicate loot receipt to be suppressed after direct winner logging")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected direct winner log to preserve the need type")
     assertEqual(raid.loot[1].rollValue, 96, "expected direct winner log to preserve the numeric roll value")
@@ -7252,10 +7206,10 @@ test("group loot self roll lines preserve rollValue on direct passive winners", 
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -7282,7 +7236,7 @@ test("group loot self roll lines preserve rollValue on direct passive winners", 
 
     Raid:AddLoot("need-win-self-no-value")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected self direct winner to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected self roll line to preserve the need type")
     assertEqual(raid.loot[1].rollValue, 96, "expected self roll line to preserve the numeric roll value")
@@ -7305,10 +7259,10 @@ test("late self roll lines backfill rollValue on already logged passive winners"
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -7335,7 +7289,7 @@ test("late self roll lines backfill rollValue on already logged passive winners"
 
     assertEqual(Raid:AddGroupLootMessage("need-roll-self-late-96"), "selection", "expected late self roll line to be observed")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected backfill flow to keep a single loot entry")
     assertEqual(raid.loot[1].rollValue, 96, "expected late self roll line to backfill the missing roll value")
 end)
@@ -7357,10 +7311,10 @@ test("group loot raw need and won messages log passive NE history", function()
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -7379,7 +7333,7 @@ test("group loot raw need and won messages log passive NE history", function()
 
     Raid:AddLoot("You won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected raw win message to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected raw need selection to classify the loot as NE")
 end)
@@ -7402,10 +7356,10 @@ test("raw winner messages do not poison later duplicate passive receipts", funct
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -7428,7 +7382,7 @@ test("raw winner messages do not poison later duplicate passive receipts", funct
     assertEqual(Raid:AddGroupLootMessage("You won: " .. link), "winner", "expected second raw winner message to be observed")
     Raid:AddLoot("You won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 2, "expected duplicate raw win messages to create two loot entries")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected first duplicate raw win to keep NE type")
     assertEqual(raid.loot[2].rollType, h.rollTypes.NEED, "expected second duplicate raw win to keep NE type")
@@ -8159,10 +8113,10 @@ test("group loot rolled lines queue winner type before raw won message", functio
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -8184,7 +8138,7 @@ test("group loot rolled lines queue winner type before raw won message", functio
 
     Raid:AddLoot("Tester won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected raw winner line to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected rolled need line to preserve NE type")
     assertEqual(raid.loot[1].rollValue, 45, "expected rolled need line to preserve the rolled value")
@@ -8207,10 +8161,10 @@ test("raw group loot roll lines preserve numeric rollValue", function()
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -8230,7 +8184,7 @@ test("raw group loot roll lines preserve numeric rollValue", function()
 
     Raid:AddLoot("Tester won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected raw need roll flow to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected raw need roll flow to preserve NE type")
     assertEqual(raid.loot[1].rollValue, 67, "expected raw need roll flow to preserve numeric rollValue")
@@ -8253,10 +8207,10 @@ test("localized group loot patterns preserve numeric rollValue without english r
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -8281,7 +8235,7 @@ test("localized group loot patterns preserve numeric rollValue without english r
 
     Raid:AddLoot("Tester ha vinto: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected localized group loot flow to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected localized group loot flow to preserve NE type")
     assertEqual(raid.loot[1].rollValue, 67, "expected localized group loot flow to preserve numeric rollValue")
@@ -8304,10 +8258,10 @@ test("loot pending awards upgrade selection entries with later group roll values
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -8330,7 +8284,7 @@ test("loot pending awards upgrade selection entries with later group roll values
 
     Raid:AddLoot("You won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected upgraded pending award to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected upgraded pending award to keep NE type")
     assertEqual(raid.loot[1].rollValue, 96, "expected upgraded pending award to preserve the numeric rollValue")
@@ -8355,10 +8309,10 @@ test("group loot pending awards fall back to 60 seconds without roll metadata", 
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -8385,7 +8339,7 @@ test("group loot pending awards fall back to 60 seconds without roll metadata", 
     now = now + 59
     Raid:AddLoot("You won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected delayed group-loot receipt to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected delayed group-loot receipt to keep the queued NE type")
 end)
@@ -8409,10 +8363,10 @@ test("start loot roll extends passive group loot expiry beyond the fallback ttl"
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -8446,7 +8400,7 @@ test("start loot roll extends passive group loot expiry beyond the fallback ttl"
     now = now + 70
     Raid:AddLoot("You won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected tracked passive group-loot receipt to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected tracked passive group-loot receipt to keep the queued NE type")
     assertEqual(raid.loot[1].rollSessionId, "GL:1", "expected START_LOOT_ROLL tracking to stamp a passive roll session id")
@@ -8514,7 +8468,7 @@ test("loot winner dispatch forwards passive winners immediately", function()
 
     h.addon.State.frames = { main = mainFrame }
     h:load("!KRT/Init.lua")
-    h.addon.Core.SetCurrentRaid(1)
+    h.addon.Database.SetCurrentRaid(1)
     h.addon.Services.Raid = {
         CanObservePassiveLoot = function()
             return true
@@ -8625,7 +8579,7 @@ test("start loot roll dispatch forwards to the loot service", function()
 
     h.addon.State.frames = { main = mainFrame }
     h:load("!KRT/Init.lua")
-    h.addon.Core.SetCurrentRaid(1)
+    h.addon.Database.SetCurrentRaid(1)
     h.addon.Services.Loot = {
         AddPassiveLootRoll = function(_, rollId, rollTime)
             observed.rollId = rollId
@@ -8702,7 +8656,7 @@ test("chat msg addon dispatch gives loot distribution messages to the loot servi
             return prefix == "KRTDist"
         end,
     }
-    h.Core.GetSyncer = function()
+    h.Database.GetSyncer = function()
         return {
             OnAddonMessage = function()
                 syncerCalls = syncerCalls + 1
@@ -8921,10 +8875,10 @@ test("master loot add loot prefers the active roll session pending award", funct
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -8962,7 +8916,7 @@ test("master loot add loot prefers the active roll session pending award", funct
 
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected master loot receipt to create one loot entry")
     assertEqual(raid.loot[1].rollType, h.rollTypes.OFFSPEC, "expected master loot receipt to use the pending award from the active roll session")
     assertEqual(raid.loot[1].rollValue, 12, "expected master loot receipt to keep the active roll session rollValue")
@@ -8987,10 +8941,10 @@ test("master loot receipt does not double credit a pre-counted pending award", f
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -9016,7 +8970,7 @@ test("master loot receipt does not double credit a pre-counted pending award", f
 
     Raid:AddLoot("loot-receive-self")
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     local playerNid = Raid:GetPlayerID("Tester", 1)
     assertEqual(#raid.loot, 1, "expected master loot receipt to still create a loot entry")
     assertEqual(Raid:GetPlayerLootCountByNid(playerNid, "ms", 1), 1, "expected observed loot chat to avoid double-crediting the pre-counted award")
@@ -9067,7 +9021,7 @@ test("passive group loot selections keep duplicate item sessions separate by rol
     local link = h.registerItem(91862, "Duplicated Sigil")
     local now = 1000
 
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     _G.GetLootMethod = function()
@@ -9117,7 +9071,7 @@ test("passive roll sessions keep native roll metadata", function()
     local link = h.registerItem(91865, "Native Roll Sigil", 4, "Interface\\Icons\\INV_Misc_Rune_01")
     local now = 1000
 
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     _G.GetLootMethod = function()
@@ -9162,7 +9116,7 @@ test("passive winner context includes roll session details", function()
     local link = h.registerItem(91866, "Context Sigil")
     local now = 1000
 
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     _G.GetLootMethod = function()
@@ -9224,10 +9178,10 @@ test("ambiguous duplicate passive rolls stay sessionless without roll ids", func
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -9267,7 +9221,7 @@ test("ambiguous duplicate passive rolls stay sessionless without roll ids", func
     Raid:AddLoot("Tester won: " .. link)
     Raid:AddLoot("Tester won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 2, "expected both ambiguous duplicate passive rolls to log")
     assertEqual(raid.loot[1].rollValue, 91, "expected first ambiguous duplicate to keep the first numeric roll")
     assertEqual(raid.loot[2].rollValue, 87, "expected second ambiguous duplicate to keep the second numeric roll")
@@ -9294,10 +9248,10 @@ test("passive duplicate receipts prefer resolved winner values over zero placeho
             nextLootNid = 1,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
-    h.Core.GetLastBoss = function()
+    h.Database.GetLastBoss = function()
         return 10
     end
     _G.GetLootMethod = function()
@@ -9344,7 +9298,7 @@ test("passive duplicate receipts prefer resolved winner values over zero placeho
     assertEqual(Raid:AddGroupLootMessage("need-win-self-1"), "winner", "expected first duplicate winner to resolve second")
     Raid:AddLoot("You won: " .. link)
 
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 2, "expected both resolved duplicate passive receipts to log")
     assertEqual(raid.loot[1].rollValue, 97, "expected first receipt to consume the resolved winner value instead of a zero placeholder")
     assertEqual(raid.loot[2].rollValue, 99, "expected second receipt to keep the later resolved winner value")
@@ -9386,13 +9340,13 @@ test("held loot lookup skips consumed duplicates and returns the next matching h
             nextLootNid = 3,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
 
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
-    local raid = h.Core.EnsureRaidById(1)
+    local raid = h.Database.EnsureRaidById(1)
 
     assertEqual(Raid:GetHeldLootNid(link, 1, "Tester", 0), 2, "expected newest matching hold row to be selected first")
 
@@ -9442,7 +9396,7 @@ test("loot tracking snapshot exposes runtime and authoritative loot state", func
             nextLootNid = 8,
         },
     })
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h.addon.Services.Raid = {
@@ -10193,12 +10147,12 @@ test("harness raid capability service mirrors shared loot and leadership policy"
     })
 
     local lootState = raid:GetCapabilityState("loot")
-    local changesState = raid:GetCapabilityState("changes_broadcast")
+    local counterState = raid:GetCapabilityState("loot_counter_broadcast")
 
     assertEqual(lootState.allowed, false, "expected loot capability to require master looter in raid")
     assertEqual(lootState.reason, "missing_master_looter", "expected missing ML denial reason")
-    assertEqual(changesState.allowed, false, "expected changes broadcast to require raid leadership")
-    assertEqual(changesState.reason, "missing_leadership", "expected leadership denial reason")
+    assertEqual(counterState.allowed, false, "expected counter broadcast to require raid leadership")
+    assertEqual(counterState.reason, "missing_leadership", "expected leadership denial reason")
     assertTrue(raid:EnsureMasterOnlyAccess() ~= true, "expected shared master-only guard to block when loot access is denied")
     assertContains(h.logs.warn, "L.WarnMLOnlyMode", "expected guard denial to use the shared warning")
 
@@ -10209,7 +10163,7 @@ test("harness raid capability service mirrors shared loot and leadership policy"
     })
 
     assertTrue(raid:CanUseCapability("loot") == true, "expected ML ownership to re-enable loot capability")
-    assertTrue(raid:CanUseCapability("changes_broadcast") == true, "expected raid leadership to re-enable changes broadcast")
+    assertTrue(raid:CanUseCapability("loot_counter_broadcast") == true, "expected raid leadership to re-enable counter broadcast")
     assertTrue(raid:CanUseCapability("ready_check") == true, "expected leadership to re-enable ready checks")
 end)
 
@@ -10823,7 +10777,7 @@ test("master dropdown click uses UIDropDown owner/value arguments", function()
         return nil
     end
 
-    h.Core.GetRaidStoreOrNil = function()
+    h.Database.GetRaidStoreOrNil = function()
         return {
             GetRaidByIndex = function(_, raidId)
                 if raidId == 1 then
@@ -12587,7 +12541,7 @@ test("reserves format supports filtering to current raid players", function()
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h:load("!KRT/Services/Reserves.lua")
@@ -12648,7 +12602,7 @@ test("reserves expose item and roster match context for master loot", function()
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h:load("!KRT/Services/Reserves.lua")
@@ -12713,7 +12667,7 @@ test("reserves name match report suggests read-only softres roster name fixes", 
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h:load("!KRT/Services/Reserves.lua")
@@ -12764,7 +12718,7 @@ test("reserves manual aliases resolve SoftRes eligibility without mutating impor
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
 
@@ -12804,7 +12758,7 @@ test("reserves alias readiness report reports applied aliases separately from su
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
 
@@ -12861,7 +12815,7 @@ test("reserves readiness report consolidates item roster and name-match context"
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h:load("!KRT/Services/Reserves.lua")
@@ -12926,7 +12880,7 @@ test("reserves readiness report exposes read-only health audit signals", functio
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h:load("!KRT/Services/Reserves.lua")
@@ -12964,7 +12918,7 @@ test("reserves readiness report marks no-data health as error", function()
         end,
     }
     h.feature.Services = h.addon.Services
-    h.Core.GetCurrentRaid = function()
+    h.Database.GetCurrentRaid = function()
         return 1
     end
     h:load("!KRT/Services/Reserves.lua")
@@ -13221,10 +13175,10 @@ test("slash bug prints local diagnostic summary", function()
         end
         return nil
     end
-    h.Core.GetRaidSchemaVersion = function()
+    h.Database.GetRaidSchemaVersion = function()
         return 5
     end
-    h.Core.GetRaidStoreOrNil = function()
+    h.Database.GetRaidStoreOrNil = function()
         return {
             GetAllRaids = function()
                 return _G.KRT_Raids
@@ -13280,7 +13234,7 @@ test("slash version prints local addon compatibility summary", function()
         end
         return nil
     end
-    h.Core.GetRaidSchemaVersion = function()
+    h.Database.GetRaidSchemaVersion = function()
         return 5
     end
 
@@ -13322,10 +13276,10 @@ test("comms version check sends group request and records acknowledgements", fun
         end
         return nil
     end
-    h.Core.GetRaidSchemaVersion = function()
+    h.Database.GetRaidSchemaVersion = function()
         return 5
     end
-    h.Core.GetSyncer = function()
+    h.Database.GetSyncer = function()
         return {
             GetProtocolVersion = function()
                 return 2
@@ -13370,7 +13324,7 @@ test("comms version check replies to requests by whisper", function()
         end
         return nil
     end
-    h.Core.GetRaidSchemaVersion = function()
+    h.Database.GetRaidSchemaVersion = function()
         return 5
     end
 
@@ -13398,10 +13352,10 @@ test("comms exposes shared version metadata", function()
         end
         return nil
     end
-    h.Core.GetRaidSchemaVersion = function()
+    h.Database.GetRaidSchemaVersion = function()
         return 5
     end
-    h.Core.GetSyncer = function()
+    h.Database.GetSyncer = function()
         return {
             GetProtocolVersion = function()
                 return 2

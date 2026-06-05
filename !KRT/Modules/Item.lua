@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- notes: consolidated item helpers + tooltip-based item metadata probing
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 addon.Item = addon.Item or feature.Item or {}
 local Item = addon.Item

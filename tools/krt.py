@@ -1208,7 +1208,7 @@ def dev_stack_status(args: argparse.Namespace) -> int:
         warnings.append(
             {
                 "code": "powershell_missing",
-                "message": "Some direct scripts still require PowerShell. Core flows now use tools/krt.py.",
+                "message": "Some direct scripts still require PowerShell. Database flows now use tools/krt.py.",
             }
         )
     if verification and verification.get("status") == "unavailable":

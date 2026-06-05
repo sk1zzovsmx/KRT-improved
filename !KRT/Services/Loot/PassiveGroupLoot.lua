@@ -4,11 +4,11 @@
 -- exports: addon.Services.Loot._PassiveGroupLoot
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
 local C = feature.C
-local Core = feature.Core
+local Database = feature.Database
 local Item = feature.Item
 local Strings = feature.Strings
 local raidState = feature.raidState
@@ -470,7 +470,7 @@ local function parseGroupLootSelection(msg, rule)
     if values then
         local _, itemLink, numbers = extractGroupLootPatternValues(values)
         if itemLink then
-            return Core.GetPlayerName(), itemLink, numbers[1] or nil
+            return Database.GetPlayerName(), itemLink, numbers[1] or nil
         end
     end
 
@@ -497,7 +497,7 @@ local function parseGroupLootRollPattern(msg, pattern, rollType, isSelf)
         return nil
     end
     if isSelf then
-        playerName = Core.GetPlayerName()
+        playerName = Database.GetPlayerName()
     end
     if not playerName then
         return nil
@@ -529,7 +529,7 @@ local function parseGroupLootWinnerPattern(msg, groupPattern, selfPattern, rollT
         local _, itemLink, numbers = extractGroupLootPatternValues(values)
         local rollId, rollValue = resolveGroupLootNumericFields(numbers, "roll_value")
         if itemLink then
-            return Core.GetPlayerName(), itemLink, rollType, rollValue, rollId
+            return Database.GetPlayerName(), itemLink, rollType, rollValue, rollId
         end
     end
 
@@ -559,10 +559,10 @@ local function parseGroupLootWinner(msg)
 
     local values = tryDeformatValues(LOOT_ROLL_YOU_WON, msg)
     if values and values.n >= 2 then
-        return Core.GetPlayerName(), values[2], nil, nil, tonumber(values[1]) or nil
+        return Database.GetPlayerName(), values[2], nil, nil, tonumber(values[1]) or nil
     end
     if values and values.n >= 1 then
-        return Core.GetPlayerName(), values[1], nil, nil, nil
+        return Database.GetPlayerName(), values[1], nil, nil, nil
     end
 
     values = tryDeformatValues(LOOT_ROLL_WON, msg)
@@ -839,7 +839,7 @@ function PassiveGroupLoot.ResolvePassivePendingAwardContext(itemLink, rollId)
 end
 
 function PassiveGroupLoot.AddPassiveLootRoll(owner, rollId, rollTime)
-    local currentRaidId = Core.GetCurrentRaid()
+    local currentRaidId = Database.GetCurrentRaid()
     if not currentRaidId or not PassiveGroupLoot.IsPassiveGroupLootMethod() then
         return nil
     end

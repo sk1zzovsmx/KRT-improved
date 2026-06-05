@@ -1,12 +1,12 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addonName = ...
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local type, tostring = type, tostring
 local pcall = pcall
@@ -20,7 +20,7 @@ local Comms = addon.Comms
 Comms._Payload = Comms._Payload or {}
 local Payload = Comms._Payload
 local L = feature.L
-local Core = feature.Core
+local Database = feature.Database
 
 -- ----- Internal state ----- --
 
@@ -132,7 +132,7 @@ local function getAddonMetadata(key, fallback)
 end
 
 local function getRaidSchemaVersion()
-    local getter = Core and Core.GetRaidSchemaVersion
+    local getter = Database and Database.GetRaidSchemaVersion
     if type(getter) == "function" then
         return tostring(getter() or getUnknownText())
     end
@@ -140,7 +140,7 @@ local function getRaidSchemaVersion()
 end
 
 local function getSyncProtocolVersion()
-    local syncer = Core and Core.GetSyncer and Core.GetSyncer() or nil
+    local syncer = Database and Database.GetSyncer and Database.GetSyncer() or nil
     if syncer and type(syncer.GetProtocolVersion) == "function" then
         return tostring(syncer:GetProtocolVersion() or getUnknownText())
     end

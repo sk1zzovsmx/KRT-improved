@@ -64,10 +64,10 @@ assertContains(
 )
 assertContains(registrySource, 'ModuleRegistry.SetLoaded("Modules/ModuleRegistry")', "ModuleRegistry must mark itself loaded after consuming pending bootstrap loads")
 assertBefore(toc, "Modules\\ModuleRegistry.lua", "Modules\\Bus.lua")
-assertBefore(toc, "Modules\\Bus.lua", "Core\\DBRaidMigrations.lua")
-assertBefore(toc, "Modules\\Bus.lua", "Core\\DBRaidStore.lua")
-assertBefore(toc, "Modules\\Bus.lua", "Core\\DBRaidQueries.lua")
-assertBefore(toc, "Modules\\Bus.lua", "Core\\DBRaidValidator.lua")
+assertBefore(toc, "Modules\\Bus.lua", "Database\\DBRaidMigrations.lua")
+assertBefore(toc, "Modules\\Bus.lua", "Database\\DBRaidStore.lua")
+assertBefore(toc, "Modules\\Bus.lua", "Database\\DBRaidQueries.lua")
+assertBefore(toc, "Modules\\Bus.lua", "Database\\DBRaidValidator.lua")
 
 for i = 1, #expectedModules do
     local expected = expectedModules[i]
@@ -80,7 +80,7 @@ for i = 1, #expectedModules do
 end
 
 local addon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,

@@ -1,5 +1,7 @@
 Makefile
 .superpowers/
+.venv/
+dist/
 *.zip
 *.sha256
 *.sublime-project

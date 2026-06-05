@@ -70,7 +70,7 @@ function Add-ControllerOwnershipCheck {
     foreach ($line in Get-Content $FilePath) {
         $lineNo = $lineNo + 1
 
-        $parentMatches = [regex]::Matches($line, 'addon\.(Changes|Master|Warnings|Logger|Spammer)\b')
+        $parentMatches = [regex]::Matches($line, 'addon\.(Master|Warnings|Logger|Spammer)\b')
         foreach ($match in $parentMatches) {
             $parentName = $match.Groups[1].Value
             if ($parentName -ne $Owner) {
@@ -78,7 +78,7 @@ function Add-ControllerOwnershipCheck {
             }
         }
 
-        $frameMatches = [regex]::Matches($line, 'KRT(Changes|Master|Warnings|Logger|Spammer)\b')
+        $frameMatches = [regex]::Matches($line, 'KRT(Master|Warnings|Logger|Spammer)\b')
         foreach ($match in $frameMatches) {
             $frameOwner = $match.Groups[1].Value
             if ($frameOwner -ne $Owner) {
@@ -104,19 +104,19 @@ function Add-ControllerOwnershipCheck {
 
 Add-RgCheck `
     -Name "Service direct parent refs" `
-    -Pattern 'addon\.(Changes|Master|Warnings|Logger|Spammer)\b' `
+    -Pattern 'addon\.(Master|Warnings|Logger|Spammer)\b' `
     -Path "!KRT/Services" `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
     -Name "Service parent frame refs" `
-    -Pattern 'addon\.(Master|Logger)\.frame|KRT(Master|Logger|Warnings|Changes|Spammer)' `
+    -Pattern 'addon\.(Master|Logger)\.frame|KRT(Master|Logger|Warnings|Spammer)' `
     -Path "!KRT/Services" `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
     -Name "Service hooksecurefunc parent refs" `
-    -Pattern 'hooksecurefunc\(addon\.(Master|Logger|Warnings|Changes|Spammer)' `
+    -Pattern 'hooksecurefunc\(addon\.(Master|Logger|Warnings|Spammer)' `
     -Path "!KRT/Services" `
     -ExtraArgs @("--glob", "*.lua")
 
@@ -144,19 +144,19 @@ Add-RgRequireMatch `
     -Path "!KRT/Modules/Item.lua"
 
 Add-RgCheck `
-    -Name "Core parent frame leak" `
+    -Name "Database parent frame leak" `
     -Pattern 'addon\.Master\.frame|KRTMaster' `
     -Path "!KRT/Init.lua"
 
 Add-RgCheck `
-    -Name "Core.GetFeatureShared outside Init.lua" `
-    -Pattern 'function\s+Core\.(GetFeatureShared|getFeatureShared)' `
+    -Name "Database.GetFeatureShared outside Init.lua" `
+    -Pattern 'function\s+Database\.(GetFeatureShared|getFeatureShared)' `
     -Path "!KRT" `
     -ExtraArgs @("--glob", "*.lua", "--glob", "!Init.lua", "--glob", "!**/Init.lua")
 
 Add-RgCheck `
-    -Name "Core.EnsureLootRuntimeState outside Init.lua" `
-    -Pattern 'function\s+Core\.(EnsureLootRuntimeState|ensureLootRuntimeState)' `
+    -Name "Database.EnsureLootRuntimeState outside Init.lua" `
+    -Pattern 'function\s+Database\.(EnsureLootRuntimeState|ensureLootRuntimeState)' `
     -Path "!KRT" `
     -ExtraArgs @("--glob", "*.lua", "--glob", "!Init.lua", "--glob", "!**/Init.lua")
 
@@ -167,13 +167,13 @@ Add-RgCheck `
 
 Add-RgCheck `
     -Name "EntryPoint duplicated controller getters" `
-    -Pattern 'local\s+function\s+get(Master|Logger|Warnings|Changes|Spammer)Controller' `
+    -Pattern 'local\s+function\s+get(Master|Logger|Warnings|Spammer)Controller' `
     -Path "!KRT/EntryPoints" `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
     -Name "Retired parent alias usage (addon.Parent)" `
-    -Pattern '\baddon\.(Master|Logger|Warnings|Changes|Spammer)\b' `
+    -Pattern '\baddon\.(Master|Logger|Warnings|Spammer)\b' `
     -Path "!KRT" `
     -ExtraArgs @("--glob", "*.lua", "--glob", "!Init.lua", "--glob", "!**/Init.lua")
 
@@ -187,7 +187,6 @@ Add-RgCheck `
     -Pattern '\b(addon\.Utils|Utils\.)' `
     -Path "!KRT/Modules/UI/ListController.lua"
 
-Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Changes.lua" -Owner "Changes"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Master.lua" -Owner "Master"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Warnings.lua" -Owner "Warnings"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Logger.lua" -Owner "Logger"
@@ -209,7 +208,7 @@ Write-Host "  Services -> direct UI APIs"
 Write-Host "  Services -> tooltip probe APIs (GameTooltip/CreateFrame/Set*Item/SetHyperlink)"
 Write-Host "  Item tooltip-hack confinement (Modules/Item.lua)"
 Write-Host "  Init.lua -> parent frame refs"
-Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints)"
+Write-Host "  Quick-win duplicate regressions (Database/Reserves/EntryPoints)"
 Write-Host "  Retired parent alias usage (addon.Parent) outside Init"
 Write-Host "  UI module back-edges (Frames/ListController -> Utils)"
 Write-Host "  Controllers -> own parent only (addon.Parent and KRTParent* ownership)"

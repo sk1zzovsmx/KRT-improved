@@ -4,7 +4,7 @@
 -- exports: addon.Services.Loot._State
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")

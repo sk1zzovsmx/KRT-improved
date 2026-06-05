@@ -1,0 +1,13 @@
+## Interface: 30300
+## Title: Ace3 Addon
+## Notes: Ace3-based starter template for WoW 3.3.5a (uses LibStub-shared libraries)
+## Author: YourName
+## Version: 1.0.0
+## SavedVariables: Ace3AddonDB
+## OptionalDeps: Ace3, !Swatter, !BugGrabber
+
+# Embed Ace3 libraries from Libs/ folder. If you instead depend on the
+# standalone Ace3 addon, comment out embeds.xml and add `## Dependencies: Ace3`.
+embeds.xml
+
+main.lua

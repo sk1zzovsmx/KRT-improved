@@ -1,17 +1,17 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
 local L = feature.L
 
 local Events = feature.Events
 local C = feature.C
-local Core = feature.Core
+local Database = feature.Database
 local Bus = feature.Bus
 local Item = feature.Item
 local Strings = feature.Strings
@@ -332,8 +332,8 @@ do
     end
 
     local function invalidateRaidRuntime(raid)
-        if Core and Core.StripRuntimeRaidCaches then
-            Core.StripRuntimeRaidCaches(raid)
+        if Database and Database.StripRuntimeRaidCaches then
+            Database.StripRuntimeRaidCaches(raid)
             return
         end
         if type(raid) == "table" then
@@ -342,12 +342,12 @@ do
     end
 
     local function indexAppendedLootRuntime(raid, lootInfo, index)
-        if not (Core and Core.GetRaidStoreOrNil) then
+        if not (Database and Database.GetRaidStoreOrNil) then
             invalidateRaidRuntime(raid)
             return nil
         end
 
-        local raidStore = Core.GetRaidStoreOrNil("Loot.UpsertLootIndex", { "UpsertLootIndex" })
+        local raidStore = Database.GetRaidStoreOrNil("Loot.UpsertLootIndex", { "UpsertLootIndex" })
         if not (raidStore and raidStore.UpsertLootIndex) then
             invalidateRaidRuntime(raid)
             return nil
@@ -965,7 +965,7 @@ do
             if link then
                 itemLink = link
                 itemCount = count or 1
-                player = Core.GetPlayerName()
+                player = Database.GetPlayerName()
             end
         end
 
@@ -974,7 +974,7 @@ do
             if link then
                 itemLink = link
                 itemCount = 1
-                player = Core.GetPlayerName()
+                player = Database.GetPlayerName()
             end
         end
 
@@ -1715,7 +1715,7 @@ do
         lootState.opened = true
         lootState.fromInventory = false
         Workflow.BeginLootWindow(workflowContext, {
-            raidNum = Core.GetCurrentRaid and Core.GetCurrentRaid() or nil,
+            raidNum = Database.GetCurrentRaid and Database.GetCurrentRaid() or nil,
             source = "LOOT_OPENED",
         })
         self:ClearLoot()

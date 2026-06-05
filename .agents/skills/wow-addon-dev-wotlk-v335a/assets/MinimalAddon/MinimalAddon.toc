@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: Minimal Addon
+## Notes: Starter template for WoW 3.3.5a addon development
+## Author: YourName
+## Version: 1.0.0
+## SavedVariables: MinimalAddonDB
+## SavedVariablesPerCharacter: MinimalAddonCharDB
+
+main.lua

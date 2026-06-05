@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Reserves._Chat
 -- events: listens to wow.CHAT_MSG_WHISPER and replies with opt-in SoftRes summaries
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Strings = feature.Strings

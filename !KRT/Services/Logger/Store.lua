@@ -1,13 +1,13 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Strings = feature.Strings
-local Core = feature.Core
+local Database = feature.Database
 
 local type, tostring, tonumber = type, tostring, tonumber
 
@@ -77,11 +77,11 @@ resolveLootLooterName = function(raid, loot)
 end
 
 local function ensureRaid(raid)
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.EnsureRaid", { "NormalizeRaidRecord" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Store.EnsureRaid", { "NormalizeRaidRecord" })
     if raidStore then
         return raidStore:NormalizeRaidRecord(raid)
     end
-    return Core.EnsureRaidSchema(raid)
+    return Database.EnsureRaidSchema(raid)
 end
 
 resolveLootLooterClass = function(raid, loot)
@@ -96,7 +96,7 @@ resolveLootLooterClass = function(raid, loot)
 end
 
 function Store:GetRaid(rID)
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.GetRaid", { "GetRaidByIndex" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Store.GetRaid", { "GetRaidByIndex" })
     if raidStore then
         local raid = rID and raidStore:GetRaidByIndex(rID) or nil
         if raid then
@@ -104,7 +104,7 @@ function Store:GetRaid(rID)
         end
         return raid
     end
-    local raid = rID and Core.EnsureRaidById(rID) or nil
+    local raid = rID and Database.EnsureRaidById(rID) or nil
     if raid then
         ensureRaid(raid)
     end
@@ -112,7 +112,7 @@ function Store:GetRaid(rID)
 end
 
 function Store:GetRaidByNid(raidNid)
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.GetRaidByNid", { "GetRaidByNid" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Store.GetRaidByNid", { "GetRaidByNid" })
     if raidStore then
         local raid = raidNid and raidStore:GetRaidByNid(raidNid) or nil
         if raid then
@@ -120,7 +120,7 @@ function Store:GetRaidByNid(raidNid)
         end
         return raid
     end
-    local raid = raidNid and Core.EnsureRaidByNid(raidNid) or nil
+    local raid = raidNid and Database.EnsureRaidByNid(raidNid) or nil
     if raid then
         ensureRaid(raid)
     end
@@ -131,8 +131,8 @@ invalidateIndexes = function(raid)
     if type(raid) ~= "table" then
         return
     end
-    if Core and Core.StripRuntimeRaidCaches then
-        Core.StripRuntimeRaidCaches(raid)
+    if Database and Database.StripRuntimeRaidCaches then
+        Database.StripRuntimeRaidCaches(raid)
         return
     end
     raid._runtime = nil
@@ -150,7 +150,7 @@ bossIdx = function(raid, bossNid)
     if not (raid and queryNid) then
         return nil
     end
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.BossIdx", { "EnsureRaidRuntime" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Store.BossIdx", { "EnsureRaidRuntime" })
     local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
     local idxByNid = runtime and runtime.bossIdxByNid or nil
     return idxByNid and idxByNid[queryNid] or nil
@@ -161,7 +161,7 @@ lootIdx = function(raid, lootNid)
     if not (raid and queryNid) then
         return nil
     end
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.LootIdx", { "EnsureRaidRuntime" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Store.LootIdx", { "EnsureRaidRuntime" })
     local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
     local idxByNid = runtime and runtime.lootIdxByNid or nil
     return idxByNid and idxByNid[queryNid] or nil
@@ -182,7 +182,7 @@ playerIdx = function(raid, playerNid)
     if not (raid and queryNid) then
         return nil
     end
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.PlayerIdx", { "EnsureRaidRuntime" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Store.PlayerIdx", { "EnsureRaidRuntime" })
     local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
     local idxByNid = runtime and runtime.playerIdxByNid or nil
     return idxByNid and idxByNid[queryNid] or nil

@@ -1,15 +1,15 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 
-local Core = feature.Core
+local Database = feature.Database
 local Item = feature.Item
 local Strings = feature.Strings
 local Services = feature.Services
@@ -418,7 +418,7 @@ do
             getRaidService = getRaidService,
             getItemReserveContext = getItemReserveContext,
             getCurrentRaid = function()
-                return addon.Core.GetCurrentRaid and addon.Core.GetCurrentRaid() or nil
+                return addon.Database.GetCurrentRaid and addon.Database.GetCurrentRaid() or nil
             end,
             getSourceRollType = function()
                 return state.tieReroll and state.tieReroll.sourceRollType or getActiveRollType()
@@ -458,7 +458,7 @@ do
             return
         end
 
-        local name = Core.GetPlayerName()
+        local name = Database.GetPlayerName()
         local allowed = getAllowedRolls(itemId, name)
         local used = getLocalPlayerRollCount(itemId)
 
@@ -480,7 +480,7 @@ do
 
     function module:GetRollStatus()
         local itemId = getCurrentRollItemID()
-        local name = Core.GetPlayerName()
+        local name = Database.GetPlayerName()
         updateLocalRollState(itemId, name)
         return getActiveRollType(), state.record, state.canRoll, state.rolled
     end

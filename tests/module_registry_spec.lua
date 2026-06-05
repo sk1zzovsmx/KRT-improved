@@ -22,7 +22,7 @@ local initSource = read("!KRT/Init.lua")
 local toc = read("!KRT/!KRT.toc")
 
 assertContains(source, "local addon = select(2, ...)", "ModuleRegistry must use the standard addon header")
-assertContains(source, "local feature = addon.Core.GetFeatureShared()", "ModuleRegistry must use the feature shared header")
+assertContains(source, "local feature = addon.Database.GetFeatureShared()", "ModuleRegistry must use the feature shared header")
 assertContains(source, "addon.ModuleRegistry", "ModuleRegistry must export addon.ModuleRegistry")
 assertContains(source, "-- ----- Internal state ----- --", "ModuleRegistry must use canonical internal-state header")
 assertContains(source, "-- ----- Private helpers ----- --", "ModuleRegistry must use canonical private-helper header")
@@ -43,7 +43,7 @@ assertBefore(toc, "Modules\\Features.lua", "Modules\\ModuleRegistry.lua")
 assertBefore(toc, "Modules\\ModuleRegistry.lua", "Modules\\UI\\Facade.lua")
 
 local addon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,
@@ -70,27 +70,27 @@ local registryStatus = registry.GetStatus("Modules/ModuleRegistry")
 assert(registryStatus and registryStatus.Loaded == true, "ModuleRegistry must register and mark itself loaded")
 assert(#registryStatus.Deps == 1 and registryStatus.Deps[1] == "Init", "ModuleRegistry must depend on Init")
 
-registry.AddModule("Core", { deps = {} })
-registry.AddModule("Feature", { deps = { "Core" } })
-registry.SetLoaded("Core")
+registry.AddModule("Database", { deps = {} })
+registry.AddModule("Feature", { deps = { "Database" } })
+registry.SetLoaded("Database")
 registry.SetLoaded("Feature")
 
-local coreStatus = registry.GetStatus("Core")
+local coreStatus = registry.GetStatus("Database")
 local featureStatus = registry.GetStatus("Feature")
 assert(coreStatus and coreStatus.Loaded == true, "SetLoaded must mark an existing module loaded")
 assert(featureStatus and featureStatus.LoadOrder > coreStatus.LoadOrder, "LoadOrder must be monotonic")
 
 coreStatus.Loaded = false
-assert(registry.GetStatus("Core").Loaded == true, "GetStatus must return a copy")
+assert(registry.GetStatus("Database").Loaded == true, "GetStatus must return a copy")
 
 local modules = registry.GetModules()
 assert(#modules == 4, "GetModules must include bootstrap, registry, and registered modules")
 assert(modules[1].Name == "Init", "GetModules must preserve bootstrap marker order")
 assert(modules[2].Name == "Modules/ModuleRegistry", "GetModules must preserve registry self-registration order")
-assert(modules[3].Name == "Core", "GetModules must preserve registration order")
+assert(modules[3].Name == "Database", "GetModules must preserve registration order")
 assert(modules[4].Name == "Feature", "GetModules must preserve registration order")
 modules[3].Loaded = false
-assert(registry.GetStatus("Core").Loaded == true, "GetModules must not expose internal records")
+assert(registry.GetStatus("Database").Loaded == true, "GetModules must not expose internal records")
 
 local out = {}
 assert(registry.GetModules(out) == out, "GetModules must write into and return the provided output table")

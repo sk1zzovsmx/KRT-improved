@@ -307,8 +307,8 @@ end
 local function run()
     local currentSchemaVersion = 5
     local addonRoot = rawget(_G, "KRT")
-    if type(addonRoot) == "table" and type(addonRoot.Core) == "table" and type(addonRoot.Core.GetRaidSchemaVersion) == "function" then
-        currentSchemaVersion = toNumber(addonRoot.Core.GetRaidSchemaVersion(), 1)
+    if type(addonRoot) == "table" and type(addonRoot.Database) == "table" and type(addonRoot.Database.GetRaidSchemaVersion) == "function" then
+        currentSchemaVersion = toNumber(addonRoot.Database.GetRaidSchemaVersion(), 1)
     end
 
     local inputPath = arg and arg[1] or nil

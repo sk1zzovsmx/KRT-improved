@@ -4,7 +4,7 @@
 -- exports: addon.Services.Loot._Context
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
@@ -233,7 +233,7 @@ function LootContext.ProjectLootSourceState(context)
 end
 
 function LootContext.ResolveRaidRecord(raidNum)
-    local core = addon.Core
+    local core = addon.Database
     local resolvedRaidNum = raidNum
     if not resolvedRaidNum and core and type(core.GetCurrentRaid) == "function" then
         resolvedRaidNum = core.GetCurrentRaid()

@@ -1,12 +1,12 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: consumes RaidRosterDelta
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
-local Core = feature.Core
+local Database = feature.Database
 local Events = feature.Events
 local Bus = feature.Bus
 local Time = feature.Time
@@ -153,11 +153,11 @@ do
             return
         end
 
-        local raid = Core.EnsureRaidById(resolvedRaidNum)
+        local raid = Database.EnsureRaidById(resolvedRaidNum)
         if not raid then
             return
         end
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         local timestamp = tonumber(delta.timestamp) or Time.GetCurrentTime()
         applyRosterList(raid, delta.joined, timestamp, false)

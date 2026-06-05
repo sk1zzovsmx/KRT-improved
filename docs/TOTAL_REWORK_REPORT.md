@@ -24,7 +24,7 @@ le regole binding di `AGENTS.md` restano prioritarie.
 - Le registrazioni UI documentano il primo grafo esplicito per `Facade`, `Effects`, `Visuals`,
   `Frames`, `ListController` e `MultiSelect`.
 - Stato corrente: il grafo registry metadata-first copre ora l'intero layer caricato prima di XML:
-  `Init`, `Modules`, `Core`, `Services`, `EntryPoints`, `Controllers` e `Widgets`.
+  `Init`, `Modules`, `Database`, `Services`, `EntryPoints`, `Controllers` e `Widgets`.
 
 ## Confronto baseline iniziale vs snapshot rework
 
@@ -39,7 +39,7 @@ snapshot del rework. Le metriche runtime/API sono quelle della chiusura Wave AC 
 perche il commit successivo e solo documentale.
 
 Distribuzione file toccati: `!KRT` `81`, `docs` `13`, `tests` `7`, `tools` `5`. I file Lua
-runtime toccati sono concentrati su `Services` (`35`), `Modules` (`23`), `Core` (`9`),
+runtime toccati sono concentrati su `Services` (`35`), `Modules` (`23`), `Database` (`9`),
 `Controllers` (`5`), `Widgets` (`3`), `EntryPoints` (`2`), piu `Init.lua` e localization.
 
 | Area | Baseline iniziale | Stato attuale | Beneficio |
@@ -89,7 +89,7 @@ Benefici principali:
 - `!KRT/Modules/UI/ListController.lua` registra `Modules/UI/ListController`.
 - `!KRT/Modules/UI/MultiSelect.lua` registra `Modules/UI/MultiSelect`.
 - `!KRT/Modules/Bus.lua` registra `Modules/Bus`.
-- I file `!KRT/Core/*.lua` del package DB/SV registrano metadata registry senza cambiare
+- I file `!KRT/Database/*.lua` del package DB/SV registrano metadata registry senza cambiare
   comportamento SavedVariables.
 - `!KRT/Services/Chat.lua` registra metadata registry come Wave C.0.
 - I file `!KRT/Services/Rolls/*.lua` registrano metadata registry come Wave C senza cambiare la
@@ -102,13 +102,11 @@ Benefici principali:
   `!KRT/Services/Debug.lua` registrano metadata registry come Wave F.0 senza cambiare runtime.
 - I file `!KRT/Controllers/*.lua`, `!KRT/Widgets/*.lua` e `!KRT/EntryPoints/*.lua` registrano
   metadata registry come Wave F senza cambiare runtime.
-- `docs/superpowers/plans/2026-05-25-total-rework-foundation.md` e un artefatto di pianificazione
-  intenzionale per questo branch.
 - Test aggiunti:
   - `tests/module_registry_spec.lua`
   - `tests/module_registry_ui_spec.lua`
   - `tests/module_registry_modules_spec.lua`
-  - `tests/module_registry_core_spec.lua`
+  - `tests/module_registry_database_spec.lua`
   - `tests/module_registry_services_spec.lua`
   - `tests/module_registry_ui_entrypoints_spec.lua`
 
@@ -162,23 +160,23 @@ La semantica del bus interno, dei callback e delle metriche resta invariata.
 | --- | --- |
 | `Modules/Bus` | `Init`, `Modules/ModuleRegistry` |
 
-## Wave B completata: Core DB/SV
+## Wave B completata: Database DB/SV
 
-Wave B ha reso osservabile il package Core DB/SavedVariables. I file Core caricati prima del
-registry usano ancora il percorso pending; i file Core caricati dopo `Modules/ModuleRegistry.lua`
+Wave B ha reso osservabile il package Database DB/SavedVariables. I file Database caricati prima del
+registry usano ancora il percorso pending; i file Database caricati dopo `Modules/ModuleRegistry.lua`
 usano registrazione diretta. La shape SavedVariables e il comportamento runtime restano invariati.
 
 | Modulo | Dipendenze |
 | --- | --- |
-| `Core/DB` | `Init` |
-| `Core/Options` | `Init` |
-| `Core/DBSchema` | `Init` |
-| `Core/DBManager` | `Init`, `Core/DB` |
-| `Core/DBRaidMigrations` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Modules/Strings` |
-| `Core/DBRaidStore` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Core/DBRaidMigrations`, `Modules/Time`, `Modules/Strings` |
-| `Core/DBRaidQueries` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBRaidStore`, `Modules/Sort` |
-| `Core/DBRaidValidator` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Core/DBRaidMigrations`, `Core/DBRaidStore`, `Modules/Dataset/IgnoredMobs` |
-| `Core/DBSyncer` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Core/DBRaidStore`, `Core/DBRaidQueries`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Time`, `Modules/Comms` |
+| `Database/DB` | `Init` |
+| `Database/DBOptions` | `Init` |
+| `Database/DBSchema` | `Init` |
+| `Database/DBManager` | `Init`, `Database/DB` |
+| `Database/DBRaidMigrations` | `Init`, `Modules/ModuleRegistry`, `Database/DB`, `Database/DBSchema`, `Modules/Strings` |
+| `Database/DBRaidStore` | `Init`, `Modules/ModuleRegistry`, `Database/DB`, `Database/DBSchema`, `Database/DBRaidMigrations`, `Modules/Time`, `Modules/Strings` |
+| `Database/DBRaidQueries` | `Init`, `Modules/ModuleRegistry`, `Database/DB`, `Database/DBRaidStore`, `Modules/Sort` |
+| `Database/DBRaidValidator` | `Init`, `Modules/ModuleRegistry`, `Database/DB`, `Database/DBSchema`, `Database/DBRaidMigrations`, `Database/DBRaidStore`, `Modules/Dataset/IgnoredMobs` |
+| `Database/DBSyncer` | `Init`, `Modules/ModuleRegistry`, `Database/DB`, `Database/DBSchema`, `Database/DBRaidStore`, `Database/DBRaidQueries`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Time`, `Modules/Comms` |
 
 ## Wave C.0 completata: Services/Chat
 
@@ -261,7 +259,7 @@ Note di confine:
 - `Services/Raid/Capabilities` mantiene `Services/Chat` lazy, quindi Chat non e un hard metadata edge.
 - `Services/Raid/LootRecords` dichiara un hard edge su `Services/Raid/Counts` per
   `_FindRaidPlayerByNid`.
-- Core raid store resta runtime lookup tramite facade Core/DB; non e un hard metadata edge Raid.
+- Database raid store resta runtime lookup tramite facade Database/DB; non e un hard metadata edge Raid.
 
 ## Wave F.0 completata: remaining Services
 
@@ -292,7 +290,7 @@ Reserves/Debug services:
 | `Services/Debug` | `Init`, `Modules/ModuleRegistry`, `Modules/Strings`, `Modules/Time` |
 
 Note di confine:
-- Logger services non dipendono da Core DB, Raid service o Controller; usano superfici passate o lookup
+- Logger services non dipendono da Database DB, Raid service o Controller; usano superfici passate o lookup
   runtime gia esistenti.
 - Il facade `Services/Reserves` non dipende da `Services/Reserves/Sync`, `Services/Reserves/Chat`,
   `Services/Raid/*` o `Services/Chat`.
@@ -309,8 +307,8 @@ Controllers:
 
 | Modulo | Dipendenze |
 | --- | --- |
-| `Controllers/Master` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Item`, `Modules/Colors`, `Modules/Comms`, `Modules/UI/Facade`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Modules/UI/MultiSelect`, `Services/Chat`, `Services/Loot/Service`, `Services/Rolls/Service`, `Services/Raid/State`, `Services/Raid/Capabilities`, `Services/Raid/Roster`, `Services/Raid/LootRecords` |
-| `Controllers/Logger` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Colors`, `Modules/Base64`, `Modules/Sort`, `Modules/Dataset/IgnoredMobs`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Modules/UI/MultiSelect`, `Services/Logger/Store`, `Services/Logger/View`, `Services/Logger/Export`, `Services/Logger/Helpers`, `Services/Logger/Actions` |
+| `Controllers/Master` | `Init`, `Modules/ModuleRegistry`, `Database/DBOptions`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Item`, `Modules/Colors`, `Modules/Comms`, `Modules/UI/Facade`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Modules/UI/MultiSelect`, `Services/Chat`, `Services/Loot/Service`, `Services/Rolls/Service`, `Services/Raid/State`, `Services/Raid/Capabilities`, `Services/Raid/Roster`, `Services/Raid/LootRecords` |
+| `Controllers/Logger` | `Init`, `Modules/ModuleRegistry`, `Database/DBOptions`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Colors`, `Modules/Base64`, `Modules/Sort`, `Modules/Dataset/IgnoredMobs`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Modules/UI/MultiSelect`, `Services/Logger/Store`, `Services/Logger/View`, `Services/Logger/Export`, `Services/Logger/Helpers`, `Services/Logger/Actions` |
 | `Controllers/Warnings` | `Init`, `Modules/ModuleRegistry`, `Modules/Strings`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Services/Chat` |
 | `Controllers/Changes` | `Init`, `Modules/ModuleRegistry`, `Modules/Events`, `Modules/Bus`, `Modules/Colors`, `Modules/Strings`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Services/Chat`, `Services/Raid/Roster`, `Services/Raid/Capabilities`, `Services/Raid/Session` |
 | `Controllers/Spammer` | `Init`, `Modules/ModuleRegistry`, `Modules/Strings`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Services/Chat` |
@@ -319,21 +317,21 @@ Widgets:
 
 | Modulo | Dipendenze |
 | --- | --- |
-| `Widgets/LootCounter` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Colors`, `Modules/Events`, `Modules/Bus`, `Modules/UI/Facade`, `Modules/UI/Frames`, `Services/Chat`, `Services/Raid/State`, `Services/Raid/Capabilities`, `Services/Raid/Counts`, `Services/Raid/Roster` |
+| `Widgets/LootCounter` | `Init`, `Modules/ModuleRegistry`, `Database/DBOptions`, `Modules/C`, `Modules/Colors`, `Modules/Events`, `Modules/Bus`, `Modules/UI/Facade`, `Modules/UI/Frames`, `Services/Chat`, `Services/Raid/State`, `Services/Raid/Capabilities`, `Services/Raid/Counts`, `Services/Raid/Roster` |
 | `Widgets/ReservesUI` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Events`, `Modules/Bus`, `Modules/UI/Facade`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Services/Reserves` |
-| `Widgets/Config` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/Events`, `Modules/Bus`, `Modules/UI/Facade`, `Modules/UI/Frames` |
+| `Widgets/Config` | `Init`, `Modules/ModuleRegistry`, `Database/DBOptions`, `Modules/Events`, `Modules/Bus`, `Modules/UI/Facade`, `Modules/UI/Frames` |
 
 EntryPoints:
 
 | Modulo | Dipendenze |
 | --- | --- |
-| `EntryPoints/Minimap` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Colors`, `Modules/UI/Frames`, `Modules/UI/Facade` |
-| `EntryPoints/SlashEvents` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Colors`, `Modules/Strings`, `Modules/Comms`, `Modules/Item`, `Modules/UI/Frames`, `Modules/UI/Facade` |
+| `EntryPoints/Minimap` | `Init`, `Modules/ModuleRegistry`, `Database/DBOptions`, `Modules/C`, `Modules/Colors`, `Modules/UI/Frames`, `Modules/UI/Facade` |
+| `EntryPoints/SlashEvents` | `Init`, `Modules/ModuleRegistry`, `Database/DBOptions`, `Modules/C`, `Modules/Colors`, `Modules/Strings`, `Modules/Comms`, `Modules/Item`, `Modules/UI/Frames`, `Modules/UI/Facade` |
 
 Note di confine:
 - Controllers non dipendono da Widgets; optional widget routing resta via `addon.UI` facade.
 - EntryPoints non dipendono da Controllers/Services; slash/minimap dispatch resta runtime via
-  Core/UI facade.
+  Database/UI facade.
 - Widgets non dipendono da Controllers/EntryPoints; `ReservesUI` dipende dal facade
   `Services/Reserves`, non helper interni.
 - Widget metadata e volutamente prima del feature gate `UIFacade:IsEnabled(...)`, per non perdere il
@@ -444,7 +442,7 @@ unique APIs and `468` public APIs.
 
 Wave V repaired the small-controller dispatch contracts found by audit. Slash routing now targets
 `Warnings:RequestAnnounce`, `Spammer:RequestStart`, and `Spammer:RequestStop` through
-`Core.RequestControllerMethod`, while the implementation helpers `announceWarning`, `startSpam`, and
+`Database.RequestControllerMethod`, while the implementation helpers `announceWarning`, `startSpam`, and
 `stopSpam` remain private/local to their controllers.
 
 The regression coverage in `tests/module_registry_ui_entrypoints_spec.lua` now asserts that the slash
@@ -535,8 +533,8 @@ intentional contracts for the current architecture:
 | --- | --- | --- |
 | Master WoW-forwarded event handlers | `LOOT_OPENED`, `LOOT_CLOSED`, `LOOT_SLOT_CLEARED`, `UI_ERROR_MESSAGE`, `TRADE_ACCEPT_UPDATE`, `TRADE_CLOSED`, `TRADE_REQUEST_CANCEL` | Master listens through event-name/method-name dispatch. |
 | Changes command endpoints | `Demand`, `Announce` | Slash and minimap menu routes call these public commands. |
-| Warnings command endpoint | `RequestAnnounce` | `/krt rw ...` dispatches through `Core.RequestControllerMethod`. |
-| Spammer command endpoints | `RequestStart`, `RequestStop` | `/krt pug start|stop` dispatches through `Core.RequestControllerMethod`. |
+| Warnings command endpoint | `RequestAnnounce` | `/krt rw ...` dispatches through `Database.RequestControllerMethod`. |
+| Spammer command endpoints | `RequestStart`, `RequestStop` | `/krt pug start|stop` dispatches through `Database.RequestControllerMethod`. |
 | Minimap state/lifecycle endpoints | `SetPos`, `BindUI`, `EnsureUI`, `ToggleMinimapButton` | Slash/config/minimap ownership still enters through `addon.Minimap`. |
 
 The classification is now documented in `docs/ARCHITECTURE.md` as the intentional
@@ -632,7 +630,7 @@ py -3 tools/krt.py api-catalog-refresh
 lua tests/module_registry_spec.lua
 lua tests/module_registry_ui_spec.lua
 lua tests/module_registry_modules_spec.lua
-lua tests/module_registry_core_spec.lua
+lua tests/module_registry_database_spec.lua
 lua tests/module_registry_services_spec.lua
 lua tests/module_registry_ui_entrypoints_spec.lua
 lua tests/release_stabilization_spec.lua
@@ -656,7 +654,7 @@ lua tests/module_registry_services_spec.lua
 lua tests/module_registry_spec.lua
 lua tests/module_registry_modules_spec.lua
 lua tests/module_registry_ui_spec.lua
-lua tests/module_registry_core_spec.lua
+lua tests/module_registry_database_spec.lua
 lua tests/release_stabilization_spec.lua
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-syntax.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-toc-files.ps1
@@ -690,7 +688,7 @@ py -3 tools/krt.py api-catalog-check
 lua tests/module_registry_spec.lua
 lua tests/module_registry_ui_spec.lua
 lua tests/module_registry_modules_spec.lua
-lua tests/module_registry_core_spec.lua
+lua tests/module_registry_database_spec.lua
 lua tests/module_registry_services_spec.lua
 lua tests/module_registry_ui_entrypoints_spec.lua
 py -3 tools/krt.py run-release-targeted-tests
@@ -733,7 +731,7 @@ Cataloghi generati attesi:
 - `tests/module_registry_modules_spec.lua` verifica il percorso sorgente di registrazione diretta e
   pending; il load reale e stato verificato manualmente con `/reload`.
 - Warning CRLF sui CSV possono apparire durante rigenerazione o git diff; non hanno fallito i gate.
-- `ModuleRegistry` e completo per il layer caricato prima di XML: `Init`, `Modules`, `Core`,
+- `ModuleRegistry` e completo per il layer caricato prima di XML: `Init`, `Modules`, `Database`,
   `Services`, `EntryPoints`, `Controllers` e `Widgets`.
 - `tests/module_registry_services_spec.lua` copre i service registrati finora: `Services/Chat`,
   `Services/Rolls/*`, `Services/Loot/*`, `Services/Raid/*`, `Services/Logger/*`,
@@ -779,7 +777,7 @@ Comandi minimi:
 lua tests/module_registry_spec.lua
 lua tests/module_registry_ui_spec.lua
 lua tests/module_registry_modules_spec.lua
-lua tests/module_registry_core_spec.lua
+lua tests/module_registry_database_spec.lua
 lua tests/module_registry_services_spec.lua
 lua tests/module_registry_ui_entrypoints_spec.lua
 lua tests/release_stabilization_spec.lua

@@ -19,7 +19,7 @@ For architecture guardrails, see `docs/ARCHITECTURE.md`.
 
 `Init.lua` owns initialization of shared namespaces and runtime state roots:
 
-- `addon.Core`
+- `addon.Database`
 - `addon.L`
 - `addon.Diagnose`
 - `addon.State`
@@ -28,10 +28,10 @@ For architecture guardrails, see `docs/ARCHITECTURE.md`.
 - `addon.Controllers`, `addon.Services`, `addon.Widgets`
 
 `Init.lua` also owns global WoW event wiring and bus forwarding.
-Modules consume shared dependencies through `addon.Core.GetFeatureShared()`.
+Modules consume shared dependencies through `addon.Database.GetFeatureShared()`.
 Service submodules bootstrap owner tables through `feature.EnsureServiceNamespace(...)`
 so namespace creation stays centralized with the rest of bootstrap.
-`Core/Options.lua` owns `addon.Options`, namespaced defaults, and strict schema-2 storage.
+`Database/DBOptions.lua` owns `addon.Options`, namespaced defaults, and strict schema-2 storage.
 
 ## Runtime Module Map
 
@@ -42,7 +42,6 @@ Top-level parent owners:
 - `addon.Controllers.Master`
 - `addon.Controllers.Logger`
 - `addon.Controllers.Warnings`
-- `addon.Controllers.Changes`
 - `addon.Controllers.Spammer`
 
 ### Services (`addon.Services.*`)
@@ -71,8 +70,7 @@ Runtime data/model/service modules:
 - `Services/Raid/Roster.lua` (live roster tracking and player lookups)
 - `Services/Raid/Attendance.lua` (per-player attendance ledger from roster deltas)
 - `Services/Raid/LootRecords.lua` (loot-record query helpers)
-- `Services/Raid/Session.lua` (raid session checks/scheduling + raid changes CRUD/message builders
-  + boss query/icon helpers)
+- `Services/Raid/Session.lua` (raid session checks/scheduling + boss query/icon helpers)
 
 `addon.Services.Loot` internal runtime helpers are composed by:
 - `Services/Loot/Context.lua` (`LootContext` normalization/projection helpers)
@@ -120,7 +118,7 @@ Entrypoints stay narrow:
 
 - `addon.Minimap` (`EntryPoints/Minimap.lua`)
 - slash command routing (`EntryPoints/SlashEvents.lua`)
-- parent routing should prefer `addon.Core.RequestControllerMethod(...)`
+- parent routing should prefer `addon.Database.RequestControllerMethod(...)`
 
 ### Shared Modules
 
@@ -148,11 +146,11 @@ Common infra under `!KRT/Modules/`:
 - `addon:Print` remains a compatibility hook for `LibLogger-1.0`.
 - For reserves, use `addon.Services.Reserves` as the canonical public surface.
   Do not rely on nested `.Service` alias surfaces.
-- For DB-manager-backed accessors, use `addon.Core.GetRaidStore`,
-  `addon.Core.GetRaidStoreOrNil`, `addon.Core.GetRaidQueries`,
-  `addon.Core.GetRaidMigrations`, `addon.Core.GetRaidValidator`, and
-  `addon.Core.GetSyncer` as the canonical public surface.
-  Use `addon.Core.GetRaidSchemaVersion` as the canonical schema-version accessor.
+- For DB-manager-backed accessors, use `addon.Database.GetRaidStore`,
+  `addon.Database.GetRaidStoreOrNil`, `addon.Database.GetRaidQueries`,
+  `addon.Database.GetRaidMigrations`, `addon.Database.GetRaidValidator`, and
+  `addon.Database.GetSyncer` as the canonical public surface.
+  Use `addon.Database.GetRaidSchemaVersion` as the canonical schema-version accessor.
   `addon.DB` remains the concrete DB namespace (`RaidStore`, `RaidQueries`,
   `RaidMigrations`, `RaidValidator`, `Syncer`) plus manager state, and
   `addon.DBSchema` remains the concrete schema namespace.

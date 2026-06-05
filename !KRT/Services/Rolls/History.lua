@@ -4,7 +4,7 @@
 -- exports: addon.Services.Rolls._History
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
 local Events = feature.Events

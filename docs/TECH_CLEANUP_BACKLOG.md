@@ -87,10 +87,10 @@ Interpretation:
   tooltip helper to the canonical `addon.Frames.HideTooltip` surface.
 - The mechanical duplication lane is now closed; the remaining work is contract
   review and selective naming/API simplification, not wrapper collapse.
-- The first high-signal contract-cleanup lane is `Core/DB`, where DB-manager-backed
-  getters were still exposed on two public surfaces (`addon.Core.*` and `addon.DB.*`)
-  even though in-repo call sites already preferred `addon.Core.*`.
-- The same contract lane also included schema-version access: `Core.GetRaidSchemaVersion`
+- The first high-signal contract-cleanup lane is `Database/DB`, where DB-manager-backed
+  getters were still exposed on two public surfaces (`addon.Database.*` and `addon.DB.*`)
+  even though in-repo call sites already preferred `addon.Database.*`.
+- The same contract lane also included schema-version access: `Database.GetRaidSchemaVersion`
   was already the in-repo owner, so the extra `addon.DBSchema.GetRaidSchemaVersion`
   surface was removable with low risk.
 
@@ -128,7 +128,7 @@ Stage 1 completed:
 - retained `.Service` only as an internal bridge to the same table
 - migrated `ReservesUI` to the canonical reserves owner
 - replaced duplicated entrypoint controller-routing helpers with
-  `addon.Core.RequestControllerMethod(...)`
+  `addon.Database.RequestControllerMethod(...)`
 - removed low-value `Services.Reserves` accessors duplicated in `Master` and `Rolls`
 
 Stage 2 target set:
@@ -145,25 +145,25 @@ Stage 2 completed:
 
 Contract wave seed (`2026-04-06`):
 
-- target owner: `!KRT/Core/DB.lua`
+- target owner: `!KRT/Database/DB.lua`
 - scope: collapse duplicate DB-manager-backed public getter facades and keep one
   canonical public owner
-- canonical contract: `addon.Core.*`
+- canonical contract: `addon.Database.*`
 - non-goals: no changes to concrete DB module tables under `addon.DB.*`
 
 Contract wave result snapshot (`2026-04-06`):
 
 - scope completed:
-  - removed redundant DB getter facades from `!KRT/Core/DB.lua`
-  - removed redundant schema getter facade from `!KRT/Core/DBSchema.lua`
+  - removed redundant DB getter facades from `!KRT/Database/DB.lua`
+  - removed redundant schema getter facade from `!KRT/Database/DBSchema.lua`
 - canonical public owner confirmed:
-  - `addon.Core.GetRaidStore`
-  - `addon.Core.GetRaidStoreOrNil`
-  - `addon.Core.GetRaidQueries`
-  - `addon.Core.GetRaidMigrations`
-  - `addon.Core.GetRaidValidator`
-  - `addon.Core.GetSyncer`
-  - `addon.Core.GetRaidSchemaVersion`
+  - `addon.Database.GetRaidStore`
+  - `addon.Database.GetRaidStoreOrNil`
+  - `addon.Database.GetRaidQueries`
+  - `addon.Database.GetRaidMigrations`
+  - `addon.Database.GetRaidValidator`
+  - `addon.Database.GetSyncer`
+  - `addon.Database.GetRaidSchemaVersion`
 - metrics:
   - API surface: `637 -> 629`
   - public API surface: `614 -> 606`
@@ -210,7 +210,7 @@ Contract wave result snapshot (`2026-04-06`, Chat/Raid ownership):
     - `!KRT/Services/Rolls/Service.lua`
     - `!KRT/EntryPoints/Minimap.lua`
     - `!KRT/EntryPoints/SlashEvents.lua`
-    - `!KRT/Core/DBSyncer.lua`
+    - `!KRT/Database/DBSyncer.lua`
     - `!KRT/Init.lua`
   - updated the stabilization harness/tests to the service-owned capability contract
 - metrics:
@@ -400,10 +400,10 @@ What this means:
 - `!KRT/EntryPoints/SlashEvents.lua`: contract wave completed, uses service-owned ML guard
 - `!KRT/EntryPoints/Minimap.lua`: contract wave completed, uses service-owned capability queries
 
-### 2.5 Core and Infra
+### 2.5 Database and Infra
 
-- `!KRT/Core/DBSyncer.lua`: contract wave completed, uses service-owned capability query
-- `!KRT/Core/DBRaidStore.lua`: cleanup wave C2 in progress
+- `!KRT/Database/DBSyncer.lua`: contract wave completed, uses service-owned capability query
+- `!KRT/Database/DBRaidStore.lua`: cleanup wave C2 in progress
 - `!KRT/Modules/UI/Frames.lua`: cleanup wave U1 in progress
 - `!KRT/Init.lua`: contract wave completed, root chat/capability facades removed
 
@@ -439,8 +439,8 @@ because they sit on repo-wide boundaries.
 
 1. `!KRT/EntryPoints/SlashEvents.lua` - about 691 lines
 2. `!KRT/EntryPoints/Minimap.lua` - about 413 lines
-3. `!KRT/Core/DBSyncer.lua` - about 1454 lines
-4. `!KRT/Core/DBRaidStore.lua` - about 755 lines
+3. `!KRT/Database/DBSyncer.lua` - about 1454 lines
+4. `!KRT/Database/DBRaidStore.lua` - about 755 lines
 5. `!KRT/Modules/UI/Frames.lua` - about 889 lines
 
 ### P3: Bootstrap Follow-up
@@ -565,7 +565,7 @@ Owner files:
 Scope:
 - keep the file focused on slash parsing and dispatch only
 - reduce inline formatting/report helpers if they belong to owners or services
-- normalize routing helpers around `Core.GetController(...)` and `addon.UI`
+- normalize routing helpers around `Database.GetController(...)` and `addon.UI`
 
 Current worktree progress:
 - controller method dispatch now shares one helper path across toggle and action commands
@@ -615,7 +615,7 @@ Smoke path:
 ### Wave C1: Syncer Store Boundary
 
 Owner files:
-- `!KRT/Core/DBSyncer.lua`
+- `!KRT/Database/DBSyncer.lua`
 
 Scope:
 - separate protocol parsing, merge logic, and persistence boundaries
@@ -636,7 +636,7 @@ Validation:
 ### Wave C2: Raid Store Runtime Boundaries
 
 Owner files:
-- `!KRT/Core/DBRaidStore.lua`
+- `!KRT/Database/DBRaidStore.lua`
 
 Scope:
 - tighten runtime-index ownership

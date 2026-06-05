@@ -1,13 +1,13 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._DistributionSession
 -- events: LootDistributionSessionChanged
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
-local Core = feature.Core
+local Database = feature.Database
 local Diag = feature.Diag
 local Events = feature.Events
 local Bus = feature.Bus
@@ -209,7 +209,7 @@ local function resolveItemKey(itemKeyOrLink, itemLink)
 end
 
 local function buildSessionId()
-    local playerName = Core and Core.GetPlayerName and Core.GetPlayerName() or "player"
+    local playerName = Database and Database.GetPlayerName and Database.GetPlayerName() or "player"
     local ordinal = tonumber(state.nextSessionOrdinal) or 1
     state.nextSessionOrdinal = ordinal + 1
 

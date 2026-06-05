@@ -2,60 +2,23 @@
     "version": 1,
     "sources": [
         {
-            "skill": "s-clean",
-            "repo": "Falkicon/Mechanic",
-            "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
-            "sourceBasePath": ".agent/skills/s-clean",
-            "verifyPolicy": "presence",
-            "destinationPath": ".agents/skills/s-clean"
-        },
-        {
-            "skill": "s-audit",
-            "repo": "Falkicon/Mechanic",
-            "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
-            "sourceBasePath": ".agent/skills/s-audit",
-            "verifyPolicy": "presence",
-            "destinationPath": ".agents/skills/s-audit"
-        },
-        {
-            "skill": "s-debug",
-            "repo": "Falkicon/Mechanic",
-            "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
-            "sourceBasePath": ".agent/skills/s-debug",
-            "verifyPolicy": "presence",
-            "destinationPath": ".agents/skills/s-debug"
-        },
-        {
-            "skill": "s-working",
-            "repo": "Falkicon/Mechanic",
-            "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
-            "sourceBasePath": ".agent/skills/s-working",
-            "verifyPolicy": "presence",
-            "destinationPath": ".agents/skills/s-working"
-        },
-        {
-            "skill": "s-lint",
-            "repo": "Falkicon/Mechanic",
-            "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
-            "sourceBasePath": ".agent/skills/s-lint",
-            "verifyPolicy": "presence",
-            "destinationPath": ".agents/skills/s-lint"
-        },
-        {
-            "skill": "s-release",
-            "repo": "Falkicon/Mechanic",
-            "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
-            "sourceBasePath": ".agent/skills/s-release",
-            "verifyPolicy": "presence",
-            "destinationPath": ".agents/skills/s-release"
-        },
-        {
-            "skill": "k-docs",
-            "repo": "Falkicon/Mechanic",
-            "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
-            "sourceBasePath": ".agent/skills/k-docs",
-            "verifyPolicy": "presence",
-            "destinationPath": ".agents/skills/k-docs"
+            "skill": "wow-addon-dev-wotlk-v335a",
+            "repo": "Kirchlive/WoW-Addon-Dev-Wotlk-v335a-Claude-Skill",
+            "commit": "2e1f0a37595d181427be5caeb29d76288f9c452c",
+            "sourceBasePath": ".",
+            "verifyPolicy": "local-presence",
+            "destinationPath": ".agents/skills/wow-addon-dev-wotlk-v335a",
+            "adaptedFor": "Codex",
+            "notes": "Adapted with skill-creator; do not overwrite from upstream without reapplying Codex changes."
         }
+    ],
+    "archivedSkills": [
+        "k-docs",
+        "s-audit",
+        "s-clean",
+        "s-debug",
+        "s-lint",
+        "s-release",
+        "s-working"
     ]
 }

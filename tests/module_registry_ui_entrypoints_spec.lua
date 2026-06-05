@@ -72,7 +72,7 @@ local expectedControllers = {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Timer",
             "Modules/Events",
@@ -115,7 +115,7 @@ local expectedControllers = {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Timer",
             "Modules/Events",
@@ -156,34 +156,6 @@ local expectedControllers = {
         forbiddenDeps = { "Modules/Events", "Modules/Bus" },
     },
     {
-        name = "Controllers/Changes",
-        path = "!KRT/Controllers/Changes.lua",
-        owner = "module",
-        separator = ":",
-        deps = {
-            "Init",
-            "Modules/ModuleRegistry",
-            "Modules/Events",
-            "Modules/Bus",
-            "Modules/Colors",
-            "Modules/Strings",
-            "Modules/UI/Frames",
-            "Modules/UI/Visuals",
-            "Modules/UI/ListController",
-            "Services/Chat",
-            "Services/Raid/Roster",
-            "Services/Raid/Capabilities",
-            "Services/Raid/Session",
-        },
-        forbiddenPrefixes = { "Services/Loot/" },
-        forbiddenDeps = {
-            "Services/Raid/State",
-            "Services/Raid/Counts",
-            "Services/Raid/Attendance",
-            "Services/Raid/LootRecords",
-        },
-    },
-    {
         name = "Controllers/Spammer",
         path = "!KRT/Controllers/Spammer.lua",
         owner = "module",
@@ -209,7 +181,7 @@ local expectedWidgets = {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Colors",
             "Modules/Events",
@@ -254,7 +226,7 @@ local expectedWidgets = {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/Events",
             "Modules/Bus",
             "Modules/UI/Facade",
@@ -274,7 +246,7 @@ local expectedEntryPoints = {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Colors",
             "Modules/UI/Frames",
@@ -288,7 +260,7 @@ local expectedEntryPoints = {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Colors",
             "Modules/Strings",
@@ -297,15 +269,15 @@ local expectedEntryPoints = {
             "Modules/UI/Frames",
             "Modules/UI/Facade",
         },
-        forbiddenDeps = { "EntryPoints/Minimap", "Core/DBSyncer", "Core/DBRaidValidator" },
+        forbiddenDeps = { "EntryPoints/Minimap", "Database/DBSyncer", "Database/DBRaidValidator" },
     },
 }
 
 local preRegistryCoreModules = {
-    { name = "Core/DB", deps = { "Init" } },
-    { name = "Core/Options", deps = { "Init" } },
-    { name = "Core/DBSchema", deps = { "Init" } },
-    { name = "Core/DBManager", deps = { "Init", "Core/DB" } },
+    { name = "Database/DB", deps = { "Init" } },
+    { name = "Database/DBOptions", deps = { "Init" } },
+    { name = "Database/DBSchema", deps = { "Init" } },
+    { name = "Database/DBManager", deps = { "Init", "Database/DB" } },
 }
 
 local preRegistryUtilityModules = {
@@ -338,46 +310,46 @@ local directRegistryModules = {
 
 local postRegistryCoreModules = {
     {
-        name = "Core/DBRaidMigrations",
-        deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBSchema", "Modules/Strings" },
+        name = "Database/DBRaidMigrations",
+        deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBSchema", "Modules/Strings" },
     },
     {
-        name = "Core/DBRaidStore",
+        name = "Database/DBRaidStore",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/DB",
-            "Core/DBSchema",
-            "Core/DBRaidMigrations",
+            "Database/DB",
+            "Database/DBSchema",
+            "Database/DBRaidMigrations",
             "Modules/Time",
             "Modules/Strings",
         },
     },
     {
-        name = "Core/DBRaidQueries",
-        deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBRaidStore", "Modules/Sort" },
+        name = "Database/DBRaidQueries",
+        deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBRaidStore", "Modules/Sort" },
     },
     {
-        name = "Core/DBRaidValidator",
+        name = "Database/DBRaidValidator",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/DB",
-            "Core/DBSchema",
-            "Core/DBRaidMigrations",
-            "Core/DBRaidStore",
+            "Database/DB",
+            "Database/DBSchema",
+            "Database/DBRaidMigrations",
+            "Database/DBRaidStore",
             "Modules/Dataset/IgnoredMobs",
         },
     },
     {
-        name = "Core/DBSyncer",
+        name = "Database/DBSyncer",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/DB",
-            "Core/DBSchema",
-            "Core/DBRaidStore",
-            "Core/DBRaidQueries",
+            "Database/DB",
+            "Database/DBSchema",
+            "Database/DBRaidStore",
+            "Database/DBRaidQueries",
             "Modules/Events",
             "Modules/Bus",
             "Modules/Strings",
@@ -579,15 +551,15 @@ local expectedLoggerServices = {
 
 local moduleTocPaths = {
     ["Init"] = "Init.lua",
-    ["Core/Options"] = "Core\\Options.lua",
-    ["Core/DB"] = "Core\\DB.lua",
-    ["Core/DBSchema"] = "Core\\DBSchema.lua",
-    ["Core/DBManager"] = "Core\\DBManager.lua",
-    ["Core/DBRaidMigrations"] = "Core\\DBRaidMigrations.lua",
-    ["Core/DBRaidStore"] = "Core\\DBRaidStore.lua",
-    ["Core/DBRaidQueries"] = "Core\\DBRaidQueries.lua",
-    ["Core/DBRaidValidator"] = "Core\\DBRaidValidator.lua",
-    ["Core/DBSyncer"] = "Core\\DBSyncer.lua",
+    ["Database/DBOptions"] = "Database\\DBOptions.lua",
+    ["Database/DB"] = "Database\\DB.lua",
+    ["Database/DBSchema"] = "Database\\DBSchema.lua",
+    ["Database/DBManager"] = "Database\\DBManager.lua",
+    ["Database/DBRaidMigrations"] = "Database\\DBRaidMigrations.lua",
+    ["Database/DBRaidStore"] = "Database\\DBRaidStore.lua",
+    ["Database/DBRaidQueries"] = "Database\\DBRaidQueries.lua",
+    ["Database/DBRaidValidator"] = "Database\\DBRaidValidator.lua",
+    ["Database/DBSyncer"] = "Database\\DBSyncer.lua",
     ["Modules/C"] = "Modules\\C.lua",
     ["Modules/Timer"] = "Modules\\Timer.lua",
     ["Modules/Events"] = "Modules\\Events.lua",
@@ -649,7 +621,6 @@ local moduleTocPaths = {
     ["Controllers/Master"] = "Controllers\\Master.lua",
     ["Controllers/Logger"] = "Controllers\\Logger.lua",
     ["Controllers/Warnings"] = "Controllers\\Warnings.lua",
-    ["Controllers/Changes"] = "Controllers\\Changes.lua",
     ["Controllers/Spammer"] = "Controllers\\Spammer.lua",
     ["Widgets/LootCounter"] = "Widgets\\LootCounter.lua",
     ["Widgets/ReservesUI"] = "Widgets\\ReservesUI.lua",
@@ -757,7 +728,6 @@ local scaffoldControllerMethods = {
 }
 
 local controllerPaths = {
-    Changes = "!KRT/Controllers/Changes.lua",
     Logger = "!KRT/Controllers/Logger.lua",
     Master = "!KRT/Controllers/Master.lua",
     Spammer = "!KRT/Controllers/Spammer.lua",
@@ -808,7 +778,7 @@ local function assertControllerDispatchContracts()
         "!KRT/EntryPoints/SlashEvents.lua",
         "!KRT/EntryPoints/Minimap.lua",
     }
-    local dispatchPattern = 'Core%.RequestControllerMethod%("([%w_]+)"%s*,%s*"([%w_]+)"'
+    local dispatchPattern = 'Database%.RequestControllerMethod%("([%w_]+)"%s*,%s*"([%w_]+)"'
     local total = 0
 
     for i = 1, #sources do
@@ -885,9 +855,22 @@ local function assertWidgetDispatchContracts()
     assert(total > 0, "widget dispatch sweep must find literal dispatch pairs")
 end
 
+local function assertMinimapRaidMenuContract()
+    local source = read("!KRT/EntryPoints/Minimap.lua")
+    local reservesDispatch = 'callWidgetMethod("Reserves", "Toggle")'
+
+    assertContains(source, reservesDispatch, "minimap menu must open Raid Reserves through UI facade")
+    assertBefore(source, "MASTER_LOOTER", "L.StrRaidReserves", "minimap menu must list Master before Raid Reserves")
+    assertBefore(source, "L.StrRaidReserves", "L.StrLootCounter", "minimap menu must list Raid Reserves before Loot Counter")
+    assertBefore(source, "L.StrLootCounter", "L.StrLootLogger", "minimap menu must list Loot Counter before Loot Logger")
+    assertBefore(source, "L.StrLootLogger", "RAID_WARNING", "minimap menu must list Loot Logger before Raid Warning")
+    assertBefore(source, "RAID_WARNING", "L.StrLFMSpam", "minimap menu must list Raid Warning before LFM Spam")
+    assertBefore(source, "L.StrLFMSpam", "L.StrClearIcons", "minimap menu must list LFM Spam before Clear Icons")
+end
+
 local function assertSyncerDispatchContracts()
     local slashSource = read("!KRT/EntryPoints/SlashEvents.lua")
-    local syncerSource = read("!KRT/Core/DBSyncer.lua")
+    local syncerSource = read("!KRT/Database/DBSyncer.lua")
     local scans = {
         {
             pattern = 'callSyncerMethod%("([%w_]+)"',
@@ -946,6 +929,7 @@ for i = 1, #expectedEntryPoints do
 end
 assertControllerDispatchContracts()
 assertWidgetDispatchContracts()
+assertMinimapRaidMenuContract()
 assertSyncerDispatchContracts()
 assertMasterWowForwardedContracts()
 
@@ -958,7 +942,7 @@ for i = 1, #preRegistryUtilityModules do
 end
 
 local addon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,
@@ -1046,7 +1030,7 @@ local function assertOutOfOrder(moduleName, dependencyName)
     local moduleSpec = assert(findSpec(moduleName), "missing expected spec: " .. moduleName)
     local dependencySpec = assert(findSpec(dependencyName), "missing expected spec: " .. dependencyName)
     local outOfOrderAddon = {
-        Core = {
+        Database = {
             GetFeatureShared = function()
                 return {}
             end,
@@ -1080,11 +1064,10 @@ end
 assertOutOfOrder("Controllers/Master", "Services/Rolls/Service")
 assertOutOfOrder("Controllers/Logger", "Services/Logger/Actions")
 assertOutOfOrder("Controllers/Warnings", "Services/Chat")
-assertOutOfOrder("Controllers/Changes", "Services/Raid/Session")
 assertOutOfOrder("Controllers/Spammer", "Services/Chat")
 assertOutOfOrder("Widgets/LootCounter", "Services/Raid/Counts")
 assertOutOfOrder("Widgets/ReservesUI", "Services/Reserves")
-assertOutOfOrder("Widgets/Config", "Core/Options")
+assertOutOfOrder("Widgets/Config", "Database/DBOptions")
 assertOutOfOrder("EntryPoints/SlashEvents", "Modules/Comms")
 
 print("module registry UI entrypoints source contract passed")

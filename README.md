@@ -18,7 +18,7 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
   - UI list grouped by **boss/source**, collapsible, with tooltips and chat-safe output
 - **Loot Counter**: track **MS loot wins per player** in the current raid session, with an editable UI.
 - **Loot History**: persistent raid sessions with roster, bosses, attendees, and loot. Includes safer internal IDs and filters.
-- **Pre-saved Raid Warnings** + **MS Changes** tracker.
+- **Pre-saved Raid Warnings** for reusable raid calls.
 - **LFM Spammer** with composition builder and achievement ID helper.
 - **Minimap button menu** + consolidated **/krt** slash commands.
 - Built-in **debug / log levels** for troubleshooting.
@@ -44,7 +44,7 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 
 - **Open the main menu**
   - Minimap button: **Left-click**
-  - From there you can open Master Looter, Loot Counter, Loot Logger, Warnings, MS Changes, and the LFM Spammer.
+  - From there you can open Master Looter, Loot Counter, Loot Logger, Warnings, and the LFM Spammer.
 
 - **Open Master Looter**
   - `/krt ml` (aliases: `/krt loot`, `/krt master`)
@@ -81,7 +81,6 @@ Common commands:
 - `/krt counter` — Loot Counter window
 - `/krt history` — Loot Logger / History window
 - `/krt rw` — Raid Warnings window (`/krt rw <ID>` announces a saved warning)
-- `/krt ms` — MS Changes window (`/krt ms demand` / `/krt ms announce`)
 - `/krt lfm` — LFM Spammer window (`/krt lfm start` / `/krt lfm stop`)
 - `/krt res` — Reserves list (`/krt res import` opens the import window)
 - `/krt minimap on|off|pos <deg>` — show/hide button or set position angle
@@ -110,7 +109,7 @@ Several KRT panels use an **OS-like multi-selection** system to make lists faste
 
 The Master Looter window is designed to reduce clicks and mistakes during loot distribution while keeping the workflow fast and predictable.
 
-**Core workflow**
+**Database workflow**
 - **Select Item**: pick a loot slot from the current boss loot, or remove an inventory item from the window.
 - **Spam Loot / Ready Check**: announce what dropped (boss loot) or do a ready-check before rolling (inventory rolls).
 - **Roll types**:
@@ -248,22 +247,7 @@ Warnings are stored across characters.
 
 ---
 
-### 6) MS Changes (Main Spec Changes)
-
-<img width="248" height="201" alt="image" src="https://github.com/user-attachments/assets/1cb1e664-ce2a-47ff-98b9-01ae6a465e77" />
-
-Track what people are rolling as (MS changes) so you don’t lose track mid-raid.
-
-- Add / edit changes manually
-- Ask the raid to whisper you their changes:
-  - `/krt ms demand`
-- Spam the collected changes:
-  - `/krt ms announce`
-- Ctrl+Click can be used for quick single-player spam (where supported by the UI).
-
----
-
-### 7) Loot History (Loot Logger)
+### 6) Loot History (Loot Logger)
 
 <img width="829" height="485" alt="image" src="https://github.com/user-attachments/assets/cbf6b20c-a876-4a53-a4e8-db0b33f256c1" />
 
@@ -314,7 +298,7 @@ Export buttons exist in UI but may be disabled / not implemented in this branch.
 
 ## Minimap Button
 
-- **Left-click**: open the quick menu (Master Looter, Counter, Logger, Warnings, MS Changes, LFM, etc.)
+- **Left-click**: open the quick menu (Master Looter, Counter, Logger, Warnings, LFM, etc.)
 - **Right-click**: open Configuration
 - **Shift + drag**: move on the minimap ring
 - **Alt + drag**: free-drag mode (place anywhere)

@@ -123,7 +123,7 @@ It is keyed by `playerNid`, not by player name, and stores join/leave/online/sub
 ## Runtime caches (MUST NOT PERSIST)
 
 Runtime-only data must stay under `raid._runtime` and must be stripped before SV save.
-Save hardening runs through `Core.PrepareSavedVariablesForSave(...)`, which invokes raid normalization/compaction
+Save hardening runs through `Database.PrepareSavedVariablesForSave(...)`, which invokes raid normalization/compaction
 and strips runtime caches before persistence.
 
 Allowed runtime keys:

@@ -1,12 +1,12 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Logger.Export
 -- events: none
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
-local Core = feature.Core
+local Database = feature.Database
 
 local tostring, tonumber, type = tostring, tonumber, type
 local date = date
@@ -54,8 +54,8 @@ local HEADER_RAID_ATTENDANCE = {
 
 -- ----- Private helpers ----- --
 local function getRaidQueries()
-    if Core.GetRaidQueries then
-        return Core.GetRaidQueries()
+    if Database.GetRaidQueries then
+        return Database.GetRaidQueries()
     end
     return nil
 end

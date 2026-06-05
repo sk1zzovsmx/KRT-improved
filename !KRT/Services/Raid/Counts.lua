@@ -1,13 +1,13 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Events = feature.Events
-local Core = feature.Core
+local Database = feature.Database
 
 local InternalEvents = Events.Internal
 
@@ -49,12 +49,12 @@ local function findRaidPlayerByNid(raid, playerNid)
 end
 
 local function resolveRaidWithSchema(raidNum)
-    local resolvedRaidNum = raidNum or Core.GetCurrentRaid()
-    local raid = Core.EnsureRaidById(resolvedRaidNum)
+    local resolvedRaidNum = raidNum or Database.GetCurrentRaid()
+    local raid = Database.EnsureRaidById(resolvedRaidNum)
     if not raid then
         return nil, nil
     end
-    Core.EnsureRaidSchema(raid)
+    Database.EnsureRaidSchema(raid)
     return raid, resolvedRaidNum
 end
 
@@ -79,8 +79,8 @@ do
     -- ----- Public methods ----- --
 
     function module:GetLootCounterRows(raidNum, out)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(raidNum)
         local rows = out or {}
         if out then
             twipe(rows)
@@ -89,7 +89,7 @@ do
             return rows
         end
 
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         local seenByName = {}
         for i = #raid.players, 1, -1 do
@@ -147,7 +147,7 @@ do
     end
 
     function module:AddPlayerLootCountByNid(playerNid, lootType, delta, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
         if not raidNum then
             return
         end
@@ -167,7 +167,7 @@ do
     end
 
     local function addPlayerLootCount(name, lootType, delta, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
         if not raidNum or not name then
             return
         end
@@ -215,7 +215,7 @@ do
     end
 
     function module:GetPlayerCount(name, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
         if not raidNum then
             return 0
         end

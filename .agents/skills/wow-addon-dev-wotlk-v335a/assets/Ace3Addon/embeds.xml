@@ -1,0 +1,27 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!--
+        Embed Ace3 libraries. You must download these separately and place
+        them under Libs/ in this addon folder. Use the WoWAce r1198-era
+        bundle (or the version embedded in ElvUI-WotLK) - newer Ace3 releases
+        have the variadic-xpcall break documented in references/ace3-on-335.md.
+
+        Run scripts/scan_xpcall.py against your Libs/ folder before shipping
+        to confirm no library uses variadic xpcall.
+    -->
+    <Include file="Libs\LibStub\LibStub.lua"/>
+    <Include file="Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml"/>
+
+    <Include file="Libs\AceAddon-3.0\AceAddon-3.0.xml"/>
+    <Include file="Libs\AceEvent-3.0\AceEvent-3.0.xml"/>
+    <Include file="Libs\AceTimer-3.0\AceTimer-3.0.xml"/>
+    <Include file="Libs\AceConsole-3.0\AceConsole-3.0.xml"/>
+    <Include file="Libs\AceDB-3.0\AceDB-3.0.xml"/>
+
+    <!-- Add more libraries as needed:
+    <Include file="Libs\AceConfig-3.0\AceConfig-3.0.xml"/>
+    <Include file="Libs\AceGUI-3.0\AceGUI-3.0.xml"/>
+    <Include file="Libs\AceComm-3.0\AceComm-3.0.xml"/>
+    <Include file="Libs\AceLocale-3.0\AceLocale-3.0.xml"/>
+    <Include file="Libs\AceSerializer-3.0\AceSerializer-3.0.xml"/>
+    -->
+</Ui>

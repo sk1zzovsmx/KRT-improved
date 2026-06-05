@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._Rules
 -- notes: suggestion-only auto-loot classification; never awards or trades items
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local C = feature.C
 local IgnoredItems = feature.IgnoredItems or {}

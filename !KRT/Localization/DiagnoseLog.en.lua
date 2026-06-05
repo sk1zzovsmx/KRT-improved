@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
 
@@ -21,13 +21,13 @@ Diag.D = Diag.D or {}
 -- ----- Public methods ----- --
 
 -- ==================== Log Messages ==================== --
--- Core --
-Diag.W.LogRaidStoreUnavailable = "[Core] RaidStore unavailable (context=%s)"
-Diag.W.LogRaidStoreMethodMissing = "[Core] RaidStore missing method %s (context=%s)"
-Diag.I.LogCoreLoaded = "[Core] Loaded version=%s logLevel=%s perfMode=%s"
-Diag.D.LogCoreEventsRegistered = "[Core] Events registered=%d"
-Diag.D.LogCorePlayerEnteringWorld = "[Core] PLAYER_ENTERING_WORLD -> scheduling CheckInitialRaidState"
-Diag.E.LogCoreEventHandlerFailed = "[Core] Event handler failed event=%s err=%s"
+-- Database --
+Diag.W.LogRaidStoreUnavailable = "[Database] RaidStore unavailable (context=%s)"
+Diag.W.LogRaidStoreMethodMissing = "[Database] RaidStore missing method %s (context=%s)"
+Diag.I.LogDatabaseLoaded = "[Database] Loaded version=%s logLevel=%s perfMode=%s"
+Diag.D.LogDatabaseEventsRegistered = "[Database] Events registered=%d"
+Diag.D.LogDatabasePlayerEnteringWorld = "[Database] PLAYER_ENTERING_WORLD -> scheduling CheckInitialRaidState"
+Diag.E.LogDatabaseEventHandlerFailed = "[Database] Event handler failed event=%s err=%s"
 Diag.I.LogPerfBlock = "[Perf] %s %.1fms%s"
 
 -- Utils --
@@ -192,9 +192,6 @@ Diag.D.LogReservesQueryMissingItems = "[Reserves] Query missing items"
 Diag.D.LogReservesMissingItems = "[Reserves] Missing items requested=%d"
 Diag.D.LogReservesFormatPlayers = "[Reserves] Format players itemId=%d"
 Diag.D.LogReservesPlayersList = "[Reserves] Players itemId=%d list=%s"
-
--- Changes --
-Diag.D.LogChangesInitTable = "[Changes] Init table"
 
 -- Logger --
 Diag.E.LogListUIError = "[ListUI:%s] %s"

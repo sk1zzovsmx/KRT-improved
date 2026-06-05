@@ -22,7 +22,7 @@ This workflow is not for:
 - large behavior rewrites
 - vendored library edits under `!KRT/Libs`
 
-## 2. Core Policy
+## 2. Database Policy
 
 1. Lock behavior first, then clean structure.
 2. Work one owner at a time.
@@ -144,7 +144,7 @@ Target outcome:
 Checklist:
 
 1. Remove direct parent references and frame access.
-2. Use `Core.GetRaidStoreOrNil(...)` instead of ad-hoc nil guards when applicable.
+2. Use `Database.GetRaidStoreOrNil(...)` instead of ad-hoc nil guards when applicable.
 3. Deduplicate helper functions and keep one canonical owner.
 4. Keep sorting deterministic with explicit tie-breakers.
 5. Avoid UI delegation and `addon.*UI` calls.

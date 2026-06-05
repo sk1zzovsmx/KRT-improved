@@ -1,12 +1,12 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
-local Core = feature.Core
+local Database = feature.Database
 local Strings = feature.Strings
 local Item = feature.Item
 
@@ -71,12 +71,12 @@ do
 
     -- ----- Public methods ----- --
     function module:GetLootByNid(lootNid, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(raidNum)
         if not raid or lootNid == nil then
             return nil
         end
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         lootNid = tonumber(lootNid) or 0
         if lootNid <= 0 then
@@ -98,14 +98,14 @@ do
             return false
         end
 
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
 
         local query = buildHeldLootItemQuery(itemLink)
         if not matchesHeldLootItem(entry, query, false) then
             return false
         end
 
-        local resolvedHolder = Strings.NormalizeName(holderName or Core.GetPlayerName(), true)
+        local resolvedHolder = Strings.NormalizeName(holderName or Database.GetPlayerName(), true)
         if not resolvedHolder or resolvedHolder == "" then
             return true
         end
@@ -122,7 +122,7 @@ do
             return 0
         end
 
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
         if not raidNum then
             return 0
         end
@@ -139,13 +139,13 @@ do
     end
 
     function module:GetHeldLootNid(itemLink, raidNum, holderName, bossNid)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(raidNum)
         if not raid or not itemLink then
             return 0
         end
 
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
         holderName = Strings.NormalizeName(holderName, true)
 
         local query = buildHeldLootItemQuery(itemLink)
@@ -172,13 +172,13 @@ do
             return 0
         end
 
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(raidNum)
         if not raid then
             return 0
         end
 
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
         holderName = Strings.NormalizeName(holderName, true)
 
         local queryBossNid = tonumber(bossNid) or 0

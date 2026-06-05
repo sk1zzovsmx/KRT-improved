@@ -9,7 +9,7 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 
 1. `Libs/*`
    Third-party runtime libraries loaded first.
-2. `Init.lua` + `Core/{DB,Options,DBSchema,DBManager}.lua`
+2. `Init.lua` + `Database/{DB,DBOptions,DBSchema,DBManager}.lua`
    Unified bootstrap, shared namespaces, controller dispatch, DB/options bootstrap.
 3. `Localization/*`
    User strings (`addon.L`) and diagnose templates (`addon.Diagnose`).
@@ -17,7 +17,7 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
    Shared XML templates only.
 5. `Modules/*`
    Shared infra (`Timer`, `Events`, `Bus`, `Item`, `Sort`, `Frames`, `UIScaffold`, `UI` facade, ...).
-6. `Core/DBRaid*.lua`, `Services/*`, `Controllers/*`, `Widgets/*`, `EntryPoints/*`
+6. `Database/DBRaid*.lua`, `Services/*`, `Controllers/*`, `Widgets/*`, `EntryPoints/*`
    Runtime feature implementation and entrypoints.
 7. `KRT.xml` -> `UI/*.xml`
    UI include manifest and concrete frame layout files.
@@ -25,8 +25,8 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 ## Runtime Ownership Map
 
 - `!KRT/Init.lua`
-  Owns shared bootstrap namespaces (`addon.Core`, `addon.State`, `addon.Events`, ...)
-  and global WoW event wiring. `Core.GetFeatureShared()` is the module-facing
+  Owns shared bootstrap namespaces (`addon.Database`, `addon.State`, `addon.Events`, ...)
+  and global WoW event wiring. `Database.GetFeatureShared()` is the module-facing
   shared dependency contract, and `feature.EnsureServiceNamespace(...)` owns
   service namespace bootstrap for split service files.
 - `!KRT/Controllers/*.lua`
@@ -56,15 +56,15 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   (`addon.Services.Reserves._Import`, `_Aliases`, `_Display`, `_Sync`, `_Chat`).
   `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
   `Services/Chat.lua` owns announce/warn output contracts.
-- `!KRT/Core/DB.lua`
+- `!KRT/Database/DB.lua`
   Owns the canonical public accessor facade for DB-manager-backed services on
-  `addon.Core.*`; `addon.DB` remains the concrete namespace for DB submodules and
+  `addon.Database.*`; `addon.DB` remains the concrete namespace for DB submodules and
   manager state, not a parallel getter surface.
-- `!KRT/Core/Options.lua`
+- `!KRT/Database/DBOptions.lua`
   Owns `addon.Options`, strict nested option namespaces, and the read-only `addon.options` proxy.
-- `!KRT/Core/DBSchema.lua`
+- `!KRT/Database/DBSchema.lua`
   Owns schema-version state while exposing the canonical public accessor on
-  `addon.Core.GetRaidSchemaVersion`; `addon.DBSchema` is not a second parallel getter facade.
+  `addon.Database.GetRaidSchemaVersion`; `addon.DBSchema` is not a second parallel getter facade.
 - `!KRT/Widgets/*.lua`
   Own child UI controllers under `addon.Widgets.*`.
 - `!KRT/EntryPoints/*.lua`
@@ -102,7 +102,7 @@ compatibility exception is `addon:Print` for `LibLogger-1.0`.
 - Controllers must not reference other parent owners directly.
 - Upward communication should use `addon.Bus` and canonical event names from `Modules/Events.lua`.
 - Prefer existing internal events (`SetItem`, `RaidRosterDelta`, etc.) over new micro-events.
-- EntryPoints should prefer `addon.Core.RequestControllerMethod(...)` for parent routing instead
+- EntryPoints should prefer `addon.Database.RequestControllerMethod(...)` for parent routing instead
   of open-coded controller lookup helpers.
 - Capability checks and announce/warn output should target `addon.Services.Raid` and
   `addon.Services.Chat` (or their top-level alias tables), not root addon methods.
@@ -127,11 +127,9 @@ entrypoints, or scaffold/minimap ownership.
 | `Master:TRADE_ACCEPT_UPDATE` | WoW-forwarded event handler | Called by Master trade forwarding through method-name dispatch. |
 | `Master:TRADE_CLOSED` | WoW-forwarded event handler | Called by Master trade forwarding through method-name dispatch. |
 | `Master:TRADE_REQUEST_CANCEL` | WoW-forwarded event handler | Called by Master trade forwarding through method-name dispatch. |
-| `Changes:Demand` | Slash/minimap command endpoint | Used by `/krt ms demand` and minimap menu routing. |
-| `Changes:Announce` | Slash/minimap command endpoint | Used by `/krt ms announce` and minimap menu routing. |
-| `Warnings:RequestAnnounce` | Slash command endpoint | Used by `/krt rw ...` through `Core.RequestControllerMethod`. |
-| `Spammer:RequestStart` | Slash command endpoint | Used by `/krt pug start` through `Core.RequestControllerMethod`. |
-| `Spammer:RequestStop` | Slash command endpoint | Used by `/krt pug stop` through `Core.RequestControllerMethod`. |
+| `Warnings:RequestAnnounce` | Slash command endpoint | Used by `/krt rw ...` through `Database.RequestControllerMethod`. |
+| `Spammer:RequestStart` | Slash command endpoint | Used by `/krt pug start` through `Database.RequestControllerMethod`. |
+| `Spammer:RequestStop` | Slash command endpoint | Used by `/krt pug stop` through `Database.RequestControllerMethod`. |
 | `Minimap:SetPos` | Slash/minimap state endpoint | Used by `/krt minimap pos` and minimap drag/load positioning. |
 | `Minimap:BindUI` | Minimap lifecycle endpoint | Owned by `EntryPoints/Minimap.lua` for minimap frame binding. |
 | `Minimap:EnsureUI` | Minimap lifecycle endpoint | Used by bootstrap/config paths to ensure minimap state. |

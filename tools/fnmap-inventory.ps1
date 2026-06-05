@@ -12,7 +12,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
 $scanRoots = @(
-    "!KRT/Core",
+    "!KRT/Database",
     "!KRT/Init.lua",
     "!KRT/Modules",
     "!KRT/Services",

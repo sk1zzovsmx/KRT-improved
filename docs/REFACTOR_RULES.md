@@ -42,11 +42,11 @@ Permanent guardrails for function mapping and unification work.
 
 ## Canonical Ownership (Quick Wins)
 
-- `Core.GetFeatureShared`: `!KRT/Init.lua`
-- `Core.EnsureLootRuntimeState`: `!KRT/Init.lua`
-- `Core.GetController`: `!KRT/Init.lua`
-- DB manager-backed accessors: `!KRT/Core/DB.lua` via `addon.Core.*`
-- Raid schema version accessor: `!KRT/Core/DBSchema.lua` via `addon.Core.GetRaidSchemaVersion`
+- `Database.GetFeatureShared`: `!KRT/Init.lua`
+- `Database.EnsureLootRuntimeState`: `!KRT/Init.lua`
+- `Database.GetController`: `!KRT/Init.lua`
+- DB manager-backed accessors: `!KRT/Database/DB.lua` via `addon.Database.*`
+- Raid schema version accessor: `!KRT/Database/DBSchema.lua` via `addon.Database.GetRaidSchemaVersion`
 - Chat announce/warn output: `!KRT/Services/Chat.lua` via `addon.Services.Chat.*`
 - Raid capability queries and ML guard: `!KRT/Services/Raid/Capabilities.lua` via
   `addon.Services.Raid.*`
@@ -58,7 +58,7 @@ Permanent guardrails for function mapping and unification work.
 - Master button/dropdown/cursor glue: private unless explicitly consumed by tests or
   another owner
 - Reserves formatters: `!KRT/Services/Reserves.lua`
-- EntryPoint controller lookup: `Core.GetController(name)`
+- EntryPoint controller lookup: `Database.GetController(name)`
 - UI primitives: `!KRT/Modules/UI/Visuals.lua`
 - UI row visuals: `!KRT/Modules/UI/Visuals.lua`
 - UI scaffold orchestration: `!KRT/Modules/UI/Frames.lua` (`addon.UIScaffold.*`)

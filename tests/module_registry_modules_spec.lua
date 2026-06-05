@@ -144,7 +144,7 @@ for i = 1, #expectedModules do
 end
 
 local addon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,

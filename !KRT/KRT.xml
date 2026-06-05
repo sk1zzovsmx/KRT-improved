@@ -6,7 +6,6 @@
     <Include file="UI\Spammer.xml" />
     <Include file="UI\Warnings.xml" />
     <Include file="UI\Master.xml" />
-    <Include file="UI\Changes.xml" />
     <Include file="UI\Logger.xml" />
     <Include file="UI\Config.xml" />
     <Include file="UI\LootCounter.xml" />

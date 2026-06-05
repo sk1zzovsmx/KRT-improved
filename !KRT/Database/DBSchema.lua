@@ -1,0 +1,51 @@
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Database.GetFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: none
+local addon = select(2, ...)
+local feature = addon.Database.GetFeatureShared()
+
+local Database = feature.Database
+
+addon.DBSchema = addon.DBSchema or {}
+local DBSchema = addon.DBSchema
+
+-- ----- Internal state ----- --
+local DEFAULT_RAID_SCHEMA_VERSION = 5
+
+-- ----- Private helpers ----- --
+local function normalizeSchemaVersion(value)
+    local version = tonumber(value)
+    if not version or version < 1 then
+        return DEFAULT_RAID_SCHEMA_VERSION
+    end
+    return version
+end
+
+local function getCanonicalRaidSchemaVersion()
+    local version = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSION)
+    DBSchema.RAID_SCHEMA_VERSION = version
+    return version
+end
+
+-- ----- Public methods ----- --
+DBSchema.RAID_SCHEMA_VERSION = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSION)
+
+function Database.GetRaidSchemaVersion()
+    return getCanonicalRaidSchemaVersion()
+end
+
+do
+    local name = "Database/DBSchema"
+    local deps = { "Init" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

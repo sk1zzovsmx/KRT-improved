@@ -23,10 +23,10 @@ Libs\LibLogger-1.0\lib.xml
 
 # Layer 1 - Unified init/bootstrap/runtime (must load before all addon Lua files)
 Init.lua
-Core\DB.lua
-Core\Options.lua
-Core\DBSchema.lua
-Core\DBManager.lua
+Database\DB.lua
+Database\DBOptions.lua
+Database\DBSchema.lua
+Database\DBManager.lua
 
 # Layer 2 - Localization (must load before runtime modules)
 Localization\localization.en.lua
@@ -66,11 +66,11 @@ Modules\Bus.lua
 
 # Layer 5 - Runtime modules (ordered by dependency)
 # Services + entrypoint + parents + child UI controllers
-Core\DBRaidMigrations.lua
-Core\DBRaidStore.lua
-Core\DBRaidQueries.lua
-Core\DBRaidValidator.lua
-Core\DBSyncer.lua
+Database\DBRaidMigrations.lua
+Database\DBRaidStore.lua
+Database\DBRaidQueries.lua
+Database\DBRaidValidator.lua
+Database\DBSyncer.lua
 Services\Loot\Context.lua
 Services\Loot\State.lua
 Services\Loot\Snapshots.lua
@@ -120,7 +120,6 @@ Services\Logger\Actions.lua
 Controllers\Logger.lua
 Widgets\Config.lua
 Controllers\Warnings.lua
-Controllers\Changes.lua
 Controllers\Spammer.lua
 
 # Layer 6 - UI include manifest

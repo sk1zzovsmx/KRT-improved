@@ -4,7 +4,7 @@
 -- exports: addon.Services.Reserves._Aliases
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Strings = feature.Strings
 

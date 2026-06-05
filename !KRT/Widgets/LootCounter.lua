@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 
@@ -13,7 +13,7 @@ local Colors = feature.Colors
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events
 local C = feature.C
-local Core = feature.Core
+local Database = feature.Database
 local Bus = feature.Bus
 local Services = feature.Services
 local Chat = Services.Chat
@@ -37,7 +37,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Colors",
             "Modules/Events",
@@ -182,7 +182,7 @@ do
             return false, "not_in_raid"
         end
 
-        local state = raidService:GetCapabilityState("changes_broadcast")
+        local state = raidService:GetCapabilityState("loot_counter_broadcast")
         if state and state.allowed == true then
             return true
         end
@@ -383,10 +383,10 @@ do
 
     local function getCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not addon.Core.GetCurrentRaid() then
+        if not addon.Database.GetCurrentRaid() then
             return raidPlayers
         end
-        return Services.Raid:GetLootCounterRows(addon.Core.GetCurrentRaid(), raidPlayers)
+        return Services.Raid:GetLootCounterRows(addon.Database.GetCurrentRaid(), raidPlayers)
     end
 
     local function ensureRow(i, rowHeight)
@@ -478,14 +478,14 @@ do
                 sec.plus:SetScript("OnClick", function()
                     local nid = row._playerNid
                     if nid then
-                        Services.Raid:AddPlayerLootCountByNid(nid, lt, 1, addon.Core.GetCurrentRaid())
+                        Services.Raid:AddPlayerLootCountByNid(nid, lt, 1, addon.Database.GetCurrentRaid())
                         module:RequestRefresh("count_changed")
                     end
                 end)
                 sec.minus:SetScript("OnClick", function()
                     local nid = row._playerNid
                     if nid then
-                        Services.Raid:AddPlayerLootCountByNid(nid, lt, -1, addon.Core.GetCurrentRaid())
+                        Services.Raid:AddPlayerLootCountByNid(nid, lt, -1, addon.Database.GetCurrentRaid())
                         module:RequestRefresh("count_changed")
                     end
                 end)
@@ -494,7 +494,7 @@ do
             row.reset:SetScript("OnClick", function()
                 local nid = row._playerNid
                 if nid then
-                    local raidNum = addon.Core.GetCurrentRaid()
+                    local raidNum = addon.Database.GetCurrentRaid()
                     Services.Raid:SetPlayerLootCountByNid(nid, "ms", 0, raidNum)
                     Services.Raid:SetPlayerLootCountByNid(nid, "os", 0, raidNum)
                     Services.Raid:SetPlayerLootCountByNid(nid, "free", 0, raidNum)
@@ -533,7 +533,7 @@ do
     end
 
     resetAllCounts = function()
-        local currentRaid = addon.Core.GetCurrentRaid()
+        local currentRaid = addon.Database.GetCurrentRaid()
         if not currentRaid then
             return
         end

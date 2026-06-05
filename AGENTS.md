@@ -1,596 +1,138 @@
 # KRT - AGENTS.md (WoW 3.3.5a / Lua 5.1)
 
-Context file for AI coding agents. Lives at repo root as `AGENTS.md`.
-Keep lines <= 120 chars. Keep this file current.
+Context file for AI coding agents. Keep lines <= 120 chars.
 
 Default: guidelines are non-binding; when in doubt, follow existing KRT patterns.
 Exception: sections marked **BINDING** must be followed for every change.
 
-Changelog: **CHANGELOG.md** is the single source of truth for behavior/user-visible changes.
+`!KRT/CHANGELOG.md` is the single source of truth for behavior/user-visible changes.
 
-Developer docs package (keep these files aligned when architecture/tooling changes):
-- `docs/ARCHITECTURE.md` (architecture/layering map + UI/XML binding and template policy)
-- `docs/OVERVIEW.md` (runtime ownership and module map)
-- `docs/LUA_WRITING_RULES.md` (Lua writing rules and naming policy)
-- `docs/DEV_CHECKS.md` (quick layering/tooling checks)
-- `docs/AGENT_SKILLS.md` (agent skills + Mechanic companion workflow)
-- `docs/KRT_MCP.md` (repo-local MCP server usage and tool inventory)
-- `tools/krt.py` (cross-platform tooling entrypoint)
+Developer docs package:
+- `docs/ARCHITECTURE.md` - architecture/layering map and XML/UI policy
+- `docs/OVERVIEW.md` - runtime ownership and module map
+- `docs/LUA_WRITING_RULES.md` - Lua writing and naming rules
+- `docs/DEV_CHECKS.md` - local checks and gates
+- `docs/AGENT_SKILLS.md` - agent skills and companion tooling
+- `docs/KRT_MCP.md` - repo-local MCP server usage
+- `tools/krt.py` - cross-platform tooling entrypoint
 
 ---
 
-## Conversations (Self-Learning)
+## 1) Conversation Rules
 
-Update requirement:
-- Before starting any task, scan the latest user message for new permanent rules/preferences.
+- Before starting a task, scan the latest user message for new permanent rules/preferences.
 - If a new durable rule is detected, update this file first, then do the task.
-
-Do NOT record:
-- one-off instructions for a single task,
-- temporary exceptions.
-
-Durable preferences learned from recent conversations:
-- Prefer refactors to reduce code surface while adding new behavior; avoid keeping debug-only or
-  redundant helper layers when a simpler implementation preserves the same contract.
-- Prefer master-looter-only runtime behavior: non-master clients should not run roll/award gameplay flows.
-- Prefer centralized Master Looter access policy via shared facade/helpers; avoid duplicating ML gate
-  checks and warnings across controllers and entrypoints.
-- Prefer capability-based access policy: looting flows require current Master Looter ownership, while
-  leadership features (for example Raid Warnings, Changes, LFM spammer) should remain available to raid
-  leader/assistant roles when appropriate.
-- Prefer `Changes:Demand()` and `Changes:Announce()` to require raid leader/assistant permission in raid;
-  being merely in raid is not sufficient.
-- Prefer LootCounter grouped-count announce/spam actions to require raid leader/assistant permission in raid.
-- Prefer centralized raid-role capability policy (`member`/`assistant`/`leader`/`master looter`) to drive
-  enable/disable and action guards across UI/controllers, instead of ad-hoc per-feature role checks.
-- Prefer `addon.Services.Raid` as the canonical owner for capability queries and shared
-  master-only guards, and `addon.Services.Chat` as the canonical owner for announce/warn
-  output; avoid root `addon:*` method facades except `addon:Print` compatibility for LibLogger.
-- Prefer `Logger` public contracts to expose only cross-module/runtime ownership; keep Logger UI-local
-  selection/edit/popup glue private to `Controllers/Logger.lua` whenever those helpers do not need to
-  cross module boundaries.
-- Prefer reducing `Unclassified` APIs only when there is a real ownership/contract problem behind them;
-  do not rename or churn public methods only to satisfy taxonomy noise.
-- Prefer underscore-prefixed internal APIs for cross-file package helpers that are not public
-  contracts; do not leave them exposed as public `*Internal` methods on canonical owner tables.
-- In `Controllers/Master.lua`, keep button/dropdown/cursor glue private unless a test or another
-  module genuinely depends on the public handler contract.
-- In `Services/Logger/*`, `Services/Raid/*`, and `Services/Reserves/*`, keep parser/cache/selection
-  and other package-internal helpers on local helpers or underscore-prefixed owner-table fields rather
-  than public APIs.
-- Prefer simpler role-gated UI without extra explanatory tooltips for disabled actions unless explicitly requested.
-- Do not introduce Ace dependencies (Ace2/Ace3); prefer native KRT + LibCompat patterns.
-- Do not modify vendored libraries under `!KRT/Libs/*`; keep fixes in addon code.
-- Avoid runtime backward-compat shims when refactoring; target the fresh-SV model directly.
-- Prefer LuaRocks Lua Style Guide for formatting/layout when it does not conflict with KRT binding conventions.
-- Prefer PascalCase for addon module table names.
-- Prefer PascalCase for public exported methods on feature modules (`module:*`, `Store:*`, `View:*`, `Actions:*`,
-  `Box:*`); keep WoW-required event names unchanged (UPPERCASE handlers).
-- Prefer PascalCase for public/cross-module APIs in infrastructure namespaces too
-  (`Core`, `Bus`, `Frames`, `UI*`, `Strings`, `Time`, `Comms`, `Base64`, `Colors`, `Item`, `Sort`).
-- Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
-- Keep file-local/private helpers in camelCase; keep Lua metamethods (`__index`, `__call`, etc.) unchanged.
-- For naming migrations, prefer direct migration to canonical PascalCase call-sites with no retired alias references;
-  add temporary aliases only when explicitly requested.
-- For API inventories and reports, separate `Public` and `Internal` surfaces; treat underscore methods
-  and `._ui` targets as internal implementation APIs.
-- For new/renamed public API methods, use a short verb taxonomy:
-  queries (`Get/Find/Is/Can`), mutations (`Set/Add/Remove/Delete/Upsert`),
-  lifecycle/UI (`Ensure/Bind/Localize/Request/RequestRefresh/Refresh/Toggle/Show/Hide`),
-  plus exact hooks (`OnLoad`, `OnLoadFrame`, `AcquireRefs`, `BindHandlers`, `RefreshUI`).
-- Keep staged API nomenclature checks automated in local gates/pre-commit to block new naming regressions.
-- Prefer API cleanup work to start from a fresh full function/API census, then merge or remove redundant
-  surfaces by canonical ownership instead of preserving parallel wrappers.
-- Prefer staged API-reduction refactors with explicit checkpoints; after each completed stage, regenerate
-  `docs/*`, rerun the relevant checks, recatalog the surface, and only then continue to the next stage.
-- In feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/`, prefer canonical top-level
-  section headers in order:
-  `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
-  `-- ----- Public methods ----- --`.
-- UI refactors: centralize shared UI glue/patterns in `Init.lua`; keep feature-specific UI logic in each module.
-- Move helpers to dedicated `Modules/*` files only when they are generic and reused; avoid catch-all utility files.
-- Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
-- Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
-- For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
-- For whole-addon optimization/uniformization, start with a measurable audit and update this file with the
-  agreed process/rules before runtime code changes.
-- For whole-addon uniformization waves, proceed sequentially through KRT-owned files in stable load/layer order;
-  do not jump between hotspots except to fix a blocking shared contract.
-- For Logger visual refreshes, prefer a MizusRaidTracker-inspired Wrath raid-log look: Blizzard dialog frame,
-  dark compact tables, yellow section titles, default KRT buttons outside list panels, and green selected rows.
-- For Logger loot item icons, preserve an approximately `28x28` click target, a centered `26x26` icon texture,
-  and a centered `32x32` quickslot-like border drawn outside the icon; avoid using button `NormalTexture`
-  when it clips or overlays the item bitmap.
-- For UI function naming, keep explicit `UI` in method names when it improves clarity; prefer readable names
-  over ultra-short abbreviations.
-- For module-local UI readability, prefer a local `UI` state/helper table:
-  `UI.Bound`, `UI.Loaded`, `UI.isDirty`, `UI.AcquireRefs`, `UI.Localize`, `UI.Refresh`.
-- Prefer one canonical UI lifecycle vocabulary across modules; avoid mixed synonyms for the same concept
-  (for example `uiBound` vs `UI.Bound`, `UpdateUIFrame` vs `UI.Refresh`).
-- Prefer a canonical UI module contract when feasible:
-  `OnLoad`, `AcquireRefs`, `BindUI`, `EnsureUI`, `Toggle`, `Hide`, `RequestRefresh`, `Refresh`.
-- Prefer the definitive UI contract via `UIScaffold.DefineModuleUi(cfg)` for Controllers/Widgets.
-- Modules should implement only UI hooks (`AcquireRefs`, `BindHandlers`, `Localize`, `OnLoadFrame`,
-  `RefreshUI`/`Refresh`), while scaffold-generated methods own `BindUI`, `EnsureUI`, `Toggle`,
-  `Show`, `Hide`, `RequestRefresh`, `MarkDirty`, and cache fields (`frame`, `refs`, `_ui`).
-- Keep UI state schema uniform: `module._ui = { Loaded, Bound, Localized, Dirty, Reason, FrameName }`.
-- Prefer `Core.GetRaidStoreOrNil(contextTag, requiredMethods)` over ad-hoc
-  `Core.GetRaidStore` nil/method checks to keep diagnostics and guard behavior uniform.
-- Prefer homogeneous module structure/patterns across Lua modules; avoid one-off lifecycle variants
-  unless behavior requires them.
-- Prefer Lua fixes to follow the established local-helper/module pattern; use scoped local blocks or
-  focused splits before moving private helpers onto tables just to work around local limits.
-- For UI named-frame access standardization, prefer the dominant in-repo `_G[frameName .. suffix]`
-  pattern over introducing static local ref caches only for stylistic cleanup.
-- For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
-  `https://www.townlong-yak.com/framexml/3.3.5`.
-- For custom button glow UX, prefer high-visibility dynamic pulses with geometry
-  tightly aligned to each button's border (avoid diffuse/off-frame halos).
-- For button-glow styling, prefer clean border pulses; avoid glossy/sweep
-  "shiny" overlays unless explicitly requested for a specific patch.
-- For glow architecture on WoW 3.3.5a, prefer local UI module implementations
-  (for example LCG-like ports in `Modules/UI/Effects.lua`) over vendoring
-  full modern glow libs.
-- Keep glow/proc implementation details in `Modules/UI/Effects.lua`; keep
-  `Modules/UI/Visuals.lua` focused on generic UI primitives and row visuals.
-- Treat raid `players[].countMS` (LootCounter MS bucket) as canonical persisted raid data; OS/Free/SR buckets live in
-  `players[].countOs`, `players[].countFree`, and `players[].countSR`.
-- Prefer a clean persisted raid schema: keep `players[]` as the canonical persisted player store; treat
-  `_playersByName` as a derived runtime index/cache.
-- Treat fresh SavedVariables as strict mode: avoid historical-schema cleanups and avoid fallback to
-  volatile array indices when stable NIDs (`playerNid`, `bossNid`, `lootNid`) are available.
-- Prefer lean SavedVariables persistence: store only canonical restore-critical data; avoid persisting
-  duplicated, derived, or runtime-only fields that can be rebuilt at load time.
-- Keep `EntryPoints/SlashEvents.lua` focused on `/cmd` handling only.
-- Keep main WoW event handlers centralized in `Init.lua`; modules should expose callable APIs used by those handlers.
-- Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
-- Keep glow effects single-choice by method (`ACShine`, `Pixel`, `Proc`, `buttonOverlay`);
-  avoid profile-name methods such as `SoftPulse`/`CombatPulse`.
-- Prefer deterministic sorting with explicit tie-breakers; when primary values are equal, use stable secondary keys
-  (for Logger Loot, prefer loot name, then IDs) to avoid random reordering between sorts.
-- Prefer deterministic bugfixes over timing-dependent or fragile workaround-style fixes.
-- Keep bootstrap ownership centralized in `Init.lua` for `addon.Core`, `addon.L`, `addon.Diagnose`,
-  `addon.State`, `addon.C`, and `addon.Events`; do not re-bootstrap them in feature files.
-- Prefer a uniform Lua file contract header with:
-  `local addon = select(2, ...)` and `local feature = addon.Core.GetFeatureShared()`.
-- Prefer bus-only architecture from `Init.lua`: no direct calls from Core to retired root parent aliases or other
-  Parents; wire WoW events into `Bus.TriggerEvent("wow.EVENT", ...)` and let modules subscribe.
-- Keep Logger-owned roster UI refresh logic inside `Controllers/Logger.lua` (subscribed via `RaidRosterDelta`),
-  not in `Init.lua`.
-- Prefer a unified root bootstrap/runtime entry file `!KRT/Init.lua`; do not split ownership between
-  `Core/Init.lua` and `KRT.lua`.
-- Prefer a widget facade/port via `addon.UI` (`Modules/UI/Facade.lua`) for Controller/EntryPoint -> Widget calls.
-- Avoid direct references to `addon.LootCounter`, `addon.ReservesUI`, and `addon.Config` in
-  `Controllers/*.lua` and `EntryPoints/*.lua`; use `addon.UI:Call(...)` instead.
-- Prefer optional widget architecture with `addon.Features` flags and profile-aware toggles (`core` vs `full`).
-- Keep XML layout-only: do not use `<Scripts>`/`<On...>` in `UI/*.xml` and `UI/Templates/*.xml`.
-- Keep optional-widget behavior inside `addon.UI`, `UIScaffold`, and feature-local Lua wiring;
-  there is no `Modules/UI/Binder` layer in the current tree.
-- Keep Services pure: no frame lifecycle (`OnLoad`/`Refresh`) or UI delegation in `Services/*`;
-  widgets should consume the canonical service surface, while nested `.Service` fields remain
-  compatibility-only when present, and refresh via bus events (e.g. `ReservesDataChanged`).
-- Keep item helpers consolidated in a dedicated infra module (for example `Modules/Item.lua`);
-  expose item-link parsing and tooltip probes via `feature.Item`/`addon.Item`.
-- Prefer dedicated reusable modules (`Bus`, `ListController`, `MultiSelect`, `Frames`, `Strings`,
-  `Colors`, `Comms`, `Base64`, `Json`, `Time`, `Sort`) over reviving `Modules/Utils.lua`.
-- Prefer explicit canonical contracts and deterministic initialization over scattered defensive guards;
-  when a dependency must exist, normalize it once at the module boundary/bootstrap rather than adding
-  many per-call fallback branches.
-- Treat `feature.X or addon.X` locals and `addon.Services.* = addon.Services.* or {}` guards as intentional
-  test/bootstrap wiring until a dedicated `Core.GetFeatureShared()` and namespace-bootstrap stage replaces
-  them coherently; do not remove those patterns piecemeal.
-- Prefer `addon.Core` as the canonical public accessor surface for DB-backed contracts
-  (`GetRaidStore`, `GetRaidStoreOrNil`, `GetRaidQueries`, `GetRaidMigrations`,
-  `GetRaidValidator`, `GetSyncer`, `GetRaidSchemaVersion`); keep `addon.DB`/`addon.DBSchema`
-  focused on concrete modules/state, not duplicate public getter facades.
-- Prefer centralized MultiSelect modifier policies in `Modules/UI/MultiSelect.lua`
-  with per-list scope keys; avoid per-controller CTRL/SHIFT gating flags.
-- Prefer centralized event-name registry in `Modules/Events.lua` for internal bus events and
-  wow-forwarded events (avoid ad-hoc string literals in modules).
-- Prefer minimizing cross-service interlacing: keep loot ingestion/parsing ownership in
-  `Services/Loot/Service.lua`, and avoid over-splitting `Services/Raid/*` into thin pass-through files.
-- Prefer loot-context runtime internals (`LootContext`, `activeLoot`, loot-window session/snapshot
-  state) to live under `Services/Loot/*`; keep `Services/Loot/Service.lua` focused on
-  ingestion/parsing and public loot-service APIs, while `Services/Raid/State.lua` consumes shared helpers instead of
-  owning those internals directly.
-- Prefer splitting oversized service hotspots into focused sibling modules (for example `PendingAwards`,
-  `PassiveGroupLoot`, `Tracking`, `Workflow`, `Receipts`, `Records`, `Reconcile`, and `Rules`) while keeping
-  `Services/Loot/Service.lua` as the stable public facade.
-- Prefer namespaced module ownership under `addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`;
-  do not reintroduce retired root aliases (`addon.Master`, `addon.Raid`, etc.).
-- Alias lockdown: keep retired root aliases blocked by local gates to prevent new call sites from regressing.
-- Prefer callsite guards for debug/trace logging (`if addon.hasDebug then ... end`) when message
-  arguments need `format`/`tostring` work; do not rely on LibLogger level guards to skip evaluation.
-- Keep `Features:GetProfile()` while slash/debug feature-profile reporting depends on it.
-- Prefer the fixed `full` feature profile at runtime; do not add global feature/profile override hooks
-  unless explicitly requested.
-- Do not remove bundled LibGroupTalents/LibTalentQuery/LibBabble files unless `LibCompat` talent/spec
-  requirements are patched first.
-- Prefer fast architecture verification via focused `rg` checks (XML inline scripts, widget facade calls,
-  namespacing coverage, and retired top-level access scans) before closing refactor tasks.
-- Prefer gradual function/API deduplication: remove or consolidate similar helper functions to reduce drift,
-  while preserving behavior and module ownership boundaries.
-- Prefer reducing public API redundancy by collapsing pass-through wrappers into canonical service APIs;
-  avoid exposing cross-service bridge methods as long-term public contracts when they can stay internal.
-- Prefer centralized constants for shared timing windows/TTLs used across modules;
-  avoid repeating the same hardcoded seconds in multiple files.
-- Prefer AFD-oriented development workflow with pinned skills in `.agents/skills`;
-  sync via `tools/sync-agent-skills.ps1`.
-- Keep Mechanic as external companion tooling (not vendored in addon runtime);
-  bootstrap per-device via `tools/mech-bootstrap.ps1`.
-- Prefer multi-device workflow using repo scripts and explicit addon path wrapper
-  `tools/mech-krt.ps1` for Mechanic commands.
-- Keep skill/tooling configuration stored in-repo (`tools/agent-skills.manifest.json`)
-  with docs under `docs/AGENT_SKILLS.md` for deterministic setup.
-- Prefer canonical repo-wide Lua writing rules in `docs/LUA_WRITING_RULES.md`;
-  keep `.stylua.toml`, `.luacheckrc`, and `tools/check-lua-uniformity.ps1`
-  aligned with that document.
-- For roll-response lifecycle hardening, prefer this canonical policy:
-  `PASS` reversible, `CANCELLED` reversible, `TIMED_OUT` terminal for the session,
-  `INELIGIBLE` recoverable only through eligibility refresh, and only eligible `ROLL`
-  responses may enter the resolver.
-- For countdown-bypass intake (`countdownRollsBlock=false`), late rolls should stay visible
-  with `OOT` tagging but must be excluded from resolver candidates, manual winner
-  selection, and tie-reroll triggers.
-- Treat `Rolls:GetDisplayModel().resolution` as an explicit public service contract;
-  keep its stable fields documented (`autoWinners`, `tiedNames`, `topRollName`,
-  `requiresManualResolution`, `cutoff`) instead of treating them as incidental internals.
-- Treat `tests/release_stabilization_spec.lua` as the regression gate for changes in
-  `Services/Rolls/Service.lua` and `Controllers/Master.lua`; run it whenever those modules change.
-- Prefer repo-relative paths or placeholders in config/docs/examples; avoid personal absolute
-  paths unless strictly required by the tool.
-- Prefer simplified repo tooling that works on both Windows and Linux with automatic OS-aware
-  execution; local runs should use Windows-native paths/tools, while cloud runs should use Linux-
-  compatible paths/tools without requiring separate user workflows.
-- Prefer release-channel resolution from changelog release metadata: under `## Unreleased`, keep
-  `Release-Version: <version>` in `!KRT/CHANGELOG.md` using SemVer forms `x.y.z` (stable),
-  `x.y.z-alpha.N` (internal/no publication), or `x.y.z-beta.N` (GitHub prerelease); workflows,
-  tags, and assets should validate against that metadata instead of manual prerelease toggles.
-- Prefer release publication only when the full SemVer increases; unchanged or lower versions
-  must not publish a new release.
-- Prefer semantic version bumps with this policy: increment `patch` for backward-compatible fixes
-  and polish, increment `minor` for backward-compatible features or meaningful UI/workflow
-  additions, and increment `major` only for breaking API/SavedVariables changes or required user
-  migrations.
-- Treat prerelease transitions (`alpha.N`, `beta.N`, or `-> stable`) as explicit SemVer versions;
-  publish a new version instead of moving or replacing existing release tags/assets.
-- Prefer branch-agnostic release automation: release workflows should accept pushes from any branch,
-  and manual release dispatch should target any ref once the workflow exists on the default branch.
-- Prefer manual release workflows to use the selected branch/ref directly; avoid redundant
-  `target_ref` inputs when the Actions branch selector already defines release context.
-- Prefer concise GitHub release notes with headings `Included Commits`,
-  `New Functionality`, and `Enhancements/Improvement`; keep bullets short
-  and avoid overly detailed release-note prose. In `Included Commits`,
-  include commit short hashes alongside each subject.
-- Prefer GitHub release notes to call out regressions/fixes explicitly when a
-  release contains behavior corrections or recovery from prior regressions.
-- For release artifacts, package only the addon folder `!KRT/`; do not include repo-level
-  docs/tooling files in distributable ZIP outputs.
-- Keep GitHub release asset download/checksum instructions out of root `README.md`;
-  document them in dedicated release/tooling docs under `docs/` or `tools/`.
-- For auto-loot rules, prefer automatic suggestions only; do not auto-award, auto-trade, or auto-assign loot
-  unless explicitly requested.
-- For passive Group Loot logging, prefer filtering low-value DE/Greed drops such as green-quality items,
-  gems, and recipes out of the logger unless explicitly requested.
-- For Whisper SoftRes, keep player whisper handling out of `EntryPoints/SlashEvents.lua`; put request parsing
-  and response policy under Reserves/Chat-style service ownership, gate replies behind config, valid reserve
-  data, and ML/leader/assistant authority, and send only chat-safe messages through
-  `addon.Services.Chat`/`addon.Comms`.
+- Do not record one-off instructions, temporary exceptions, or task-local preferences.
+- For large cleanup/refactor waves, start from a fresh inventory and proceed in stable load/layer order.
 
 ---
 
-## 1) Purpose
+## 2) Hard Constraints (**BINDING**)
 
-KRT (Kader Raid Tools) provides raid-lead QoL for WotLK 3.3.5a:
-- loot handling (MS/OS/SR) + master-loot helpers,
-- soft reserves (import/export, reserve list),
-- loot history/logger,
-- warnings/announces, LFM spammer,
-- small utilities (export strings, helpers).
-
-UI is XML + Lua (no Ace3 GUI). Libraries are vendored via LibStub.
-
----
-
-## 2) Hard constraints (**BINDING**)
-
-- Client/API: Wrath of the Lich King 3.3.5a (Interface 30300), Lua 5.1 runtime.
-- Addon folder name: `!KRT` (leading `!` is intentional).
-- No Ace3 dependencies (do not introduce Ace3).
-- SavedVariables compatibility: do not break SV keys/shape without migration + CHANGELOG entry.
+- Client/API: Wrath of the Lich King 3.3.5a, Interface 30300, Lua 5.1.
+- Addon folder name: `!KRT` with the leading `!`.
+- Do not introduce Ace2/Ace3 dependencies.
+- Do not modify vendored libraries under `!KRT/Libs/*`.
+- Do not break SavedVariables shape without migration and changelog notes.
+- Do not introduce new non-frame globals unless explicitly required and documented.
+- Code, comments, UI labels, chat text, and docs should be English and ASCII-only unless required otherwise.
+- User-facing strings go through `addon.L`; diagnostic templates go through `addon.Diagnose`.
 
 ---
 
-## 3) Modular feature policy (**BINDING**)
+## 3) Runtime Architecture (**BINDING**)
 
-KRT is now modular by design:
-- Unified bootstrap/runtime ownership for shared addon tables, runtime state, and global event wiring lives in
-  `!KRT/Init.lua`.
-- Feature implementations live in:
-  - `!KRT/Controllers/*.lua` (top-level parent owners),
-  - `!KRT/Services/*.lua` (runtime service/model modules),
-  - `!KRT/Widgets/*.lua` (feature-specific UI controllers/widgets),
-  - `!KRT/EntryPoints/*.lua` (slash/minimap entrypoints).
-- `!KRT/Modules/` remains reserved for utilities/constants/static data (e.g., `Utils.lua`, `C.lua`,
-  `IgnoredItems.lua`, `IgnoredMobs.lua`) and must not become a feature folder.
-- XML is split into feature-oriented files under `!KRT/UI/`, loaded via `!KRT/KRT.xml` include manifest.
+KRT is modular. Keep ownership boundaries clear.
+
+- `!KRT/Init.lua` owns bootstrap, shared runtime tables, and main WoW event wiring.
+- `!KRT/Database/*` owns DB/options/schema/persistence contracts.
+- `!KRT/Modules/*` owns reusable infra/static data only, not feature implementations.
+- `!KRT/Services/*` owns runtime service/model logic.
+- `!KRT/Controllers/*` owns top-level feature Parents and their frames.
+- `!KRT/Widgets/*` owns feature-specific child widgets.
+- `!KRT/EntryPoints/*` owns slash/minimap entrypoints.
+- XML stays layout-only under `!KRT/UI/*`; do not add XML `<Scripts>` or `<On...>` handlers.
+- `!KRT/!KRT.toc` is the authoritative load order. Keep it aligned with `docs/TREE.md`.
+
+Top-level Parents:
+- `addon.Controllers.Master`
+- `addon.Controllers.Logger`
+- `addon.Controllers.Warnings`
+- `addon.Controllers.Spammer`
 
 Rules:
-1) New feature modules SHOULD be placed in the appropriate folder among `Controllers/`, `Services/`,
-   `Widgets/`,
-   `EntryPoints/`, unless there is a strong reason to keep them in `Init.lua`.
-2) `Init.lua` should stay focused on bootstrap/glue and shared infrastructure that must exist before features.
-3) Prefer `addon.Core.GetFeatureShared()` in feature file headers for shared locals/runtime state bootstrap.
-4) Public exports go on `addon.*`; avoid extra globals.
-5) Any user-visible behavior changes or migration notes MUST be documented in `CHANGELOG.md`.
+- Services must not call Parents, touch Parent frames, reference Widgets, or delegate UI.
+- Upward communication uses `addon.Bus`.
+- EntryPoints may call Parent `:Toggle()` methods.
+- Child widgets attach Parent -> Child only.
+- Use `addon.UI:Call(...)` for Controller/EntryPoint -> Widget calls.
+- Do not reintroduce retired root aliases such as `addon.Master`, `addon.Raid`, or `addon.Config`.
+- `addon:Print` remains the only root-method compatibility exception for LibLogger.
 
 ---
 
-## 4) Load order (**BINDING**)
+## 4) File Header And Namespaces
 
-WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
+Preferred Lua file header:
 
-1) Libs/LibStub/LibStub.lua
-2) Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
-3) Libs/LibBossIDs-1.0/lib.xml
-4) Libs/LibDeformat-3.0/lib.xml
-5) Libs/LibCompat-1.0/lib.xml
-6) Libs/LibLogger-1.0/lib.xml
-7) Init.lua
-8) Core/DB.lua
-9) Core/Options.lua
-10) Core/DBSchema.lua
-11) Core/DBManager.lua
-12) Localization/localization.en.lua
-13) Localization/DiagnoseLog.en.lua
-14) UI/Templates/Common.xml
-15) Modules/C.lua
-16) Modules/Timer.lua
-17) Modules/Events.lua
-18) Modules/Colors.lua
-19) Modules/Strings.lua
-20) Modules/Item.lua
-21) Modules/Dataset/LootSources/Vanilla.lua
-22) Modules/Dataset/LootSources/BurningCrusade.lua
-23) Modules/Dataset/LootSources/Wrath.lua
-24) Modules/Dataset/LootSourcesData.lua
-25) Modules/LootSources.lua
-26) Modules/Dataset/IgnoredItems.lua
-27) Modules/Dataset/IgnoredMobs.lua
-28) Modules/Comms.lua
-29) Modules/Time.lua
-30) Modules/Base64.lua
-31) Modules/Json.lua
-32) Modules/Sort.lua
-33) Modules/Features.lua
-34) Modules/ModuleRegistry.lua
-35) Modules/UI/Facade.lua
-36) Modules/UI/Effects.lua
-37) Modules/UI/Visuals.lua
-38) Modules/UI/Frames.lua
-39) Modules/UI/ListController.lua
-40) Modules/UI/MultiSelect.lua
-41) Modules/Bus.lua
-42) Core/DBRaidMigrations.lua
-43) Core/DBRaidStore.lua
-44) Core/DBRaidQueries.lua
-45) Core/DBRaidValidator.lua
-46) Core/DBSyncer.lua
-47) Services/Loot/Context.lua
-48) Services/Loot/State.lua
-49) Services/Loot/Snapshots.lua
-50) Services/Loot/PendingAwards.lua
-51) Services/Loot/PassiveGroupLoot.lua
-52) Services/Loot/Tracking.lua
-53) Services/Loot/Workflow.lua
-54) Services/Loot/Receipts.lua
-55) Services/Loot/Records.lua
-56) Services/Loot/Reconcile.lua
-57) Services/Loot/Rules.lua
-58) Services/Loot/DistributionSession.lua
-59) Services/Raid/State.lua
-60) Services/Raid/Capabilities.lua
-61) Services/Raid/Counts.lua
-62) Services/Raid/Roster.lua
-63) Services/Raid/Attendance.lua
-64) Services/Raid/LootRecords.lua
-65) Services/Raid/Session.lua
-66) Services/Chat.lua
-67) EntryPoints/Minimap.lua
-68) EntryPoints/SlashEvents.lua
-69) Services/Rolls/Countdown.lua
-70) Services/Rolls/Sessions.lua
-71) Services/Rolls/History.lua
-72) Services/Rolls/Responses.lua
-73) Services/Rolls/Strategies.lua
-74) Services/Rolls/Resolution.lua
-75) Services/Rolls/Display.lua
-76) Services/Rolls/Service.lua
-77) Services/Loot/Service.lua
-78) Services/Debug.lua
-79) Controllers/Master.lua
-80) Widgets/LootCounter.lua
-81) Services/Reserves/Import.lua
-82) Services/Reserves/Aliases.lua
-83) Services/Reserves/Display.lua
-84) Services/Reserves/Sync.lua
-85) Services/Reserves.lua
-86) Services/Reserves/Chat.lua
-87) Widgets/ReservesUI.lua
-88) Services/Logger/Store.lua
-89) Services/Logger/View.lua
-90) Services/Logger/Export.lua
-91) Services/Logger/Helpers.lua
-92) Services/Logger/Actions.lua
-93) Controllers/Logger.lua
-94) Widgets/Config.lua
-95) Controllers/Warnings.lua
-96) Controllers/Changes.lua
-97) Controllers/Spammer.lua
-98) KRT.xml
-
----
-
-## 5) Repo layout (actual)
-
-```
-!KRT/
-  !KRT.toc
-  Init.lua                 # unified bootstrap + shared runtime glue + main event wiring
-  KRT.xml                  # unified UI include manifest/orchestrator
-
-  Core/
-    DB.lua                 # DB facade/bootstrap
-    Options.lua            # options namespace/defaults + strict schema-2 storage
-    DBSchema.lua           # canonical raid schema
-    DBManager.lua          # DB manager/factory
-    DBRaidMigrations.lua   # current-schema raid persistence compaction
-    DBRaidStore.lua        # canonical raid store + runtime indexes
-    DBRaidQueries.lua      # raid read/query helpers
-    DBRaidValidator.lua    # raid schema validation helpers
-    DBSyncer.lua           # logger synchronization store/protocol backend
-
-  Controllers/
-    Master.lua             # master-loot parent owner
-    Logger.lua             # logger parent owner (UI/controller; data via Services/Logger/)
-    Warnings.lua           # warnings parent owner
-    Changes.lua            # changes parent owner
-    Spammer.lua            # spammer parent owner
-
-  Services/
-    Raid/
-      State.lua            # raid core state + shared internals
-      Capabilities.lua     # raid role/capability policy
-      Counts.lua           # loot counter/player count APIs
-      Roster.lua           # player lookup/class/rank helper APIs
-      Attendance.lua       # player attendance ledger from roster deltas
-      LootRecords.lua      # loot-record lookup/matching/resolution APIs
-      Session.lua          # raid/session facade + boss query/icon + changes data APIs
-    Chat.lua               # output helpers (Print/Announce)
-    Rolls/
-      Countdown.lua        # countdown runtime helper (loaded before Service.lua)
-      Sessions.lua         # roll-session lifecycle, tie-reroll, and current-context helpers
-      History.lua          # raw roll entries, per-item trackers, and local roll-state helpers
-      Responses.lua        # response lifecycle, eligibility, and incoming-roll helpers
-      Strategies.lua       # package-internal normal/SR/tie/raid-roll policy helpers
-      Resolution.lua       # resolver ordering, cutoff ties, and row-policy helpers
-      Display.lua          # display-model assembly and winner/display helpers
-      Service.lua          # roll tracking, sorting, winner logic (public service facade)
-    Loot/
-      Service.lua          # loot parsing, item selection, export strings, public service API
-      Context.lua          # loot-context normalization/projection helpers
-      State.lua            # activeLoot + lootContext session helpers
-      Snapshots.lua        # loot-window item snapshot state helpers
-      PendingAwards.lua    # pending-award lifecycle helpers + consume/refresh policy
-      PassiveGroupLoot.lua # passive group-loot parser/state/winner helpers
-      Tracking.lua         # runtime tracking/debug snapshot builders
-      Workflow.lua         # transient loot workflow state and diagnostic snapshots
-      Receipts.lua         # parsed loot event classification helpers
-      Records.lua          # canonical loot-record materialization helpers
-      Reconcile.lua        # trade-only/passive duplicate reconciliation helpers
-      Rules.lua            # suggestion-only auto-loot rule classifier
-      DistributionSession.lua # Master-owned compact KRTDist v2 loot distribution session sync
-    Debug.lua              # synthetic raid/roll test helpers for local addon testing
-    Reserves/
-      Import.lua           # CSV and encoded SoftRes JSON import helpers
-      Aliases.lua          # package-internal SoftRes name alias policy helpers
-      Display.lua          # grouped display/player-format helpers (loaded before Reserves.lua)
-      Sync.lua             # runtime-only SoftRes metadata/data sync helpers
-      Chat.lua             # opt-in !sr/!softres whisper response policy
-    Reserves.lua           # soft reserves service/model + canonical public facade
-    Logger/
-      Store.lua            # logger stable-ID indexing + data access
-      View.lua             # view-model row builders and label formatters
-      Export.lua           # logger CSV export builders
-      Helpers.lua          # logger UI label/title formatting helpers
-      Actions.lua          # logger mutations + commit/cascade + selection validation
-
-  Widgets/
-    LootCounter.lua        # loot counter UI + data
-    ReservesUI.lua         # reserve list + import frame controller + row/header rendering
-    Config.lua             # options UI logic
-
-  EntryPoints/
-    Minimap.lua            # minimap button + context menu
-    SlashEvents.lua        # slash command router
-
-  UI/
-    Templates/
-      Common.xml           # shared XML templates
-    Minimap.xml            # minimap button frame
-    ReservesTemplates.xml  # reserve list templates
-    Reserves.xml           # reserve list UI + reserve import window UI
-    Logger.xml             # logger templates + frames
-    Config.xml             # config UI
-    Spammer.xml            # spammer UI
-    Warnings.xml           # warnings UI
-    Master.xml             # item selection + master looter UI
-    LootCounter.xml        # loot counter UI
-    Changes.xml            # changes UI
-
-  Localization/
-    localization.en.lua    # user-facing strings (enUS) -> addon.L
-    DiagnoseLog.en.lua     # diagnostic templates (enUS) -> addon.Diagnose
-
-  Modules/
-    C.lua                  # constants/enums/patterns (addon.C)
-    Timer.lua              # timer mixin/stat helpers backed by LibCompat (addon.Timer)
-    Events.lua             # centralized event-name registry (addon.Events)
-    Colors.lua             # color normalization/class-color helpers (addon.Colors)
-    Strings.lua            # text normalization and chat parsing helpers (addon.Strings)
-    Item.lua               # item-link parsing + tooltip probe helpers (addon.Item)
-    Dataset/
-    LootSources/
-      Vanilla.lua            # static loot source dataset for Classic Vanilla
-      BurningCrusade.lua    # static loot source dataset for The Burning Crusade
-      Wrath.lua             # static loot source dataset for Wrath of the Lich King
-    LootSourcesData.lua      # normalized lookup index by item ID
-    IgnoredItems.lua         # canonical item-ignore lookup used by loot logging
-    IgnoredMobs.lua          # canonical raid add/phase-ignore lookup + generic trash-name helpers
-    Comms.lua              # addon chat/whisper/sync helpers (addon.Comms)
-    Time.lua               # time/difficulty helpers (addon.Time)
-    Base64.lua             # base64 codec helpers (addon.Base64)
-    Json.lua               # native JSON decoder helpers (addon.Json)
-    Sort.lua               # sort comparators + tie-breakers (addon.Sort)
-    Features.lua           # feature flags/profile toggles (addon.Features)
-    ModuleRegistry.lua     # observational load-order/dependency registry (addon.ModuleRegistry)
-    UI/
-      Facade.lua           # widget facade (addon.UI) with Register/Call no-op routing
-      Effects.lua          # glow/proc button effects backend (addon.UIEffects)
-      Visuals.lua          # UI primitives + row visuals (addon.UIPrimitives/addon.UIRowVisuals)
-      Frames.lua           # frame helpers + UI scaffold/orchestration (addon.Frames/addon.UIScaffold)
-      ListController.lua   # reusable scroll-list controller (addon.ListController)
-      MultiSelect.lua      # reusable multiselect state helpers (addon.MultiSelect)
-    Bus.lua                # internal callback bus + metrics (addon.Bus)
-
-  Libs/
-    LibStub/
-    CallbackHandler-1.0/
-    LibBossIDs-1.0/
-    LibDeformat-3.0/
-    LibCompat-1.0/
-    LibLogger-1.0/
+```lua
+local addon = select(2, ...)
+local feature = addon.Database.GetFeatureShared()
 ```
 
+Use the canonical namespaces:
+- `addon.Database`
+- `addon.Controllers.*`
+- `addon.Services.*`
+- `addon.Widgets.*`
+- `addon.Modules` are exposed by concrete names such as `addon.Item`, `addon.Sort`, `addon.Bus`.
+
+Keep bootstrap ownership centralized in `Init.lua` for:
+- `addon.Database`
+- `addon.L`
+- `addon.Diagnose`
+- `addon.State`
+- `addon.C`
+- `addon.Events`
+
 ---
 
-## 6) Globals & SavedVariables (**BINDING**)
+## 5) Lua 5.1 Rules (**BINDING**)
 
-### 6.1 Intentional globals (allowed)
+- Everything is `local` unless intentionally exported.
+- Prefer locals for readability and runtime cost.
+- Do not use modern APIs such as `C_Timer` or `C_*` namespaces.
+- Avoid `io`, `os`, and `debug` in addon runtime.
+- Respect combat lockdown.
+- Arrays are 1-indexed.
+- If holes are possible, do not rely on `#t`.
+- Use `for i = 1, #arr do ... end` for sequences and `pairs()` for maps.
+- Recoverable failure returns `nil, "reason"` or `false` with a localized message.
+- Programmer errors use `assert()` or `error()`.
 
-- `_G["KRT"] = addon` is set by `Init.lua` for debugging/interop.
-- Named XML frames become globals (normal WoW UI behavior). Examples:
-  - `KRTConfig`, `KRTWarnings`, `KRTMaster`, `KRTLogger`, `KRTChanges`, `KRTSpammer`
-  - `KRTLootCounterFrame`, `KRTReserveListFrame`, `KRTImportWindow`, `KRTItemSelectionFrame`
-  - `KRTLoggerBossBox`, `KRT_MINIMAP_GUI`
-- `Init.lua` intentionally defines a few global convenience helpers:
-  - `table.shuffle`, `table.reverse`, `string.trim`, `string.startsWith`, `string.endsWith`
+Call style:
+- Use `:` only when the function expects `self`.
+- Use `.` for plain functions.
+- Never mechanically convert `.` and `:` without checking the function signature.
 
-Do not introduce additional non-frame globals (tables/vars/functions) unless explicitly required and documented.
+Naming:
+- Public module tables and public exported methods use PascalCase.
+- WoW event handler names stay uppercase.
+- Local helpers and local variables use camelCase.
+- Private cross-file package helpers use underscore-prefixed owner fields when needed.
+- Avoid snake_case for new Lua names.
 
-### 6.2 SavedVariables (account)
+Canonical public API verbs:
+- Queries: `Get`, `Find`, `Is`, `Can`
+- Mutations: `Set`, `Add`, `Remove`, `Delete`, `Upsert`
+- Lifecycle/UI: `Ensure`, `Bind`, `Localize`, `Request`, `RequestRefresh`, `Refresh`, `Toggle`, `Show`, `Hide`
+- Exact hooks: `OnLoad`, `OnLoadFrame`, `AcquireRefs`, `BindHandlers`, `RefreshUI`
 
-These keys are persisted and must remain compatible:
+---
+
+## 6) SavedVariables And Persistence (**BINDING**)
+
+Persisted account keys:
 - `KRT_Raids`
 - `KRT_Players`
 - `KRT_Reserves`
@@ -598,238 +140,141 @@ These keys are persisted and must remain compatible:
 - `KRT_Spammer`
 - `KRT_Options`
 
----
+Policies:
+- Treat fresh SavedVariables as strict mode.
+- Keep `players[]` as the canonical persisted player store.
+- Treat `_playersByName` as a derived runtime index/cache.
+- Store only canonical restore-critical data.
+- Avoid persisting duplicated, derived, or runtime-only fields.
+- Use stable NIDs (`playerNid`, `bossNid`, `lootNid`) instead of volatile array indices.
+- Use `Database.GetRaidStoreOrNil(contextTag, requiredMethods)` for optional raid-store access.
 
-## 7) Language & strings (**BINDING**)
-
-KRT is standardized on English.
-
-Rules:
-1) All new/modified content must be English (comments, logs, UI labels, chat text).
-2) User-facing strings MUST go through `addon.L` (Localization/localization.en.lua).
-3) Log/debug templates MUST go through `addon.Diagnose` (Localization/DiagnoseLog.en.lua).
-4) Prefer format placeholders over sentence concatenation (use `format(L.Key, a, b)`).
-5) Prefer ASCII-only in code/comments/logs (avoid typographic quotes/dashes and emojis).
-
----
-
-## 8) Call style: `:` vs `.` (**BINDING**)
-
-Lua method call depends on whether the function expects `self`:
-
-- Use `:` for true methods (first parameter is `self`):
-  - `addon:info(...)`, `addon:ADDON_LOADED(...)`, `module:Toggle()`, `Store:GetRaid(...)`
-- Use `.` for plain functions (no `self`):
-  - `Utils.getRaid(...)`, `addon.Options.EnsureLoaded()`, `addon.Options.Set(key, value)`,
-    `addon.Timer.BindMixin(target, name)`
-
-Rule: do not mechanically convert `.` <-> `:` unless you verified the function signature.
+Options:
+- `KRT_Options` uses strict nested schema 2 storage.
+- Modules register defaults with `addon.Options.AddNamespace(...)`.
+- Read via namespace `cfg:Get(...)`.
+- Write via `cfg:Set(...)` or `addon.Options.Set(...)`.
+- Do not write through `addon.options`.
+- `debug` is runtime-only state under `addon.State.debugEnabled`.
 
 ---
 
-## 9) UI refresh policy: event-driven (**BINDING**)
+## 7) UI Policy (**BINDING**)
 
-KRT is actively refactoring away from polling-style UI updates.
+- Prefer event-driven redraws. Avoid feature-frame polling with `OnUpdate`.
+- Allowed `OnUpdate` exceptions: minimap drag, LibCompat internals, and shared refresher drivers.
+- Use `addon.UIScaffold.DefineModuleUi(cfg)` where feasible.
+- Keep UI state uniform: `module._ui = { Loaded, Bound, Localized, Dirty, Reason, FrameName }`.
+- Modules implement hooks such as `AcquireRefs`, `BindHandlers`, `Localize`, `OnLoadFrame`, `RefreshUI`.
+- Scaffold-generated methods own `BindUI`, `EnsureUI`, `Toggle`, `Show`, `Hide`, `RequestRefresh`, `MarkDirty`.
+- Prefer the dominant `_G[frameName .. suffix]` named-frame access pattern.
+- Prefer simple role-gated UI without extra disabled-action tooltips unless requested.
+- Keep shared UI glue in `Init.lua` or `Modules/UI/*`; keep feature-specific UI in feature modules.
 
-Rules:
-- Prefer on-demand UI redraws via `Utils.makeEventDrivenRefresher(getFrame, updateFn)`.
-- Modules should expose:
-  - `module:Refresh()` (pure redraw) and `module:RequestRefresh()` (throttled request).
-- Avoid setting `OnUpdate` on feature frames to poll state.
-- Allowed exceptions:
-  - minimap drag movement,
-  - LibCompat internal timers,
-  - Utils internal driver frames used by `makeEventDrivenRefresher`.
+Logger visual direction:
+- Wrath raid-log look inspired by MizusRaidTracker.
+- Blizzard dialog frame, compact dark tables, yellow section titles, green selected rows.
+- Default KRT buttons outside list panels.
+- Loot item icons keep about `28x28` click target, centered `26x26` icon, and `32x32` quickslot border.
 
-For scroll lists:
-- Prefer `Utils.makeListController({...})` + `controller:Dirty()` over manual row loops.
-- For multi-selection, use `Utils.MultiSelect_*` with stable IDs.
-
----
-
-## 10) Options access pattern
-
-- SV table is `KRT_Options`, structured as nested namespaces (schema 2).
-- Each module owns a namespace and registers its defaults at file load:
-  ```lua
-  local cfg = addon.Options.AddNamespace("Rolls", { countdownDuration = 5, ... })
-  cfg:Get("countdownDuration")          -- read
-  cfg:Set("countdownDuration", 10)       -- write (emits OptionChanged via Bus)
-  cfg:ResetDefaults()                    -- per-namespace reset
-  ```
-- Read-only flat shortcut: `addon.options.<key>` resolves O(1) through `keyToNamespace`.
-  Writes via `addon.options.x = v` are forbidden (raises) — use `namespace:Set` or
-  `addon.Options.Set(key, value)` (dispatcher).
-- `addon.Options.EnsureLoaded()` runs on ADDON_LOADED and enforces strict nested schema 2 storage.
-- Bus events emitted: `addon.Events.Internal.OptionChanged(namespace, key, old, new)`,
-  `OptionsReset(namespace)`, `OptionsLoaded`.
-- Exception: `debug` is runtime-only state on `addon.State.debugEnabled` and must not be persisted.
+Glow effects:
+- Keep implementation details in `Modules/UI/Effects.lua`.
+- Keep `Modules/UI/Visuals.lua` focused on generic primitives and row visuals.
+- Prefer clean border pulses tightly aligned to button borders.
 
 ---
 
-## 11) Module map (runtime `addon.*`)
+## 8) Service And Feature Policies
 
-Top-level feature modules on `addon.*`:
-- `addon.Minimap`       - minimap button + EasyMenu
+Raid/capabilities:
+- `addon.Services.Raid` owns capability queries and master-only guards.
+- Looting flows require current Master Looter ownership.
+- Leadership features may use raid leader/assistant authority where appropriate.
+- LootCounter grouped announce/spam actions require raid leader/assistant permission in raid.
 
-Feature modules are otherwise namespaced under:
-- `addon.Controllers.*` - parent controllers (`Master`, `Logger`, `Warnings`, `Changes`, `Spammer`)
-- `addon.Services.*`   - runtime services (`Raid`, `Chat`, `Rolls`, `Loot`, `Reserves`, `Syncer`, etc.)
-- `addon.Widgets.*`    - UI widgets (`LootCounter`, `ReservesUI`, `Config`)
+Chat/output:
+- `addon.Services.Chat` owns announce/warn/chat-safe output.
+- Prefer localized format strings over sentence concatenation.
 
-Namespaced service-only module:
-- `addon.Services.Debug` - synthetic raid/roll test helpers for current-raid testing
-- `addon.Services.Rolls._Countdown` - rolls countdown runtime helper surface
-- `addon.Services.Rolls._Sessions` - rolls session/tie-reroll helper surface
-- `addon.Services.Rolls._History` - rolls raw-history and tracker helper surface
-- `addon.Services.Rolls._Responses` - rolls response/eligibility helper surface
-- `addon.Services.Rolls._Resolution` - rolls resolver and row-policy helper surface
-- `addon.Services.Rolls._Display` - rolls display-model and winner helper surface
-- `addon.Services.Reserves._Import` - reserves import parser helper surface
-- `addon.Services.Reserves._Display` - reserves grouped display/player formatting helper surface
+Rolls:
+- Roll-response lifecycle: `PASS` reversible, `CANCELLED` reversible, `TIMED_OUT` terminal.
+- `INELIGIBLE` is recoverable only through eligibility refresh.
+- Only eligible `ROLL` responses may enter the resolver.
+- With `countdownRollsBlock=false`, late rolls stay visible with `OOT` but are excluded from resolution.
+- `Rolls:GetDisplayModel().resolution` is a public service contract.
 
-Root-method compatibility exception:
-- `addon:Print` remains a compatibility hook required by `LibLogger-1.0`.
-- Avoid root addon method facades for chat/capability contracts; target
-  `addon.Services.Chat` and `addon.Services.Raid` directly.
+Loot:
+- Auto-loot rules are suggestions only. Do not auto-award, auto-trade, or auto-assign unless requested.
+- Passive Group Loot logging filters low-value DE/Greed drops such as greens, gems, and recipes by default.
+- Keep loot-context internals under `Services/Loot/*`.
+- Keep `Services/Loot/Service.lua` as the public facade.
 
-`addon.Controllers.Logger` internal structure (pattern for complex modules):
-- `addon.Controllers.Logger.Store`   - data access helpers + stable-ID indexing (Services/Logger/Store.lua)
-- `addon.Controllers.Logger.View`    - view-model row builders (UI-friendly data) (Services/Logger/View.lua)
-- `addon.Controllers.Logger.Export`  - Logger CSV export builders (Services/Logger/Export.lua)
-- `addon.Controllers.Logger.Helpers` - UI label/title formatting helpers (Services/Logger/Helpers.lua)
-- `addon.Controllers.Logger.Actions` - mutations + commit/refresh boundaries (Services/Logger/Actions.lua)
+Reserves:
+- Keep Whisper SoftRes player handling out of `EntryPoints/SlashEvents.lua`.
+- Put whisper parsing and response policy under Reserves/Chat service ownership.
+- Gate replies behind config, valid reserve data, and ML/leader/assistant authority.
 
-Namespaced service modules (loaded before Controller):
-- `addon.Services.Logger.Store`   - canonical Store service table
-- `addon.Services.Logger.View`    - canonical View service table
-- `addon.Services.Logger.Export`  - canonical Export service table
-- `addon.Services.Logger.Helpers` - canonical Helpers service table
-- `addon.Services.Logger.Actions` - canonical Actions service table
-
-Implementation placement (current wave):
-- `Init.lua`: unified bootstrap/runtime core + main gameplay/logger logic + `Core.GetFeatureShared()`
-- `Controllers/*.lua`, `Services/*.lua`, `Widgets/*.lua`, `EntryPoints/*.lua`
-
-External modules:
-- `addon.C`     (Modules/C.lua)
-- `addon.Timer` (Modules/Timer.lua)
-- `addon.Events` (Modules/Events.lua)
-- `addon.Colors` (Modules/Colors.lua)
-- `addon.Strings` (Modules/Strings.lua)
-- `addon.Item` (Modules/Item.lua)
-- `addon.LootSources` (Modules/LootSources.lua)
-- `addon.IgnoredItems` (Modules/Dataset/IgnoredItems.lua)
-- `addon.IgnoredMobs` (Modules/Dataset/IgnoredMobs.lua; add/phase-ignore lookup + generic trash-name helpers)
-- `addon.Comms` (Modules/Comms.lua)
-- `addon.Time` (Modules/Time.lua)
-- `addon.Base64` (Modules/Base64.lua)
-- `addon.Json` (Modules/Json.lua)
-- `addon.Sort` (Modules/Sort.lua)
-- `addon.UIEffects` (Modules/UI/Effects.lua)
-- `addon.UIPrimitives` (Modules/UI/Visuals.lua)
-- `addon.UIRowVisuals` (Modules/UI/Visuals.lua)
-- `addon.Frames` (Modules/UI/Frames.lua)
-- `addon.UIScaffold` (Modules/UI/Frames.lua)
-- `addon.MultiSelect` (Modules/UI/MultiSelect.lua)
-- `addon.ListController` (Modules/UI/ListController.lua)
-- `addon.Bus` (Modules/Bus.lua)
-- `addon.Features` (Modules/Features.lua)
-- `addon.ModuleRegistry` (Modules/ModuleRegistry.lua)
-- `addon.UI`    (Modules/UI/Facade.lua)
+Logger:
+- Logger UI-local selection/edit/popup glue stays private to `Controllers/Logger.lua`.
+- Logger store/view/export/helpers/actions live under `Services/Logger/*`.
+- Keep Logger-owned roster UI refresh logic in `Controllers/Logger.lua` via `RaidRosterDelta`.
 
 ---
 
-## 12) Lua 5.1 coding standard (**BINDING**)
+## 9) Tooling And Checks
 
-Non-negotiables:
-1) No accidental globals: everything is `local` unless intentionally exported.
-2) Prefer locals for performance/readability.
-3) Avoid environment hacks in addon logic (`getfenv/setfenv` only for niche debug tools).
+Prefer `rg`/`rg --files` for repository search.
 
-Formatting:
-- Indentation: 4 spaces (older code may contain tabs; do not mass-reformat).
-- No trailing whitespace. No semicolons.
+Common gates:
 
-Errors/returns:
-- Recoverable failure: `return nil, "reason"` or `return false` with a localized error message.
-- Programmer errors/invariants: `assert()` or `error()`.
+```powershell
+py -3 tools/krt.py repo-quality-check --check toc_files
+py -3 tools/krt.py repo-quality-check --check lua_uniformity
+py -3 tools/krt.py repo-quality-check --check raid_hardening
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-syntax.ps1
+```
 
-Iteration:
-- Arrays are 1-indexed.
-- If holes are possible, do not rely on `#t`.
-- Prefer `for i = 1, #arr do ... end` for sequences; `pairs()` for maps.
+Generated docs:
 
----
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-inventory.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-classify.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-api-census.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/update-tree.ps1
+```
 
-## 13) Logging (LibLogger-1.0)
+When editing `Services/Rolls/Service.lua` or `Controllers/Master.lua`, run:
 
-Use consistent levels:
-- error: breaks functionality or corrupts state
-- warn: abnormal but non-blocking behavior
-- info: major lifecycle events (raid created, award, trade, boss kill)
-- debug/trace: detailed flow (avoid spam, especially in combat)
+```powershell
+lua tests/release_stabilization_spec.lua
+```
 
-Throttle high-frequency sources (roster bursts, combat log, UI refresh loops) with LibCompat timers.
+If XML frame names change, update `.luacheckrc` globals in the same change.
 
 ---
 
-## 14) WoW 3.3.5a compatibility
+## 10) Release Policy
 
-- Do not use modern APIs (`C_Timer`, `C_` namespaces, etc.).
-- Avoid `io/os/debug` (not available in WoW runtime).
-- Respect combat lockdown (avoid secure frame changes in combat).
+- Release metadata lives under `## Unreleased` in `!KRT/CHANGELOG.md`.
+- Use `Release-Version: <version>`.
+- Stable: `x.y.z`; internal/no publication: `x.y.z-alpha.N`; GitHub prerelease: `x.y.z-beta.N`.
+- Publish only when the full SemVer increases.
+- Patch for compatible fixes/polish.
+- Minor for compatible features or meaningful UI/workflow additions.
+- Major for breaking API/SavedVariables changes or required user migrations.
+- Package only the addon folder `!KRT/`.
+- Do not include repo-level docs/tooling files in release ZIPs.
+- Keep release asset download/checksum instructions out of root `README.md`.
 
 ---
 
-## 15) Manual test checklist
+## 11) Manual Smoke Checklist
 
 - Login: no errors; `/krt` opens.
 - Raid detection: instance/difficulty detected; current raid created; roster updates.
 - Rolls: MS/OS/SR works; stable sorting; deterministic winner.
 - Reserves: import/export; caps; roll gating consistent.
-- Logger: loot entries append; filters; delete flows; selection highlight works.
-- Master: award/trade tracking; multi-award; `/krt counter` toggles Loot Counter.
-- Warnings/Changes/Spammer: correct channels + throttling; no UI spam.
-- Persistency: `/reload` keeps SV and expected state.
-
----
-
-## 16) Do / Don't
-
-Do:
-- small testable changes,
-- reuse templates and Utils controllers,
-- keep state local to module blocks,
-- keep feature logic in `Controllers/*.lua` / `Services/*.lua` / `Widgets/*.lua` / `EntryPoints/*.lua`,
-  and shared infra in `Init.lua`,
-- document user-visible changes in CHANGELOG.md.
-
-Don't:
-- Ace3,
-- long blocking loops,
-- new SV keys without migration,
-- new globals (beyond allowed ones).
-
----
-
-## 17) Static analysis (`.luacheckrc`)
-
-- Keep `.luacheckrc` aligned with current addon globals and frame names.
-- When XML introduces/removes named frames, update `.luacheckrc` global allowlist in the same change.
-- Prefer additive, explicit entries grouped under a `KRT addon globals` comment block.
-
----
-
-## 18) Architecture layering (Parents/Services + Bus) (**BINDING**)
-
-- 5 top-level Parents: `Changes`, `MasterLoot` (`addon.Controllers.Master`), `Warnings`, `Logger`, `Spammer`.
-- Parent owner files live under `!KRT/Controllers/` (folder naming), while "Parent" remains the architecture term.
-- Services MUST NOT call Parents or touch Parent frames.
-- Services MUST NOT reference Widgets or delegate UI (`addon.*UI`, `module.UI`, `Get*UI` patterns).
-- Upward communication uses internal bus (`Bus.RegisterCallback` / `Bus.TriggerEvent`).
-- EntryPoint toggle exception: `EntryPoints/SlashEvents.lua` and `EntryPoints/Minimap.lua` may call
-  `Parent:Toggle()`.
-- Prefer existing events (`SetItem`, `RaidRosterDelta`) over new UI micro-events.
-- UI ownership: Master frame UI code lives in `Master` (or Master View helpers).
-- Child widgets attach Parent->Child only.
+- Logger: loot entries append; filters/delete/selection highlight work.
+- Master: award/trade tracking and multi-award work; `/krt counter` toggles Loot Counter.
+- Warnings/Changes/Spammer: correct channels and throttling.
+- Persistency: `/reload` keeps SavedVariables and expected state.

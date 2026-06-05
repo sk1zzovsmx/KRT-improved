@@ -8,7 +8,7 @@ Run a new staged cleanup wave for this addon.
 Baseline:
 - Use docs/TECH_CLEANUP_BACKLOG.md and repo docs as the planning baseline.
 - Re-catalog the repo before changing code.
-- Cover the whole addon surface: Core, Controllers, Services, Widgets,
+- Cover the whole addon surface: Database, Controllers, Services, Widgets,
   EntryPoints, Modules, UI/XML, docs, and touched tooling.
 
 Process requirements:

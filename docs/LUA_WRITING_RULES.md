@@ -12,7 +12,7 @@ Applies to:
 
 Goals:
 
-- predictable API naming across Controllers/Services/Widgets/Core/Modules
+- predictable API naming across Controllers/Services/Widgets/Database/Modules
 - consistent file structure for easier review and refactor safety
 - WoW 3.3.5a compatibility without behavior regressions
 
@@ -23,14 +23,14 @@ Use this header in KRT addon files:
 ```lua
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 ```
 
-`Core.GetFeatureShared()` is the canonical bootstrap contract for shared addon
+`Database.GetFeatureShared()` is the canonical bootstrap contract for shared addon
 dependencies. Prefer direct `feature.X` locals over `feature.X or addon.X`
 fallbacks. For service-table bootstrap, use `feature.EnsureServiceNamespace(...)`
 instead of open-coded `addon.Services.* = addon.Services.* or {}` guards.
@@ -48,13 +48,13 @@ Feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/` shou
 Use `PascalCase` for exported/public APIs:
 
 - `module:*` on Controllers/Services/Widgets/EntryPoints
-- infra namespaces (`Core`, `Bus`, `Frames`, `UIScaffold`, `UI`, `ListController`, ...)
+- infra namespaces (`Database`, `Bus`, `Frames`, `UIScaffold`, `UI`, `ListController`, ...)
 - structured owners (`Store:*`, `View:*`, `Actions:*`, `Box:*`)
 
 Examples:
 
 - `module:GetDisplayModel()`
-- `Core.GetRaidStoreOrNil(tag, requiredMethods)`
+- `Database.GetRaidStoreOrNil(tag, requiredMethods)`
 - `UI.Refresh()`
 
 ### Private helpers and locals

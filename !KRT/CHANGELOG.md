@@ -8,6 +8,12 @@ Release-Version: 0.7.1-beta.3
 
 ### Fixes
 
+- **MS Changes removal** - Removed the retired MS Changes window, minimap
+  menu entry, slash commands, localization strings, controller, XML layout,
+  and public Raid change-management APIs. Legacy `raid.changes` data remains
+  tolerated during SavedVariables normalization and old sync payload parsing
+  so existing raid history can still load safely.
+
 - **Wrath raid loot-source recognition** - Expanded the Naxxramas 10/25
   and Onyxia level 80 loot-source tables from the AtlasLoot WotLK database
   so Logger source attribution recognizes missing boss drops such as
@@ -28,6 +34,8 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **Minimap raid menu** - Reordered the minimap menu into grouped raid
+  workflow sections and added direct access to Raid Reserves.
 - **Loot workflow hardening** - Loot ingestion now uses focused internal
   workflow, receipt, record, and reconciliation helpers so parsed loot events,
   canonical record creation, and passive/trade duplicate handling are easier
@@ -285,7 +293,7 @@ Release-Version: 0.7.1-beta.3
 - Replaced inline `string.find` item-link parsing in
   `Services/Loot/Service.lua` with canonical `Item.GetItemStringFromLink`
   and `Item.GetItemIdFromLink`; removed unused `ITEM_LINK_PATTERN` local.
-- Centralized `requireServiceMethod` in `Core.RequireServiceMethod`;
+- Centralized `requireServiceMethod` in `Database.RequireServiceMethod`;
   removed 4 identical copies from Controllers (Master, Warnings, Spammer,
   Changes).
 - Removed `resolveRaidDifficulty` and `getRaidSizeFromDifficulty`

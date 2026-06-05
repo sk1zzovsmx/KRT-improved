@@ -49,7 +49,7 @@ function Add-MatchesOutsideAllowed {
     }
 }
 
-Write-Host "Check 1/8: KRT_Raids access confined to DB layer..."
+Write-Host "Check 1/8: KRT_Raids access confined to Database layer..."
 $krtRaidsMatches = @(Get-KrtPatternMatches `
     -RepoRoot $repoRoot `
     -Pattern "\bKRT_Raids\b" `
@@ -57,11 +57,11 @@ $krtRaidsMatches = @(Get-KrtPatternMatches `
     -ExtraArgs @("-g", "*.lua", "-g", "!Libs/**"))
 
 Add-MatchesOutsideAllowed `
-    -Header "[KRT_Raids outside DB layer]" `
+    -Header "[KRT_Raids outside Database layer]" `
     -Lines $krtRaidsMatches `
-    -AllowedPaths @("!KRT\Init.lua", "!KRT\Core\DBRaidStore.lua")
+    -AllowedPaths @("!KRT\Init.lua", "!KRT\Database\DBRaidStore.lua")
 
-Write-Host "Check 2/8: root runtime cache keys only cleaned in !KRT/Core/DBRaidStore.lua..."
+Write-Host "Check 2/8: root runtime cache keys only cleaned in !KRT/Database/DBRaidStore.lua..."
 $rootRuntimeCacheMatches = @(Get-KrtPatternMatches `
     -RepoRoot $repoRoot `
     -Pattern "_playersByName|_playerIdxByNid|_bossIdxByNid|_lootIdxByNid" `
@@ -71,7 +71,7 @@ $rootRuntimeCacheMatches = @(Get-KrtPatternMatches `
 Add-MatchesOutsideAllowed `
     -Header "[Root runtime keys used outside cleanup layer]" `
     -Lines $rootRuntimeCacheMatches `
-    -AllowedPaths @("!KRT\Init.lua", "!KRT\Core\DBRaidStore.lua")
+    -AllowedPaths @("!KRT\Init.lua", "!KRT\Database\DBRaidStore.lua")
 
 Write-Host "Check 3/8: XML stays layout-only..."
 $xmlScriptMatches = @(Get-KrtPatternMatches `
@@ -95,9 +95,9 @@ $directStoreMatches = @(Get-KrtPatternMatches `
     -ExtraArgs @("-g", "*.lua", "-g", "!Libs/**"))
 
 Add-MatchesOutsideAllowed `
-    -Header "[Direct RaidStore access outside DB layer]" `
+    -Header "[Direct RaidStore access outside Database layer]" `
     -Lines $directStoreMatches `
-    -AllowedPaths @("!KRT\Core\DBManager.lua", "!KRT\Core\DBRaidStore.lua")
+    -AllowedPaths @("!KRT\Database\DBManager.lua", "!KRT\Database\DBRaidStore.lua")
 
 Write-Host "Check 5/8: query/migration/validator/syncer access goes through DB facade..."
 $directQueryMigrationMatches = @(Get-KrtPatternMatches `
@@ -107,14 +107,14 @@ $directQueryMigrationMatches = @(Get-KrtPatternMatches `
     -ExtraArgs @("-g", "*.lua", "-g", "!Libs/**"))
 
 Add-MatchesOutsideAllowed `
-    -Header "[Direct RaidQueries/RaidMigrations/RaidValidator/Syncer access outside DB layer]" `
+    -Header "[Direct RaidQueries/RaidMigrations/RaidValidator/Syncer access outside Database layer]" `
     -Lines $directQueryMigrationMatches `
     -AllowedPaths @(
-        "!KRT\Core\DBManager.lua",
-        "!KRT\Core\DBRaidQueries.lua",
-        "!KRT\Core\DBRaidMigrations.lua",
-        "!KRT\Core\DBRaidValidator.lua",
-        "!KRT\Core\DBSyncer.lua"
+        "!KRT\Database\DBManager.lua",
+        "!KRT\Database\DBRaidQueries.lua",
+        "!KRT\Database\DBRaidMigrations.lua",
+        "!KRT\Database\DBRaidValidator.lua",
+        "!KRT\Database\DBSyncer.lua"
     )
 
 Write-Host "Check 6/8: no local getRaidStore helpers remain..."
@@ -182,10 +182,10 @@ if ($violations.Count -gt 0) {
 
 Write-Host "Raid hardening checks passed." -ForegroundColor Green
 Write-Host "Confirmed:"
-Write-Host "  1) KRT_Raids confined to Init.lua + Core/DBRaidStore.lua"
+Write-Host "  1) KRT_Raids confined to Init.lua + Database/DBRaidStore.lua"
 Write-Host "  2) Root runtime cache keys only in cleanup layer"
 Write-Host "  3) !KRT/UI XML has no <Scripts>/<On...> blocks"
-Write-Host "  4) RaidStore access routed through DB facade (except DB layer)"
+Write-Host "  4) RaidStore access routed through DB facade (except Database layer)"
 Write-Host "  5) RaidQueries/RaidMigrations/RaidValidator/Syncer access routed through DB facade"
 Write-Host "  6) No local getRaidStore helpers in modules"
 Write-Host "  7) tools/validate-raid-schema.lua passes luacheck"

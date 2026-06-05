@@ -272,8 +272,10 @@ foreach ($source in $manifest.sources) {
     if ([string]::IsNullOrWhiteSpace($repo) -or [string]::IsNullOrWhiteSpace($commit)) {
         throw "Manifest source '$skill' has empty repo/commit."
     }
-    if ($verifyPolicy -ne "exact" -and $verifyPolicy -ne "presence") {
-        throw "Manifest source '$skill' has invalid verifyPolicy '$verifyPolicy'. Use 'exact' or 'presence'."
+    if ($verifyPolicy -ne "exact" -and
+        $verifyPolicy -ne "presence" -and
+        $verifyPolicy -ne "local-presence") {
+        throw "Manifest source '$skill' has invalid verifyPolicy '$verifyPolicy'. Use 'exact', 'presence', or 'local-presence'."
     }
     if (-not $destinationPath.StartsWith(".agents/skills/", [System.StringComparison]::Ordinal)) {
         throw "Destination for '$skill' must stay under .agents/skills/: $destinationPath"
@@ -287,6 +289,29 @@ foreach ($source in $manifest.sources) {
     }
 
     Write-Host "Processing skill '$skill' from $repo@$commit"
+
+    $destinationFullPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot.Path $destinationPath))
+
+    if ($verifyPolicy -eq "local-presence") {
+        $skillDocPath = Join-Path $destinationFullPath "SKILL.md"
+        if ($VerifyOnly) {
+            if (-not (Test-Path -LiteralPath $skillDocPath -PathType Leaf)) {
+                $verificationProblems.Add("Missing local adapted skill: $destinationPath/SKILL.md")
+            } else {
+                $verifiedFiles = $verifiedFiles + 1
+            }
+            continue
+        }
+
+        if (-not (Test-Path -LiteralPath $skillDocPath -PathType Leaf)) {
+            throw "Cannot sync local-presence skill '$skill': missing $destinationPath/SKILL.md"
+        }
+
+        Write-Host ("  local adapted skill present: " + $destinationPath)
+        $unchangedFiles = $unchangedFiles + 1
+        continue
+    }
+
     $sourceFiles = Get-SourceFilesFromSnapshot -Repo $repo -Commit $commit -SourceBasePath $sourceBasePath
 
     $expectedFiles = @{}
@@ -294,7 +319,6 @@ foreach ($source in $manifest.sources) {
         $expectedFiles[[string]$sourceFile.RelativePath] = [byte[]]$sourceFile.Bytes
     }
 
-    $destinationFullPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot.Path $destinationPath))
     if (-not (Test-Path -LiteralPath $destinationFullPath -PathType Container)) {
         if ($VerifyOnly) {
             $verificationProblems.Add("Missing directory for '$skill': $destinationPath")

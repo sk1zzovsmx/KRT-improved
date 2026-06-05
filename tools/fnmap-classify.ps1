@@ -35,12 +35,12 @@ function Get-SeedCluster([object]$row, [string]$functionKey) {
     $fn = $row.Function
     $file = $row.File
 
-    if ($fn -eq "Core.GetFeatureShared" -or $fn -eq "Core.getFeatureShared") {
+    if ($fn -eq "Database.GetFeatureShared" -or $fn -eq "Database.getFeatureShared") {
         return "core.bootstrap.getFeatureShared"
     }
     if (
-        $fn -eq "Core.EnsureLootRuntimeState" -or
-        $fn -eq "Core.ensureLootRuntimeState" -or
+        $fn -eq "Database.EnsureLootRuntimeState" -or
+        $fn -eq "Database.ensureLootRuntimeState" -or
         $functionKey -eq "ensureLootRuntimeState"
     ) {
         return "core.bootstrap.ensureLootRuntimeState"
@@ -50,8 +50,8 @@ function Get-SeedCluster([object]$row, [string]$functionKey) {
     }
     if (
         $functionKey -match "^[gG]et(Master|Logger|Warnings|Changes|Spammer)Controller$" -or
-        $fn -eq "Core.GetController" -or
-        $fn -eq "Core.getController" -or
+        $fn -eq "Database.GetController" -or
+        $fn -eq "Database.getController" -or
         $functionKey -eq "getController"
     ) {
         return "entrypoints.controllerGetters.core"
@@ -63,7 +63,7 @@ function Get-SeedCluster([object]$row, [string]$functionKey) {
         return "strings.trim/split*"
     }
     if (
-        ($file -eq "!KRT/Controllers/Warnings.lua" -or $file -eq "!KRT/Controllers/Changes.lua") -and
+        ($file -eq "!KRT/Controllers/Warnings.lua") -and
         ($functionKey -eq "LocalizeUIFrame" -or $functionKey -eq "UpdateUIFrame")
     ) {
         return "listPanel.localize/update"
@@ -230,9 +230,9 @@ foreach ($group in $groups) {
         }
 
         if (
-            $row.Function -eq "Core.GetFeatureShared" -or
-            $row.Function -eq "Core.EnsureLootRuntimeState" -or
-            $row.Function -eq "Core.GetController"
+            $row.Function -eq "Database.GetFeatureShared" -or
+            $row.Function -eq "Database.EnsureLootRuntimeState" -or
+            $row.Function -eq "Database.GetController"
         ) {
             $row.Class = "structural-pattern"
             $row.Action = "keep"

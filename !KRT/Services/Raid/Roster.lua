@@ -1,14 +1,14 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
 
-local Core = feature.Core
+local Database = feature.Database
 local Events = feature.Events
 local Bus = feature.Bus
 local Strings = feature.Strings
@@ -219,7 +219,7 @@ do
     local function publishRosterDeltaInternal(delta, raidNum)
         local payload
 
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
         if not raidNum then
             return nil, nil
         end
@@ -253,8 +253,8 @@ do
     module._PublishRosterDelta = publishRosterDeltaInternal
 
     function module:IsSyntheticPlayerActive(name, raidNum)
-        local currentRaidId = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(currentRaidId)
+        local currentRaidId = raidNum or Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(currentRaidId)
         local resolvedName
 
         if not raid or not name then
@@ -447,7 +447,7 @@ do
     function module:UpdateRaidRoster()
         checkCurrentRaidInstance()
 
-        if not Core.GetCurrentRaid() then
+        if not Database.GetCurrentRaid() then
             resetPendingUnitRetry()
             resetLiveUnitCaches()
             return false
@@ -462,15 +462,15 @@ do
             return endRosterSession(true, Diag.D.LogRaidLeftGroupEndSession)
         end
 
-        local currentRaidId = Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(currentRaidId)
+        local currentRaidId = Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(currentRaidId)
         if not raid then
             return false
         end
 
-        local realm = Core.GetRealmName()
+        local realm = Database.GetRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
-        local raidStore = Core.GetRaidStoreOrNil("Raid.UpdateRaidRoster", { "EnsureRaidRuntime" })
+        local raidStore = Database.GetRaidStoreOrNil("Raid.UpdateRaidRoster", { "EnsureRaidRuntime" })
         local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
         local playersByName = runtime and runtime.playersByName or {}
 
@@ -570,10 +570,10 @@ do
 
     function module:GetPlayerID(name, raidNum)
         local playerNid = 0
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = raidNum and Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or Database.GetCurrentRaid()
+        local raid = raidNum and Database.EnsureRaidById(raidNum)
         if raid then
-            name = Strings.NormalizeName(name or Core.GetPlayerName(), true)
+            name = Strings.NormalizeName(name or Database.GetPlayerName(), true)
             local players = raid.players or {}
             for i = #players, 1, -1 do
                 local p = players[i]
@@ -588,8 +588,8 @@ do
 
     function module:GetPlayerName(id, raidNum)
         local name
-        raidNum = raidNum or (addon.State and addon.State.selectedRaid) or Core.GetCurrentRaid()
-        local raid = raidNum and Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or (addon.State and addon.State.selectedRaid) or Database.GetCurrentRaid()
+        local raid = raidNum and Database.EnsureRaidById(raidNum)
         if raid then
             local qid = tonumber(id) or id
             local players = raid.players or {}
@@ -607,8 +607,8 @@ do
 
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
-        local realm = Core.GetRealmName()
-        local resolvedName = name or Core.GetPlayerName()
+        local realm = Database.GetRealmName()
+        local resolvedName = name or Database.GetPlayerName()
         if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
             class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
         end
@@ -617,13 +617,13 @@ do
 
     -- Returns players from the raid log. Can be filtered by boss kill.
     function module:GetPlayers(raidNum, bossNid, out)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(raidNum)
         if not raid then
             return {}
         end
 
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         local raidPlayers = raid.players or {}
 

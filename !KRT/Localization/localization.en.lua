@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local setmetatable = setmetatable
 local tostring = tostring
@@ -54,7 +54,6 @@ L.StrMinimapAClick = "|cffffd700Alt+Click|r for free drag and drop"
 L.StrLootLogger = "Loot Logger"
 L.StrLootCounter = "Loot Counter"
 L.StrLFMSpam = "LFM Spam"
-L.StrMSChanges = "MS Changes"
 L.StrClearIcons = "Clear Raid Icons"
 
 -- ==================== Loot Master Frame ==================== --
@@ -182,7 +181,6 @@ L.ErrItemStack = "You have a stack of %s, you may want to split it first"
 L.ErrCannotFindItem = "Cannot find item: %s"
 L.ErrCannotFindPlayer = "Cannot find player: %s"
 L.WarnMLNoPermission = "Cannot award: you are not the Master Looter."
-L.WarnChangesBroadcastNotAllowed = "Changes demand/announce requires raid lead or assist."
 L.WarnMLOnlyMode = "Action blocked: this addon is available only to the Master Looter."
 L.WarnMLNoCandidatesAvailable = "Cannot award: no Master Loot candidates available."
 L.WarnMLWinnerNoCandidate = "Cannot award: %s is not a valid Master Loot candidate."
@@ -268,17 +266,6 @@ L.StrWarningsHelpBody =
     "- |cffffd700Left-Click|r to select a warning, click again to cancel selection.\n- |cffffd700Ctrl-Click|r for a quick raid warning.\n- When you select a warning, you can either |cffffd700Edit|r it, |cffffd700Delete|r it or |cffffd700Announce|r it using the provided buttons."
 L.StrWarningsError = "Only the body of a message is required! Though, we recommend naming your warnings so you never get lost."
 L.StrCmdWarningAnnounce = "announce the specified raid warning"
-
--- ==================== MS Changes Frame ==================== --
-L.StrChanges = "MS Changes"
-L.StrChangesDemand = "Please whisper me your MS changes before we start!"
-L.StrChangesAnnounce = "MS Changes: "
-L.StrChangesAnnounceOne = "%s is rolling %s"
-L.StrChangesAnnounceNone = "No MS changes received!"
-L.BtnClear = "Clear"
-L.BtnDemand = "Demand"
-L.BtnAnnounce = "Announce"
-L.ErrChangesNoPlayer = "The name is required. Leaving the change empty will remove the player from the list."
 
 -- ==================== LFM Spam Frame ==================== --
 L.StrSpammer = "LFM Spam"
@@ -422,7 +409,6 @@ L.StrCmdConfig = "shows or hides configuration window"
 L.StrCmdConfigReset = "restore default options"
 L.StrCmdGrouper = "access LFM Spam related commands"
 L.StrCmdAchiev = "look for achievement ID to use for LFM"
-L.StrCmdChanges = "access ms changes related commands"
 L.StrCmdWarnings = "access warnings related commands"
 L.StrCmdLogger = "access loot logger related commands"
 L.StrCmdLoggerReq = "request a specific raid snapshot from one target player"
@@ -438,8 +424,6 @@ L.StrCmdDebugRaidRoll = "make one synthetic player roll: roll <1-4|name> [1-100]
 L.StrCmdCounter = "shows or hides loot counter window"
 L.StrCmdLFMStart = "starts LFM spam"
 L.StrCmdLFMStop = "stops LFM spam"
-L.StrCmdChangesDemand = "ask raid members to whisper you their ms changes"
-L.StrCmdChangesAnnounce = "spam ms changes to raid channel"
 L.StrCmdReserves = "access reserve list related commands"
 L.StrCmdReservesImport = "import reserves from SoftRes CSV data"
 L.StrCmdReservesCheck = "print a local SoftRes readiness report"

@@ -4,7 +4,7 @@
 -- exports: addon.Services.Rolls._Countdown
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Services = feature.Services

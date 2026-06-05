@@ -1,16 +1,16 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Strings = feature.Strings
 local Base64 = feature.Base64
-local Core = feature.Core
+local Database = feature.Database
 local Services = feature.Services
 
 local tinsert = table.insert
@@ -70,7 +70,7 @@ commitRaidSelections = function(raid, opts)
     opts = opts or {}
 
     -- Rebuild canonical raid schema/runtime indexes after in-place mutations.
-    Core.EnsureRaidSchema(raid)
+    Database.EnsureRaidSchema(raid)
 
     if opts.invalidate ~= false then
         Store._InvalidateIndexes(raid)
@@ -242,7 +242,7 @@ verifyLoggerLootMutation = function(raidID, lootNid, it, recordedLooterName, exp
 
     if addon.hasDebug then
         addon:debug(Diag.D.LogLoggerVerified:format(raidID, tostring(lootNid)))
-        if not Core.GetLastBoss() then
+        if not Database.GetLastBoss() then
             addon:debug(Diag.D.LogLoggerRecordedNoBossContext:format(raidID, tostring(lootNid), tostring(it.itemLink)))
         end
     end
@@ -259,7 +259,7 @@ function Actions:SetLootEntry(raidID, lootNid, looter, rollType, rollValue, sour
                 tostring(looter),
                 tostring(rollType),
                 tostring(rollValue),
-                tostring(Core.GetLastBoss())
+                tostring(Database.GetLastBoss())
             )
         )
     end
@@ -341,8 +341,8 @@ function Actions:DeleteBoss(rID, bossNid)
     tremove(raid.bossKills, bossIndex)
     commitRaidSelections(raid)
 
-    if Core.GetCurrentRaid() == rID and tonumber(Core.GetLastBoss()) == tonumber(bossNid) then
-        Core.SetLastBoss(nil)
+    if Database.GetCurrentRaid() == rID and tonumber(Database.GetLastBoss()) == tonumber(bossNid) then
+        Database.SetLastBoss(nil)
     end
 
     return removed
@@ -472,17 +472,17 @@ end
 
 function Actions:DeleteRaid(rID)
     local sel = tonumber(rID)
-    local raid = sel and Core.EnsureRaidById(sel) or nil
+    local raid = sel and Database.EnsureRaidById(sel) or nil
     if not raid then
         return false
     end
 
-    if Core.GetCurrentRaid() and Core.GetCurrentRaid() == sel then
+    if Database.GetCurrentRaid() and Database.GetCurrentRaid() == sel then
         addon:error(L.ErrCannotDeleteRaid)
         return false
     end
 
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Actions.DeleteRaid", { "DeleteRaid" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Actions.DeleteRaid", { "DeleteRaid" })
     local removedIdx = sel
     if raidStore then
         local deleted, idx = raidStore:DeleteRaid(raid.raidNid)
@@ -494,8 +494,8 @@ function Actions:DeleteRaid(rID)
         return false
     end
 
-    if Core.GetCurrentRaid() and Core.GetCurrentRaid() > removedIdx then
-        Core.SetCurrentRaid(Core.GetCurrentRaid() - 1)
+    if Database.GetCurrentRaid() and Database.GetCurrentRaid() > removedIdx then
+        Database.SetCurrentRaid(Database.GetCurrentRaid() - 1)
     end
 
     return true
@@ -506,18 +506,18 @@ function Actions:DeleteRaidByNid(raidNid)
     if not nid then
         return false
     end
-    local raid, sel = Core.EnsureRaidByNid(nid)
+    local raid, sel = Database.EnsureRaidByNid(nid)
     if not (raid and sel) then
         return false
     end
 
-    local currentRaidNid = Core.GetRaidNidById(Core.GetCurrentRaid())
+    local currentRaidNid = Database.GetRaidNidById(Database.GetCurrentRaid())
     if currentRaidNid and tonumber(currentRaidNid) == nid then
         addon:error(L.ErrCannotDeleteRaid)
         return false
     end
 
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Actions.DeleteRaidByNid", { "DeleteRaid" })
+    local raidStore = Database.GetRaidStoreOrNil("Logger.Actions.DeleteRaidByNid", { "DeleteRaid" })
     local removedIdx = sel
     if raidStore then
         local deleted, idx = raidStore:DeleteRaid(nid)
@@ -529,8 +529,8 @@ function Actions:DeleteRaidByNid(raidNid)
         return false
     end
 
-    if Core.GetCurrentRaid() and Core.GetCurrentRaid() > removedIdx then
-        Core.SetCurrentRaid(Core.GetCurrentRaid() - 1)
+    if Database.GetCurrentRaid() and Database.GetCurrentRaid() > removedIdx then
+        Database.SetCurrentRaid(Database.GetCurrentRaid() - 1)
     end
 
     return true
@@ -538,7 +538,7 @@ end
 
 function Actions:SetCurrentRaid(rID)
     local sel = tonumber(rID)
-    local raid = sel and Core.EnsureRaidById(sel) or nil
+    local raid = sel and Database.EnsureRaidById(sel) or nil
     if not (sel and raid) then
         return false
     end
@@ -581,8 +581,8 @@ function Actions:SetCurrentRaid(rID)
         return false
     end
 
-    Core.SetCurrentRaid(sel)
-    Core.SetLastBoss(nil)
+    Database.SetCurrentRaid(sel)
+    Database.SetLastBoss(nil)
 
     -- Sync roster/dropdowns immediately so subsequent logging targets the selected raid.
     Services.Raid:UpdateRaidRoster()

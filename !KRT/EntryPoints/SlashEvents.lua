@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 
@@ -12,7 +12,7 @@ local Options = feature.Options
 local Frames = feature.Frames
 local Colors = feature.Colors
 local Strings = feature.Strings
-local Core = feature.Core
+local Database = feature.Database
 local Services = feature.Services
 local Comms = feature.Comms
 local Item = feature.Item
@@ -32,8 +32,8 @@ local _G = _G
 local UI = addon.UI
 
 -- =========== Slash Commands  =========== --
-local function getCoreService(getterName)
-    local getter = Core and Core[getterName]
+local function getDatabaseService(getterName)
+    local getter = Database and Database[getterName]
     if type(getter) == "function" then
         return getter()
     end
@@ -97,7 +97,7 @@ end
 local slashHandlers = {}
 
 local cmdAchiev, cmdLFM, cmdConfig = { "ach", "achi", "achiev", "achievement" }, { "pug", "lfm", "group", "grouper" }, { "config", "conf", "options", "opt" }
-local cmdChanges, cmdWarnings, cmdLogger = { "ms", "changes", "mschanges" }, { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
+local cmdWarnings, cmdLogger = { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
 local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
 local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve", "sr", "softres" }, { "minimap", "mm" }, { "validate" }
 local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
@@ -127,7 +127,6 @@ local function showHelp()
     printHelp("config", L.StrCmdConfig)
     printHelp("lfm", L.StrCmdGrouper)
     printHelp("ach", L.StrCmdAchiev)
-    printHelp("changes", L.StrCmdChanges)
     printHelp("warnings", L.StrCmdWarnings)
     printHelp("logger", L.StrCmdLogger)
     printHelp("debug", L.StrCmdDebug)
@@ -339,7 +338,7 @@ local function isToggleCommand(sub)
 end
 
 local function callSyncerMethod(methodName, ...)
-    local syncer = getCoreService("GetSyncer")
+    local syncer = getDatabaseService("GetSyncer")
     local method = syncer and syncer[methodName]
     if type(method) == "function" then
         return method(syncer, ...)
@@ -359,8 +358,8 @@ local function getVersionInfo()
     end
 
     local unknown = tostring(L.StrUnknown)
-    local schemaGetter = Core and Core.GetRaidSchemaVersion
-    local syncer = getCoreService("GetSyncer")
+    local schemaGetter = Database and Database.GetRaidSchemaVersion
+    local syncer = getDatabaseService("GetSyncer")
     local syncGetter = syncer and syncer.GetProtocolVersion
 
     return {
@@ -389,7 +388,7 @@ local function yesNo(value)
 end
 
 local function countRaidHistory()
-    local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("SlashEvents.BugReport", { "GetAllRaids" }) or nil
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("SlashEvents.BugReport", { "GetAllRaids" }) or nil
     local raids = raidStore and raidStore:GetAllRaids() or nil
     if type(raids) ~= "table" then
         return 0
@@ -422,9 +421,9 @@ local function countReserves()
 end
 
 local function getCurrentRaidSummary()
-    local currentRaid = Core and Core.GetCurrentRaid and Core.GetCurrentRaid() or nil
+    local currentRaid = Database and Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
     local raidNid
-    local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("SlashEvents.CurrentRaid", { "GetRaidNidByIndex" }) or nil
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("SlashEvents.CurrentRaid", { "GetRaidNidByIndex" }) or nil
     if raidStore and currentRaid and raidStore.GetRaidNidByIndex then
         raidNid = raidStore:GetRaidNidByIndex(currentRaid)
     end
@@ -663,36 +662,20 @@ end
 local function handleWarningsCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        Core.RequestControllerMethod("Warnings", "Toggle")
+        Database.RequestControllerMethod("Warnings", "Toggle")
     elseif sub == "help" then
         addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
         printHelp("[ID]", L.StrCmdWarningAnnounce)
     else
-        Core.RequestControllerMethod("Warnings", "RequestAnnounce", sub)
-    end
-end
-
-local function handleChangesCommand(rest)
-    local sub = Strings.SplitArgs(rest)
-    if isToggleCommand(sub) then
-        Core.RequestControllerMethod("Changes", "Toggle")
-    elseif sub == "demand" or sub == "ask" then
-        Core.RequestControllerMethod("Changes", "Demand")
-    elseif sub == "announce" or sub == "spam" then
-        Core.RequestControllerMethod("Changes", "Announce")
-    else
-        addon:info(format(L.StrCmdCommands, "krt ms"), "KRT")
-        printHelp("toggle", L.StrCmdToggle)
-        printHelp("demand", L.StrCmdChangesDemand)
-        printHelp("announce", L.StrCmdChangesAnnounce)
+        Database.RequestControllerMethod("Warnings", "RequestAnnounce", sub)
     end
 end
 
 local function handleLoggerCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        Core.RequestControllerMethod("Logger", "Toggle")
+        Database.RequestControllerMethod("Logger", "Toggle")
     elseif sub == "req" then
         callSyncerMethodWithTarget("RequestLoggerReq", arg)
     elseif sub == "push" then
@@ -711,7 +694,7 @@ end
 local function handleLootCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        Core.RequestControllerMethod("Master", "Toggle")
+        Database.RequestControllerMethod("Master", "Toggle")
     end
 end
 
@@ -961,7 +944,7 @@ local function handleValidateCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if sub == "raids" then
         local verboseArg = Strings.SplitArgs(arg)
-        local validator = getCoreService("GetRaidValidator")
+        local validator = getDatabaseService("GetRaidValidator")
         if not (validator and validator.ValidateAllRaids) then
             addon:warn(L.MsgValidateUnavailable)
             return
@@ -1023,11 +1006,11 @@ end
 local function handleLfmCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if isToggleCommand(sub) or sub == "show" then
-        Core.RequestControllerMethod("Spammer", "Toggle")
+        Database.RequestControllerMethod("Spammer", "Toggle")
     elseif sub == "start" then
-        Core.RequestControllerMethod("Spammer", "RequestStart")
+        Database.RequestControllerMethod("Spammer", "RequestStart")
     elseif sub == "stop" then
-        Core.RequestControllerMethod("Spammer", "RequestStop")
+        Database.RequestControllerMethod("Spammer", "RequestStop")
     else
         addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
@@ -1061,8 +1044,6 @@ local function handleHelpCommand(rest)
         handlePerfCommand("help")
     elseif topic == "rw" or topic == "warn" or topic == "warning" or topic == "warnings" then
         handleWarningsCommand("help")
-    elseif topic == "ms" or topic == "changes" or topic == "mschanges" then
-        handleChangesCommand("help")
     elseif topic == "lfm" or topic == "pug" or topic == "group" or topic == "grouper" then
         handleLfmCommand("help")
     elseif topic == "config" or topic == "conf" or topic == "options" or topic == "opt" then
@@ -1113,7 +1094,7 @@ local function handleSlashCommand(msg)
     end
 
     if cmd == "show" or cmd == "toggle" then
-        Core.RequestControllerMethod("Master", "Toggle")
+        Database.RequestControllerMethod("Master", "Toggle")
         return
     end
     local fn = slashHandlers[cmd]
@@ -1132,7 +1113,6 @@ registerAliases(cmdMinimap, handleMinimapCommand)
 registerAliases(cmdAchiev, handleAchievementCommand)
 registerAliases(cmdConfig, handleConfigCommand)
 registerAliases(cmdWarnings, handleWarningsCommand)
-registerAliases(cmdChanges, handleChangesCommand)
 registerAliases(cmdLogger, handleLoggerCommand)
 registerAliases(cmdLoot, handleLootCommand)
 registerAliases(cmdCounter, handleCounterCommand)
@@ -1154,7 +1134,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/Options",
+            "Database/DBOptions",
             "Modules/C",
             "Modules/Colors",
             "Modules/Strings",

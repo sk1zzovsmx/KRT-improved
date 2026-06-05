@@ -4,7 +4,7 @@
 -- exports: addon.Services.Reserves._Display
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local C = feature.C

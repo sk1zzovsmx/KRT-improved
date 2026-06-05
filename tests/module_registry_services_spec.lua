@@ -88,10 +88,10 @@ local function getPostRegistryDeps(source, moduleName)
 end
 
 local preRegistryCoreModules = {
-    { name = "Core/DB", deps = { "Init" } },
-    { name = "Core/Options", deps = { "Init" } },
-    { name = "Core/DBSchema", deps = { "Init" } },
-    { name = "Core/DBManager", deps = { "Init", "Core/DB" } },
+    { name = "Database/DB", deps = { "Init" } },
+    { name = "Database/DBOptions", deps = { "Init" } },
+    { name = "Database/DBSchema", deps = { "Init" } },
+    { name = "Database/DBManager", deps = { "Init", "Database/DB" } },
 }
 
 local preRegistryUtilityModules = {
@@ -125,46 +125,46 @@ local directRegistryModules = {
 
 local postRegistryCoreModules = {
     {
-        name = "Core/DBRaidMigrations",
-        deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBSchema", "Modules/Strings" },
+        name = "Database/DBRaidMigrations",
+        deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBSchema", "Modules/Strings" },
     },
     {
-        name = "Core/DBRaidStore",
+        name = "Database/DBRaidStore",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/DB",
-            "Core/DBSchema",
-            "Core/DBRaidMigrations",
+            "Database/DB",
+            "Database/DBSchema",
+            "Database/DBRaidMigrations",
             "Modules/Time",
             "Modules/Strings",
         },
     },
     {
-        name = "Core/DBRaidQueries",
-        deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBRaidStore", "Modules/Sort" },
+        name = "Database/DBRaidQueries",
+        deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBRaidStore", "Modules/Sort" },
     },
     {
-        name = "Core/DBRaidValidator",
+        name = "Database/DBRaidValidator",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/DB",
-            "Core/DBSchema",
-            "Core/DBRaidMigrations",
-            "Core/DBRaidStore",
+            "Database/DB",
+            "Database/DBSchema",
+            "Database/DBRaidMigrations",
+            "Database/DBRaidStore",
             "Modules/Dataset/IgnoredMobs",
         },
     },
     {
-        name = "Core/DBSyncer",
+        name = "Database/DBSyncer",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
-            "Core/DB",
-            "Core/DBSchema",
-            "Core/DBRaidStore",
-            "Core/DBRaidQueries",
+            "Database/DB",
+            "Database/DBSchema",
+            "Database/DBRaidStore",
+            "Database/DBRaidQueries",
             "Modules/Events",
             "Modules/Bus",
             "Modules/Strings",
@@ -470,7 +470,7 @@ local expectedLoggerServices = {
         owner = "Store",
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
-        forbiddenDeps = { "Services/Raid", "Core/DBRaidQueries", "Core/DBRaidStore" },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
     },
     {
         name = "Services/Logger/View",
@@ -478,7 +478,7 @@ local expectedLoggerServices = {
         owner = "View",
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Sort", "Services/Logger/Store" },
-        forbiddenDeps = { "Services/Raid", "Core/DBRaidQueries", "Core/DBRaidStore" },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
     },
     {
         name = "Services/Logger/Export",
@@ -486,7 +486,7 @@ local expectedLoggerServices = {
         owner = "Export",
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Services/Logger/Store" },
-        forbiddenDeps = { "Services/Raid", "Core/DBRaidQueries", "Core/DBRaidStore" },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
     },
     {
         name = "Services/Logger/Helpers",
@@ -494,7 +494,7 @@ local expectedLoggerServices = {
         owner = "Helpers",
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Services/Logger/Store" },
-        forbiddenDeps = { "Services/Raid", "Core/DBRaidQueries", "Core/DBRaidStore" },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
     },
     {
         name = "Services/Logger/Actions",
@@ -502,7 +502,7 @@ local expectedLoggerServices = {
         owner = "Actions",
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Base64", "Services/Logger/Store", "Services/Logger/Helpers" },
-        forbiddenDeps = { "Services/Raid", "Core/DBRaidQueries", "Core/DBRaidStore" },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
     },
 }
 
@@ -556,7 +556,7 @@ local expectedReservesServices = {
             "Services/Reserves/Aliases",
             "Services/Reserves/Display",
         },
-        forbiddenDeps = { "Services/Reserves/Sync", "Services/Reserves/Chat", "Core/Options" },
+        forbiddenDeps = { "Services/Reserves/Sync", "Services/Reserves/Chat", "Database/DBOptions" },
     },
     {
         name = "Services/Reserves/Chat",
@@ -918,7 +918,7 @@ for i = 1, #preRegistryUtilityModules do
 end
 
 local addon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,
@@ -1033,7 +1033,7 @@ for i = 1, #expectedLoggerServices do
 end
 
 local negativeAddon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,
@@ -1066,7 +1066,7 @@ end
 assert(foundOutOfOrder, "Services/Loot/Service before Services/Loot/Tracking must report out_of_order")
 
 local raidNegativeAddon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,
@@ -1098,7 +1098,7 @@ end
 assert(foundRaidLootRecordsOutOfOrder, "Services/Raid/LootRecords before Services/Raid/Counts must report out_of_order")
 
 local raidStateNegativeAddon = {
-    Core = {
+    Database = {
         GetFeatureShared = function()
             return {}
         end,
@@ -1154,7 +1154,7 @@ local function assertOutOfOrder(moduleName, dependencyName)
     local moduleSpec = assert(findExpectedSpec(moduleName), "missing expected spec: " .. moduleName)
     local dependencySpec = assert(findExpectedSpec(dependencyName), "missing expected spec: " .. dependencyName)
     local outOfOrderAddon = {
-        Core = {
+        Database = {
             GetFeatureShared = function()
                 return {}
             end,

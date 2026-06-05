@@ -1,17 +1,17 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 
 local Events = feature.Events
 local C = feature.C
-local Core = feature.Core
+local Database = feature.Database
 local Bus = feature.Bus
 local Strings = feature.Strings
 local Time = feature.Time
@@ -672,8 +672,8 @@ do
     end
 
     local function invalidateRaidRuntime(raid)
-        if Core and Core.StripRuntimeRaidCaches then
-            Core.StripRuntimeRaidCaches(raid)
+        if Database and Database.StripRuntimeRaidCaches then
+            Database.StripRuntimeRaidCaches(raid)
             return
         end
         if type(raid) == "table" then
@@ -813,7 +813,7 @@ do
         end
 
         if applyLastBoss then
-            Core.SetLastBoss(contextBossNid)
+            Database.SetLastBoss(contextBossNid)
             if isDebugEnabled() then
                 addon:debug(
                     Diag.D.LogBossEventContextRecovered:format(tostring(contextBossName), contextBossNid, tonumber(delta) or -1, tostring(bossEventContext.source or "event"))
@@ -993,14 +993,14 @@ do
             local existingBossNid = tonumber(existingBoss.bossNid) or 0
             if existingBossNid > 0 then
                 if source.kind == "boss" then
-                    Core.SetLastBoss(existingBossNid)
+                    Database.SetLastBoss(existingBossNid)
                     setBossEventContext(raidNum, existingBossNid, sourceName, "LootSources", now)
                 end
                 return existingBossNid
             end
         end
 
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         local instanceDiff = resolveRaidDifficulty()
         if not instanceDiff then
@@ -1044,7 +1044,7 @@ do
         invalidateRaidRuntime(raid)
 
         if source.kind == "boss" then
-            Core.SetLastBoss(bossNid)
+            Database.SetLastBoss(bossNid)
             setBossEventContext(raidNum, bossNid, sourceName, "LootSources", killInfo.time)
         end
 
@@ -1153,7 +1153,7 @@ do
 
     function module:FindAndRememberBossContextForLootSession(raidNum, rollSessionId, options)
         options = options or {}
-        local raid = type(Core.EnsureRaidById) == "function" and Core.EnsureRaidById(raidNum) or nil
+        local raid = type(Database.EnsureRaidById) == "function" and Database.EnsureRaidById(raidNum) or nil
         if not raid then
             return 0
         end
@@ -1176,7 +1176,7 @@ do
 
     module._EnsureLootWindowItemContext = function(_, raidNum, items, options)
         options = options or {}
-        local raid = type(Core.EnsureRaidById) == "function" and Core.EnsureRaidById(raidNum) or nil
+        local raid = type(Database.EnsureRaidById) == "function" and Database.EnsureRaidById(raidNum) or nil
         if not raid then
             return 0
         end
@@ -1221,7 +1221,7 @@ do
             return nil
         end
 
-        local queryRaidNum = tonumber(raidNum) or tonumber(Core.GetCurrentRaid and Core.GetCurrentRaid()) or 0
+        local queryRaidNum = tonumber(raidNum) or tonumber(Database.GetCurrentRaid and Database.GetCurrentRaid()) or 0
         local sourceRaidNum = tonumber(source.raidNum) or 0
         if queryRaidNum > 0 and sourceRaidNum > 0 and queryRaidNum ~= sourceRaidNum then
             return nil
@@ -1275,7 +1275,7 @@ do
             return false
         end
 
-        if Core.GetCurrentRaid() then
+        if Database.GetCurrentRaid() then
             self:End()
         end
 
@@ -1283,7 +1283,7 @@ do
             module._SetNumRaidInternal(num)
         end
 
-        local realm = Core.GetRealmName()
+        local realm = Database.GetRealmName()
         local realmPlayers = (type(module._EnsureRealmPlayerMetaInternal) == "function" and module._EnsureRealmPlayerMetaInternal(realm)) or {}
         local currentTime = Time.GetCurrentTime()
 
@@ -1292,7 +1292,7 @@ do
             instanceDiff = resolveRaidDifficulty()
         end
 
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Raid.Create", { "CreateRaidRecord", "InsertRaid" }) or nil
+        local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Raid.Create", { "CreateRaidRecord", "InsertRaid" }) or nil
         if not raidStore then
             return false
         end
@@ -1335,7 +1335,7 @@ do
         if not raidId then
             return false
         end
-        Core.SetCurrentRaid(raidId)
+        Database.SetCurrentRaid(raidId)
         resetLootContextState()
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         if type(module._BumpRosterVersionInternal) == "function" then
@@ -1345,9 +1345,9 @@ do
             module._ResetRosterTrackingInternal()
         end
 
-        addon:info(Diag.I.LogRaidCreated:format(Core.GetCurrentRaid() or -1, tostring(zoneName), tonumber(raidSize) or -1, #raidInfo.players))
+        addon:info(Diag.I.LogRaidCreated:format(Database.GetCurrentRaid() or -1, tostring(zoneName), tonumber(raidSize) or -1, #raidInfo.players))
 
-        Bus.TriggerEvent(InternalEvents.RaidCreate, Core.GetCurrentRaid())
+        Bus.TriggerEvent(InternalEvents.RaidCreate, Database.GetCurrentRaid())
 
         -- Schedule one delayed roster refresh.
         if type(module._ScheduleRosterRefreshInternal) == "function" then
@@ -1364,7 +1364,7 @@ do
         if type(module._ResetRosterTrackingInternal) == "function" then
             module._ResetRosterTrackingInternal()
         end
-        if not Core.GetCurrentRaid() then
+        if not Database.GetCurrentRaid() then
             return
         end
         -- Stop any pending roster update when ending the raid
@@ -1372,12 +1372,12 @@ do
             module._CancelRosterRefreshInternal()
         end
         local currentTime = Time.GetCurrentTime()
-        local raid = Core.EnsureRaidById(Core.GetCurrentRaid())
+        local raid = Database.EnsureRaidById(Database.GetCurrentRaid())
         if raid then
             local duration = currentTime - (raid.startTime or currentTime)
             addon:info(
                 Diag.I.LogRaidEnded:format(
-                    Core.GetCurrentRaid() or -1,
+                    Database.GetCurrentRaid() or -1,
                     tostring(raid.zone),
                     tonumber(raid.size) or -1,
                     raid.bossKills and #raid.bossKills or 0,
@@ -1393,8 +1393,8 @@ do
             end
             raid.endTime = currentTime
         end
-        Core.SetCurrentRaid(nil)
-        Core.SetLastBoss(nil)
+        Database.SetCurrentRaid(nil)
+        Database.SetLastBoss(nil)
         resetLootContextState()
     end
 
@@ -1409,7 +1409,7 @@ do
             return
         end
 
-        if Core.GetCurrentRaid() and module:CheckPlayer(Core.GetPlayerName(), Core.GetCurrentRaid()) then
+        if Database.GetCurrentRaid() and module:CheckPlayer(Database.GetPlayerName(), Database.GetCurrentRaid()) then
             -- Restart the roster update timer: cancel the old one and schedule a new one
             if type(module._ScheduleRosterRefreshInternal) == "function" then
                 module._ScheduleRosterRefreshInternal()
@@ -1422,7 +1422,7 @@ do
             addon:debug(
                 Diag.D.LogRaidInitialCheck:format(
                     tostring(addon.IsInGroup()),
-                    tostring(Core.GetCurrentRaid() ~= nil),
+                    tostring(Database.GetCurrentRaid() ~= nil),
                     tostring(instanceName),
                     tostring(instanceType),
                     tostring(instanceDiff)
@@ -1437,15 +1437,15 @@ do
 
     -- Adds a player to the raid log.
     function module:AddPlayer(t, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
         if not raidNum or not t or not t.name then
             return
         end
-        local raid = Core.EnsureRaidById(raidNum)
+        local raid = Database.EnsureRaidById(raidNum)
         if not raid then
             return
         end
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         local players = module:GetPlayers(raidNum)
         local found = false
@@ -1495,7 +1495,7 @@ do
             bossName = nil
         end
 
-        raidNum = raidNum or Core.GetCurrentRaid()
+        raidNum = raidNum or Database.GetCurrentRaid()
         if not raidNum or not bossName then
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
@@ -1504,11 +1504,11 @@ do
         end
         local isTrashBoss = IsTrashMobName(bossName)
 
-        local raid = Core.EnsureRaidById(raidNum)
+        local raid = Database.EnsureRaidById(raidNum)
         if not raid then
             return 0
         end
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         local instanceDiff = resolveRaidDifficulty()
         if manDiff then
@@ -1524,7 +1524,7 @@ do
         if existingBoss then
             local existingBossNid = tonumber(existingBoss.bossNid) or 0
             if existingBossNid > 0 then
-                Core.SetLastBoss(existingBossNid)
+                Database.SetLastBoss(existingBossNid)
                 if not isTrashBoss then
                     setBossEventContext(raidNum, existingBossNid, bossName, bossSource, currentTime)
                 else
@@ -1569,7 +1569,7 @@ do
 
         tinsert(raid.bossKills, killInfo)
         invalidateRaidRuntime(raid)
-        Core.SetLastBoss(bossNid)
+        Database.SetLastBoss(bossNid)
         if not isTrashBoss then
             setBossEventContext(raidNum, bossNid, bossName, bossSource, currentTime)
         else
@@ -1577,7 +1577,7 @@ do
         end
         addon:info(Diag.I.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1, tonumber(raidNum) or -1, #players))
         if isDebugEnabled() then
-            addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Core.GetLastBoss()) or -1, tostring(killInfo.hash)))
+            addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Database.GetLastBoss()) or -1, tostring(killInfo.hash)))
         end
         return bossNid
     end
@@ -1615,7 +1615,7 @@ do
 
     -- Checks if a raid log is expired (older than the weekly reset).
     function module:IsRaidExpired(rID)
-        local raid = Core.EnsureRaidById(rID)
+        local raid = Database.EnsureRaidById(rID)
         if not raid then
             return true
         end
@@ -1624,8 +1624,8 @@ do
         local currentTime = Time.GetCurrentTime()
         local week = 604800 -- 7 days in seconds
 
-        if Core.GetNextReset() and Core.GetNextReset() > currentTime then
-            return startTime < (Core.GetNextReset() - week)
+        if Database.GetNextReset() and Database.GetNextReset() > currentTime then
+            return startTime < (Database.GetNextReset() - week)
         end
 
         return currentTime >= startTime + week
@@ -1633,13 +1633,13 @@ do
 
     -- Retrieves all loot for a given raid and optional boss number.
     function module:GetLoot(raidNum, bossNid)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
+        raidNum = raidNum or Database.GetCurrentRaid()
+        local raid = Database.EnsureRaidById(raidNum)
         bossNid = tonumber(bossNid) or 0
         if not raid then
             return {}
         end
-        Core.EnsureRaidSchema(raid)
+        Database.EnsureRaidSchema(raid)
 
         local loot = raid.loot or {}
         if bossNid <= 0 then
@@ -1657,7 +1657,7 @@ do
 
     -- Processes COMBAT_LOG_EVENT_UNFILTERED for boss-kill detection.
     function module:COMBAT_LOG_EVENT_UNFILTERED(...)
-        if not Core.GetCurrentRaid() then
+        if not Database.GetCurrentRaid() then
             return
         end
 
@@ -1685,7 +1685,7 @@ do
         end
         if sourceKind ~= "boss" then
             if sourceKind == "trash" then
-                local currentRaid = Core.GetCurrentRaid()
+                local currentRaid = Database.GetCurrentRaid()
                 local currentTime = Time.GetCurrentTime()
                 if hasRecoverableBossEventContext(currentRaid, currentTime) then
                     rememberRecentTrashDeathContext(currentRaid, destName, sourceNpcId, currentTime)
@@ -1700,7 +1700,7 @@ do
                 addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(sourceNpcId) or -1, tostring(boss)))
             end
             local bossNid = module:AddBoss(boss, nil, nil, sourceNpcId)
-            setRecentLootDeathContext(Core.GetCurrentRaid(), "boss", boss, sourceNpcId, bossNid, "UNIT_DIED", Time.GetCurrentTime())
+            setRecentLootDeathContext(Database.GetCurrentRaid(), "boss", boss, sourceNpcId, bossNid, "UNIT_DIED", Time.GetCurrentTime())
         end
     end
 end

@@ -1,0 +1,4 @@
+interface:
+  display_name: "WoW Addon WotLK 3.3.5a"
+  short_description: "WotLK 3.3.5a addon development"
+  default_prompt: "Use $wow-addon-dev-wotlk-v335a to develop, port, or debug a WoW 3.3.5a addon."

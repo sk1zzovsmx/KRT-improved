@@ -4,11 +4,11 @@
 -- exports: addon.Services.Rolls._Responses
 
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Core = feature.Core
+local Database = feature.Database
 local Strings = feature.Strings
 local Comms = feature.Comms
 local Services = feature.Services
@@ -518,7 +518,7 @@ function Responses.BuildCandidateEligibility(ctx, name, itemId, itemLink, rollTy
 
     raid = ctx.getRaidService and ctx.getRaidService() or nil
     unitId = raid and raid.GetUnitID and raid:GetUnitID(name) or "none"
-    isSyntheticPlayer = raid and raid.IsSyntheticPlayerActive and raid:IsSyntheticPlayerActive(name, Core.GetCurrentRaid and Core.GetCurrentRaid() or nil)
+    isSyntheticPlayer = raid and raid.IsSyntheticPlayerActive and raid:IsSyntheticPlayerActive(name, Database.GetCurrentRaid and Database.GetCurrentRaid() or nil)
     if (not unitId or unitId == "none") and not isSyntheticPlayer then
         return buildEligibilityResult(opts, false, bucket, reasonCodes.NOT_IN_RAID, allowedRolls, usedRolls, currentItemId, currentItemLink, false, reasonCodes.NOT_IN_RAID)
     end

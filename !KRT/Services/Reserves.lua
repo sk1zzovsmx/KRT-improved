@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.GetFeatureShared()
+local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
@@ -519,7 +519,7 @@ do
                 return Services.Raid
             end,
             getCurrentRaid = function()
-                return addon.Core and addon.Core.GetCurrentRaid and addon.Core.GetCurrentRaid() or nil
+                return addon.Database and addon.Database.GetCurrentRaid and addon.Database.GetCurrentRaid() or nil
             end,
             getAliasState = getAliasState,
             getAliasMatches = function(reservePlayers, raidPlayers)

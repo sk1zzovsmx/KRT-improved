@@ -1,6 +1,6 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: defines addon.Core.GetFeatureShared()
+-- shared: defines addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
@@ -13,7 +13,7 @@ end
 
 -- ----- Internal state ----- --
 addon.name = addon.name or addonName
-addon.Core = addon.Core or {}
+addon.Database = addon.Database or {}
 addon.L = addon.L or {}
 addon.Diagnose = addon.Diagnose or {}
 addon.State = addon.State or {}
@@ -39,7 +39,7 @@ local GetRealmName = _G.GetRealmName
 local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
 local UnitIsGroupLeader = _G.UnitIsGroupLeader
 
-local Core = addon.Core
+local Database = addon.Database
 local Diagnose = addon.Diagnose
 local DEFAULT_PERF_THRESHOLD_MS = 5
 
@@ -107,11 +107,11 @@ local function getPerfThresholdMs()
 end
 
 -- ----- Public methods ----- --
-function Core.EnsureBootstrapEvents()
+function Database.EnsureBootstrapEvents()
     return seedBootstrapEvents()
 end
 
-Core.EnsureBootstrapEvents()
+Database.EnsureBootstrapEvents()
 
 addon._PerfStart = function(self)
     if not self.hasPerf then
@@ -157,7 +157,7 @@ local function getController(name)
     return controllers and controllers[name] or nil
 end
 
-function Core.RequestControllerMethod(name, methodName, ...)
+function Database.RequestControllerMethod(name, methodName, ...)
     if type(methodName) ~= "string" or methodName == "" then
         return nil
     end
@@ -188,11 +188,11 @@ local function ensureNamespace(root, ...)
     return target
 end
 
-function Core.EnsureServiceNamespace(...)
+function Database.EnsureServiceNamespace(...)
     return ensureNamespace(addon.Services, ...)
 end
 
-function Core.GetPlayerName()
+function Database.GetPlayerName()
     local state = addon.State
     state.player = state.player or {}
     local name = state.player.name or addon.UnitFullName("player")
@@ -200,7 +200,7 @@ function Core.GetPlayerName()
     return name
 end
 
-function Core.GetRealmName()
+function Database.GetRealmName()
     local realm = GetRealmName and GetRealmName() or ""
     if type(realm) ~= "string" then
         return ""
@@ -208,7 +208,7 @@ function Core.GetRealmName()
     return realm
 end
 
-function Core.GetUnitRank(unit, fallback)
+function Database.GetUnitRank(unit, fallback)
     local groupLeader = addon.UnitIsGroupLeader or UnitIsGroupLeader
     local groupAssistant = addon.UnitIsGroupAssistant or UnitIsGroupAssistant
 
@@ -221,11 +221,11 @@ function Core.GetUnitRank(unit, fallback)
     return fallback or 0
 end
 
--- Options/SavedVariables management lives in Core/Options.lua.
+-- Options/SavedVariables management lives in Database/DBOptions.lua.
 -- IsDebugEnabled / ApplyDebugSetting are exposed on addon.Options there.
 -- Namespace registrations are owned by the modules that use them.
 
-function Core.EnsureLootRuntimeState()
+function Database.EnsureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
     state.raid = state.raid or {}
@@ -330,14 +330,14 @@ function Core.EnsureLootRuntimeState()
     return state, lootState, lootState.itemInfo, raidState
 end
 
-function Core.GetItemIndex()
-    local _, lootState = Core.EnsureLootRuntimeState()
+function Database.GetItemIndex()
+    local _, lootState = Database.EnsureLootRuntimeState()
     return tonumber(lootState.currentItemIndex) or 0
 end
 
-function Core.GetFeatureShared()
+function Database.GetFeatureShared()
     local constants = addon.C or {}
-    local core = addon.Core
+    local core = addon.Database
     local state, lootState, itemInfo, raidState = core.EnsureLootRuntimeState()
 
     return {
@@ -347,7 +347,7 @@ function Core.GetFeatureShared()
         Events = addon.Events,
         Features = addon.Features,
         C = constants,
-        Core = core,
+        Database = core,
         DB = addon.DB,
         Bus = addon.Bus,
 
@@ -404,12 +404,12 @@ end
 do
     -- ----- KRT Lua Contract ----- --
     -- deps: local addon = select(2, ...)
-    -- shared: local feature = addon.Core.GetFeatureShared()
+    -- shared: local feature = addon.Database.GetFeatureShared()
     -- exports: publish module APIs on addon.*
     -- events: document inbound/outbound events in module body
 
     local addon = select(2, ...)
-    local feature = addon.Core.GetFeatureShared()
+    local feature = addon.Database.GetFeatureShared()
 
     local addonName = addon.name
 
@@ -477,7 +477,7 @@ do
         addon:SetLogLevel(lv)
     end
 
-    -- =========== Core Addon Frames & Locals  =========== --
+    -- =========== Database Addon Frames & Locals  =========== --
 
     -- Centralized addon state
     local coreState = addon.State
@@ -492,31 +492,31 @@ do
     -- Addon UI frame used by event dispatcher
     local mainFrame = frames.main
 
-    local Core = addon.Core
+    local Database = addon.Database
 
-    function Core.GetCurrentRaid()
+    function Database.GetCurrentRaid()
         return coreState.currentRaid
     end
 
-    function Core.SetCurrentRaid(raidNum)
+    function Database.SetCurrentRaid(raidNum)
         coreState.currentRaid = raidNum
         return coreState.currentRaid
     end
 
-    function Core.GetLastBoss()
+    function Database.GetLastBoss()
         return coreState.lastBoss
     end
 
-    function Core.SetLastBoss(bossNid)
+    function Database.SetLastBoss(bossNid)
         coreState.lastBoss = bossNid
         return coreState.lastBoss
     end
 
-    function Core.GetNextReset()
+    function Database.GetNextReset()
         return tonumber(coreState.nextReset) or 0
     end
 
-    function Core.SetNextReset(nextReset)
+    function Database.SetNextReset(nextReset)
         coreState.nextReset = tonumber(nextReset) or 0
         return coreState.nextReset
     end
@@ -539,7 +539,7 @@ do
                 if type(fn) == "function" then
                     local ok, err = pcall(fn, obj, ...)
                     if not ok then
-                        addon:error(Diag.E.LogCoreEventHandlerFailed:format(tostring(eventName), tostring(err)))
+                        addon:error(Diag.E.LogDatabaseEventHandlerFailed:format(tostring(eventName), tostring(err)))
                     end
                 end
             end
@@ -629,11 +629,11 @@ do
         end
     end
 
-    Core.BindModuleRequestRefresh = bindModuleRequestRefresh
-    Core.BindModuleToggleHide = bindModuleToggleHide
-    Core.MakeModuleFrameGetter = makeModuleFrameGetter
+    Database.BindModuleRequestRefresh = bindModuleRequestRefresh
+    Database.BindModuleToggleHide = bindModuleToggleHide
+    Database.MakeModuleFrameGetter = makeModuleFrameGetter
 
-    function Core.RequireServiceMethod(serviceName, serviceTable, methodName)
+    function Database.RequireServiceMethod(serviceName, serviceTable, methodName)
         assert(type(serviceTable) == "table", "KRT missing service: " .. tostring(serviceName))
         local method = serviceTable[methodName]
         assert(type(method) == "function", "KRT missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
@@ -653,10 +653,10 @@ do
     end
 
     local function getRaidStoreOrNil(contextTag, requiredMethods)
-        if not Core.GetRaidStoreOrNil then
+        if not Database.GetRaidStoreOrNil then
             return nil
         end
-        return Core.GetRaidStoreOrNil(contextTag, requiredMethods)
+        return Database.GetRaidStoreOrNil(contextTag, requiredMethods)
     end
 
     local function ensureDBManager()
@@ -682,60 +682,60 @@ do
 
     ensureDBManager()
 
-    function Core.EnsureRaidSchema(raid)
-        local raidStore = getRaidStoreOrNil("Core.EnsureRaidSchema", { "NormalizeRaidRecord" })
+    function Database.EnsureRaidSchema(raid)
+        local raidStore = getRaidStoreOrNil("Database.EnsureRaidSchema", { "NormalizeRaidRecord" })
         if raidStore then
             return raidStore:NormalizeRaidRecord(raid)
         end
         return raid
     end
 
-    function Core.EnsureRaidById(raidNum)
+    function Database.EnsureRaidById(raidNum)
         local id = tonumber(raidNum)
         if not id then
             return nil, nil
         end
 
-        local raidStore = getRaidStoreOrNil("Core.EnsureRaidById", { "GetRaidByIndex" })
+        local raidStore = getRaidStoreOrNil("Database.EnsureRaidById", { "GetRaidByIndex" })
         if raidStore then
             return raidStore:GetRaidByIndex(id)
         end
         return nil, id
     end
 
-    function Core.EnsureRaidByNid(raidNid)
+    function Database.EnsureRaidByNid(raidNid)
         local nid = tonumber(raidNid)
         if not nid then
             return nil, nil, nil
         end
 
-        local raidStore = getRaidStoreOrNil("Core.EnsureRaidByNid", { "GetRaidByNid" })
+        local raidStore = getRaidStoreOrNil("Database.EnsureRaidByNid", { "GetRaidByNid" })
         if raidStore then
             return raidStore:GetRaidByNid(nid)
         end
         return nil, nil, nid
     end
 
-    function Core.GetRaidNidById(raidNum)
-        local raidStore = getRaidStoreOrNil("Core.GetRaidNidById", { "GetRaidNidByIndex" })
+    function Database.GetRaidNidById(raidNum)
+        local raidStore = getRaidStoreOrNil("Database.GetRaidNidById", { "GetRaidNidByIndex" })
         if raidStore then
             return raidStore:GetRaidNidByIndex(raidNum)
         end
-        local raid = Core.EnsureRaidById(raidNum)
+        local raid = Database.EnsureRaidById(raidNum)
         return raid and tonumber(raid.raidNid) or nil
     end
 
-    function Core.GetRaidIdByNid(raidNid)
-        local raidStore = getRaidStoreOrNil("Core.GetRaidIdByNid", { "GetRaidIndexByNid" })
+    function Database.GetRaidIdByNid(raidNid)
+        local raidStore = getRaidStoreOrNil("Database.GetRaidIdByNid", { "GetRaidIndexByNid" })
         if raidStore then
             return raidStore:GetRaidIndexByNid(raidNid)
         end
-        local _, idx = Core.EnsureRaidByNid(raidNid)
+        local _, idx = Database.EnsureRaidByNid(raidNid)
         return idx
     end
 
-    function Core.StripRuntimeRaidCaches(raid)
-        local raidStore = getRaidStoreOrNil("Core.StripRuntimeRaidCaches", { "StripRuntime" })
+    function Database.StripRuntimeRaidCaches(raid)
+        local raidStore = getRaidStoreOrNil("Database.StripRuntimeRaidCaches", { "StripRuntime" })
         if raidStore then
             raidStore:StripRuntime(raid)
             return
@@ -750,8 +750,8 @@ do
         raid._lootIdxByNid = nil
     end
 
-    function Core.NormalizeSavedVariablesAfterLoad()
-        local raidStore = getRaidStoreOrNil("Core.NormalizeSavedVariablesAfterLoad", { "NormalizeAllRaids" })
+    function Database.NormalizeSavedVariablesAfterLoad()
+        local raidStore = getRaidStoreOrNil("Database.NormalizeSavedVariablesAfterLoad", { "NormalizeAllRaids" })
         if raidStore and type(raidStore.NormalizeAllRaids) == "function" then
             raidStore:NormalizeAllRaids("load")
             return
@@ -760,12 +760,12 @@ do
             return
         end
         for i = 1, #KRT_Raids do
-            Core.EnsureRaidSchema(KRT_Raids[i])
+            Database.EnsureRaidSchema(KRT_Raids[i])
         end
     end
 
-    function Core.PrepareSavedVariablesForSave(contextTag)
-        local raidStore = getRaidStoreOrNil("Core.PrepareSavedVariablesForSave", { "PrepareAllRaidsForSave" })
+    function Database.PrepareSavedVariablesForSave(contextTag)
+        local raidStore = getRaidStoreOrNil("Database.PrepareSavedVariablesForSave", { "PrepareAllRaidsForSave" })
         if raidStore then
             if type(raidStore.PrepareAllRaidsForSave) == "function" then
                 raidStore:PrepareAllRaidsForSave()
@@ -774,7 +774,7 @@ do
             end
         elseif type(KRT_Raids) == "table" then
             for i = 1, #KRT_Raids do
-                Core.StripRuntimeRaidCaches(KRT_Raids[i])
+                Database.StripRuntimeRaidCaches(KRT_Raids[i])
             end
         end
 
@@ -836,14 +836,14 @@ do
         self:UnregisterEvent("ADDON_LOADED")
         ensureDBManager()
         local lvl = addon.GetLogLevel and addon:GetLogLevel()
-        addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")), tostring(lvl), tostring(true)))
+        addon:info(Diag.I.LogDatabaseLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")), tostring(lvl), tostring(true)))
         if addon.Options and addon.Options.EnsureLoaded then
             addon.Options.EnsureLoaded()
             addon.Options.SetDebugEnabled(false)
         end
         -- Bind the Timer mixin after its module has loaded so Init-owned timers use the canonical API.
         if addon.Timer and addon.Timer.BindMixin then
-            addon.Timer.BindMixin(addon, "Core")
+            addon.Timer.BindMixin(addon, "Database")
         end
         local minimap = addon.Minimap
         if minimap and minimap.EnsureUI then
@@ -856,12 +856,12 @@ do
         if addon.Comms and addon.Comms.EnsureVersionPrefix then
             addon.Comms:EnsureVersionPrefix()
         end
-        Core.NormalizeSavedVariablesAfterLoad()
+        Database.NormalizeSavedVariablesAfterLoad()
         for event in pairs(addonEvents) do
             self:RegisterEvent(event)
         end
         if isDebugEnabled() then
-            addon:debug(Diag.D.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
+            addon:debug(Diag.D.LogDatabaseEventsRegistered:format(addon.tLength(addonEvents)))
         end
         self:RAID_ROSTER_UPDATE(true)
     end
@@ -897,7 +897,7 @@ do
         end
 
         -- Single source of truth for roster change notifications (join/update/leave delta).
-        Bus.TriggerEvent(InternalEvents.RaidRosterDelta, delta, raidService:GetRosterVersion(), Core.GetCurrentRaid())
+        Bus.TriggerEvent(InternalEvents.RaidRosterDelta, delta, raidService:GetRosterVersion(), Database.GetCurrentRaid())
     end
 
     -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
@@ -922,7 +922,7 @@ do
     function addon:RAID_INSTANCE_WELCOME(...)
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
         local _, nextReset = ...
-        local resolvedNextReset = Core.SetNextReset(nextReset)
+        local resolvedNextReset = Database.SetNextReset(nextReset)
         if isTraceEnabled() then
             addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType), tostring(instanceDiff), tostring(resolvedNextReset)))
         end
@@ -955,7 +955,7 @@ do
             return
         end
         if isTraceEnabled() then
-            addon:trace(Diag.D.LogCorePlayerEnteringWorld)
+            addon:trace(Diag.D.LogDatabasePlayerEnteringWorld)
         end
         module:CancelInstanceChecks()
         -- Restart the first-check timer on login (timer owned by raid service module).
@@ -969,7 +969,7 @@ do
     end
 
     local function observePassiveLootMessage(msg, winnerOnly)
-        local currentRaid = Core.GetCurrentRaid()
+        local currentRaid = Database.GetCurrentRaid()
         local raidService = getRaidService()
         local lootService = getService("Loot")
         if not currentRaid then
@@ -994,7 +994,7 @@ do
         if isTraceEnabled() then
             addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
         end
-        local currentRaid = Core.GetCurrentRaid()
+        local currentRaid = Database.GetCurrentRaid()
         local raidService, observedType, parsedLoot = observePassiveLootMessage(msg)
         local lootService = getService("Loot")
         if not (currentRaid and raidService) then
@@ -1018,7 +1018,7 @@ do
     -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
     function addon:CHAT_MSG_SYSTEM(msg)
         local perfStart = addon.hasPerf and addon:_PerfStart() or nil
-        local currentRaid = Core.GetCurrentRaid()
+        local currentRaid = Database.GetCurrentRaid()
         local raidService, observedType, parsedLoot = observePassiveLootMessage(msg)
         local lootService = getService("Loot")
         if currentRaid and raidService then
@@ -1030,7 +1030,7 @@ do
             end
         end
 
-        if Core.GetCurrentRaid() and raidService and raidService.CanUseCapability and not raidService:CanUseCapability("loot") then
+        if Database.GetCurrentRaid() and raidService and raidService.CanUseCapability and not raidService:CanUseCapability("loot") then
             if perfStart then
                 addon:_PerfFinish("CHAT_MSG_SYSTEM", perfStart, "raid=" .. tostring(currentRaid) .. " observed=" .. tostring(observedType) .. " blocked=loot")
             end
@@ -1047,7 +1047,7 @@ do
 
     function addon:START_LOOT_ROLL(rollId, rollTime)
         local perfStart = addon.hasPerf and addon:_PerfStart() or nil
-        local currentRaid = Core.GetCurrentRaid()
+        local currentRaid = Database.GetCurrentRaid()
         local lootService = getService("Loot")
         if currentRaid and lootService and lootService.AddPassiveLootRoll then
             lootService:AddPassiveLootRoll(rollId, rollTime)
@@ -1071,7 +1071,7 @@ do
         if lootService and lootService.HandleDistributionMessage and lootService:HandleDistributionMessage(prefix, msg, channel, sender) then
             return
         end
-        local syncer = Core.GetSyncer and Core.GetSyncer() or nil
+        local syncer = Database.GetSyncer and Database.GetSyncer() or nil
         if syncer and syncer.OnAddonMessage then
             syncer:OnAddonMessage(prefix, msg, channel, sender)
         end
@@ -1081,7 +1081,7 @@ do
     function addon:CHAT_MSG_MONSTER_YELL(...)
         local text = ...
         local raidService = getRaidService()
-        if raidService and L.BossYells[text] and Core.GetCurrentRaid() then
+        if raidService and L.BossYells[text] and Database.GetCurrentRaid() then
             if isTraceEnabled() then
                 addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
             end
@@ -1099,6 +1099,6 @@ do
 
     -- PLAYER_LOGOUT: Prepare canonical SavedVariables payloads before persistence.
     function addon:PLAYER_LOGOUT()
-        Core.PrepareSavedVariablesForSave("logout")
+        Database.PrepareSavedVariablesForSave("logout")
     end
 end
