@@ -6,12 +6,6 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.8.0-beta.1
 
-### Fixes
-
-- **Group Loot SoftRes access** - Reserve list and import slash commands remain
-  available while the raid uses Group Loot, while Master Loot action checks stay
-  scoped to the protected loot flows.
-
 ## [0.8.0-beta.1] - 2026-06-05
 
 ### Documentation
@@ -23,6 +17,10 @@ Release-Version: 0.8.0-beta.1
 
 ### Fixes
 
+- **Group Loot SoftRes access** - Reserve list and import slash commands plus
+  the Loot Master `Open SoftRes`/`Insert SoftRes` action remain available while
+  the raid uses Group Loot, while Master Loot action checks stay scoped to the
+  protected loot flows.
 - **Shared Loot History sources** - Bumped the raid SavedVariables schema to
   migrate legacy `Shared: Boss A / Boss B` loot-source labels into compact
   `Shared` rows with tooltip-only boss candidates, recover compact shared

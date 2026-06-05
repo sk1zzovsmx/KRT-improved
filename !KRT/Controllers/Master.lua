@@ -1428,7 +1428,7 @@ do
         state.canStartSR = state.canStartRolls and opts.hasEligibleRaidReserve == true
         state.canChangeItem = hasLootAccess and currentFlowState ~= FLOW_STATES.COUNTDOWN
         state.canAward = hasLootAccess and lootCount >= 1 and rollsCount >= 1 and not countdownRunning and opts.canAwardSelection == true
-        state.canReserveList = hasLootAccess
+        state.canReserveList = true
         state.canRollSelf = hasLootAccess and opts.record == true and opts.canRoll == true and opts.rolled == false and countdownRunning
         state.canSpamLoot = lootCount >= 1 and ((lootState.fromInventory and opts.hasReadyCheckAccess == true) or ((not lootState.fromInventory) and hasLootAccess))
 

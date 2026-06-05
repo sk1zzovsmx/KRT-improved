@@ -12975,6 +12975,19 @@ test("master workflow model centralizes button capabilities without changing gat
         rollModel = {},
         rolled = false,
     })
+    local noItemNoAccess = Private.BuildMasterWorkflowState({
+        canAwardSelection = false,
+        canRoll = false,
+        countdownRunning = false,
+        currentFlowState = "idle",
+        hasEligibleRaidReserve = false,
+        hasItem = false,
+        hasLootAccess = false,
+        hasReadyCheckAccess = true,
+        record = false,
+        rollModel = {},
+        rolled = false,
+    })
 
     assertEqual(ready.canStartRolls, true, "expected ready workflow to enable normal roll starts")
     assertEqual(ready.canStartSR, true, "expected ready workflow to enable SR when raid reserves are eligible")
@@ -12994,8 +13007,9 @@ test("master workflow model centralizes button capabilities without changing gat
     assertEqual(awardReady.canAward, true, "expected award-ready workflow to allow awarding")
 
     assertTrue(noAccess.canStartRolls ~= true, "expected no-access workflow to block roll starts")
-    assertTrue(noAccess.canReserveList ~= true, "expected no-access workflow to block reserves UI")
+    assertEqual(noAccess.canReserveList, true, "expected no-access workflow to keep reserves UI available")
     assertTrue(noAccess.canSpamLoot ~= true, "expected no-access workflow to block spam loot")
+    assertEqual(noItemNoAccess.canReserveList, true, "expected no-item no-access workflow to keep reserves UI available")
 end)
 
 test("master dropdown click uses UIDropDown owner/value arguments", function()
