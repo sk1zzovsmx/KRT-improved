@@ -45,6 +45,10 @@ local function makeFrame(shown, name)
         self._width = width
     end
 
+    function frame:SetAlpha(alpha)
+        self._alpha = alpha
+    end
+
     function frame:GetHeight()
         return self._height
     end
@@ -105,6 +109,10 @@ local function makeFrame(shown, name)
         self.text = text
     end
 
+    function frame:SetTextColor(r, g, b)
+        self._textColor = { r, g, b }
+    end
+
     function frame:SetNumber(value)
         self.text = tostring(value)
     end
@@ -125,11 +133,21 @@ local function makeFrame(shown, name)
 
     function frame:SetMultiLine() end
 
-    function frame:SetTextInsets() end
+    function frame:SetScrollChild(child)
+        self._scrollChild = child
+    end
+
+    function frame:SetTextInsets(left, right, top, bottom)
+        self._textInsets = { left, right, top, bottom }
+    end
 
     function frame:SetJustifyH() end
 
     function frame:SetJustifyV() end
+
+    function frame:SetWordWrap(value)
+        self._wordWrap = value
+    end
 
     function frame:SetFontObject() end
 
@@ -141,9 +159,21 @@ local function makeFrame(shown, name)
         self.parent = parent
     end
 
-    function frame:ClearAllPoints() end
+    function frame:ClearAllPoints()
+        self._points = {}
+        self._pointsCleared = true
+    end
 
-    function frame:SetPoint() end
+    function frame:SetPoint(point, relativeTo, relativePoint, x, y)
+        self._points = self._points or {}
+        self._points[#self._points + 1] = {
+            point = point,
+            relativeTo = relativeTo,
+            relativePoint = relativePoint,
+            x = x,
+            y = y,
+        }
+    end
 
     function frame:SetFrameLevel(level)
         self._frameLevel = level
@@ -181,6 +211,9 @@ local function makeFrame(shown, name)
                 desaturated = false,
                 SetDesaturated = function(tex, value)
                     tex.desaturated = value and true or false
+                end,
+                SetVertexColor = function(tex, r, g, b)
+                    tex._vertexColor = { r, g, b }
                 end,
             }
             self._normalTexture = normalTexture
@@ -537,6 +570,11 @@ local function newHarness()
     L.StrRollBlockedTag = "BLK"
     L.StrRollDuplicateTag = "DUP"
     L.StrRollRerollOnlyTag = "REROLL"
+    L.StrRollSrSummaryPresentMissing = "SR %d present / %d missing"
+    L.StrRollSrSummaryPresent = "SR %d present"
+    L.StrRollSrSummaryNoPresent = "No present SR"
+    L.StrRollSrSummaryFallback = "Free roll fallback"
+    L.StrRollLootCopies = "Copies: %d"
     Diag.E.LogLoggerLootNidExpected = "[Logger] loot entry expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
     local InternalEvents = keyTable("Event")
     local Events = { Internal = InternalEvents }
@@ -1129,6 +1167,12 @@ local function newHarness()
             return _G[name]
         end,
         Ref = function(frame, suffix)
+            if not frame or not frame.GetName then
+                return nil
+            end
+            return _G[(frame:GetName() or "") .. suffix]
+        end,
+        GetRef = function(frame, suffix)
             if not frame or not frame.GetName then
                 return nil
             end
@@ -1934,6 +1978,7 @@ local function newHarness()
     _G.LOOT_ROLL_WON_NO_SPAM_DISENCHANT = _G.LOOT_ROLL_WON_NO_SPAM_DE
     _G.LOOT_ROLL_YOU_WON_NO_SPAM_DISENCHANT = _G.LOOT_ROLL_YOU_WON_NO_SPAM_DE
     _G.TRADE = "Trade"
+    _G.strmatch = string.match
     _G.RAID_TARGET_MARKERS = {
         "{rt1}",
         "{rt2}",
@@ -4884,6 +4929,16 @@ test("loot workflow shadow state records transitions and recent receipts", funct
 
     local snapshot = Workflow.BuildSnapshot(ctx)
     assertEqual(snapshot.phase, "award_pending", "expected workflow to expose pending-award phase")
+    assertEqual(snapshot.summaryText, "award_pending: Tester", "expected workflow to expose a compact current-step summary")
+    assertEqual(#snapshot.steps, 7, "expected workflow snapshot to expose every Master Loot flow step")
+    assertEqual(snapshot.steps[1].phase, "loot_window", "expected workflow steps to start at loot window")
+    assertEqual(snapshot.steps[2].phase, "item_selected", "expected workflow steps to include item selection")
+    assertEqual(snapshot.steps[3].phase, "rolling", "expected workflow steps to include rolling")
+    assertEqual(snapshot.steps[4].phase, "award_pending", "expected workflow steps to include pending awards")
+    assertTrue(snapshot.steps[4].active == true, "expected current workflow step to be marked active")
+    assertEqual(snapshot.steps[5].phase, "award_confirmed", "expected workflow steps to include confirmed awards")
+    assertEqual(snapshot.steps[6].phase, "trade_pending", "expected workflow steps to include pending trades")
+    assertEqual(snapshot.steps[7].phase, "trade_confirmed", "expected workflow steps to include completed trades")
     assertEqual(snapshot.raidNum, 1, "expected workflow to retain loot-window raid")
     assertEqual(snapshot.selectedItemKey, "item:92001", "expected workflow to retain selected item key")
     assertEqual(snapshot.rollSessionId, "ROLL:1", "expected workflow to retain roll session")
@@ -8522,6 +8577,222 @@ test("reserve list action button opens import when reserves are empty", function
     assertEqual(#uiCalls, 0, "expected data reserves action not to open import")
 end)
 
+test("reserves import window uses compact mode and format buttons", function()
+    local h = newHarness()
+    local mode = "multi"
+    local parseCalls = {}
+    local applyCount = 0
+    local registeredApis = {}
+
+    h.addon.Services.Reserves = {
+        GetImportMode = function()
+            return mode
+        end,
+        SetImportMode = function(_, nextMode)
+            mode = nextMode
+        end,
+        ParseImport = function(_, text, parseMode, opts)
+            parseCalls[#parseCalls + 1] = {
+                text = text,
+                mode = parseMode,
+                format = opts and opts.format or nil,
+            }
+            return {
+                reservesData = {
+                    alice = {
+                        playerNameDisplay = "Alice",
+                        reserves = {
+                            { rawID = 1201 },
+                        },
+                    },
+                },
+                nPlayers = 1,
+            }
+        end,
+        ApplyImport = function()
+            applyCount = applyCount + 1
+            return true, 1
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.addon.UI.Register = function(_, name, api)
+        registeredApis[name] = api
+    end
+    h.addon.UIScaffold.DefineModuleUi = function(cfg)
+        local module = cfg.module
+        module._ui = h.addon.UIScaffold.EnsureModuleUi(module)
+
+        function module:BindUI()
+            if self._ui.Bound then
+                return self.frame, self.refs
+            end
+
+            local frame = cfg.getFrame()
+            self._ui.FrameName = frame and frame:GetName() or self._ui.FrameName
+            self._ui.Loaded = self._ui.FrameName ~= nil
+            self.frame = frame
+            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, self._ui.FrameName) or {}
+
+            if cfg.bind then
+                cfg.bind(self._ui.FrameName, frame, self.refs)
+            end
+            if cfg.localize then
+                cfg.localize(self._ui.FrameName, frame, self.refs)
+                self._ui.Localized = true
+            end
+
+            self._ui.Bound = true
+            return self.frame, self.refs
+        end
+
+        function module:EnsureUI()
+            if not self._ui.Bound then
+                self:BindUI()
+            end
+            return self.frame
+        end
+
+        function module:RequestRefresh(reason)
+            self:EnsureUI()
+            self._ui.Dirty = true
+            self._ui.Reason = reason
+            if cfg.refresh then
+                return cfg.refresh(self._ui.FrameName, self.frame, self.refs, true, reason)
+            end
+            return nil
+        end
+
+        function module:Hide()
+            local frame = self:EnsureUI()
+            if frame then
+                frame:Hide()
+            end
+        end
+
+        function module:Toggle()
+            local frame = self:EnsureUI()
+            if not frame then
+                return nil
+            end
+            if frame:IsShown() then
+                frame:Hide()
+            else
+                frame:Show()
+            end
+            return frame:IsShown()
+        end
+    end
+
+    local frame = h.makeFrame(true, "KRTImportWindow")
+    local hint = h.makeFrame(true, "KRTImportWindowHint")
+    local status = h.makeFrame(true, "KRTImportWindowStatus")
+    local modeLabel = h.makeFrame(true, "KRTImportWindowModeLabel")
+    local formatLabel = h.makeFrame(true, "KRTImportWindowFormatLabel")
+    local editBox = h.makeFrame(true, "KRTImportEditBox")
+    local scrollFrame = h.makeFrame(true, "KRTImportScrollFrame")
+    local scrollBar = h.makeFrame(true, "KRTImportScrollFrameScrollBar")
+    local scrollUpButton = h.makeFrame(true, "KRTImportScrollFrameScrollBarScrollUpButton")
+    local scrollDownButton = h.makeFrame(true, "KRTImportScrollFrameScrollBarScrollDownButton")
+    local confirmButton = h.makeFrame(true, "KRTImportConfirmButton")
+    local cancelButton = h.makeFrame(true, "KRTImportCancelButton")
+    local multiButton = h.makeFrame(true, "KRTImportWindowModeMultiButton")
+    local plusButton = h.makeFrame(true, "KRTImportWindowModePlusButton")
+    local jsonButton = h.makeFrame(true, "KRTImportWindowFormatJsonButton")
+    local csvButton = h.makeFrame(true, "KRTImportWindowFormatCsvButton")
+    local function makeButtonRegions(name)
+        _G[name .. "Left"] = h.makeFrame(true, name .. "Left")
+        _G[name .. "Middle"] = h.makeFrame(true, name .. "Middle")
+        _G[name .. "Right"] = h.makeFrame(true, name .. "Right")
+    end
+
+    _G.KRTImportWindow = frame
+    _G.KRTImportWindowHint = hint
+    _G.KRTImportWindowStatus = status
+    _G.KRTImportWindowModeLabel = modeLabel
+    _G.KRTImportWindowFormatLabel = formatLabel
+    _G.KRTImportEditBox = editBox
+    _G.KRTImportScrollFrame = scrollFrame
+    _G.KRTImportScrollFrameScrollBar = scrollBar
+    _G.KRTImportScrollFrameScrollBarScrollUpButton = scrollUpButton
+    _G.KRTImportScrollFrameScrollBarScrollDownButton = scrollDownButton
+    _G.KRTImportConfirmButton = confirmButton
+    _G.KRTImportCancelButton = cancelButton
+    _G.KRTImportWindowModeMultiButton = multiButton
+    _G.KRTImportWindowModePlusButton = plusButton
+    _G.KRTImportWindowFormatJsonButton = jsonButton
+    _G.KRTImportWindowFormatCsvButton = csvButton
+    makeButtonRegions("KRTImportWindowModeMultiButton")
+    makeButtonRegions("KRTImportWindowModePlusButton")
+    makeButtonRegions("KRTImportWindowFormatJsonButton")
+    makeButtonRegions("KRTImportWindowFormatCsvButton")
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Widgets/ReservesUI.lua")
+    local Import = h.addon.Widgets.ReservesUI.Import
+
+    Import:EnsureUI()
+
+    assertEqual(modeLabel:GetText(), "Reserve System", "expected compact import reserve-system label")
+    assertEqual(formatLabel:GetText(), "Import Format", "expected compact import format label")
+    assertEqual(multiButton:GetText(), "Multi-reserve", "expected compact import mode button text")
+    assertEqual(plusButton:GetText(), "Plus System", "expected compact import plus button text")
+    assertEqual(jsonButton:GetText(), "JSON", "expected compact import JSON format button text")
+    assertEqual(csvButton:GetText(), "CSV", "expected compact import CSV format button text")
+    assertEqual(editBox._width, 244, "expected import edit box runtime width to leave a fixed scrollbar gutter")
+    assertEqual(scrollFrame._scrollChild, editBox, "expected import edit box to be the explicit scroll child")
+    assertEqual(editBox._textInsets and editBox._textInsets[1], 8, "expected import edit box left padding")
+    assertEqual(editBox._textInsets and editBox._textInsets[2], 8, "expected import edit box right padding")
+    assertEqual(editBox._textInsets and editBox._textInsets[3], 8, "expected import edit box top padding")
+    assertEqual(editBox._textInsets and editBox._textInsets[4], 8, "expected import edit box bottom padding")
+    assertEqual(editBox._wordWrap, true, "expected import edit box text to wrap inside the paste area")
+    assertEqual(scrollBar._points and scrollBar._points[1] and scrollBar._points[1].x, 28, "expected import scrollbar to sit in the right gutter")
+    assertEqual(scrollUpButton._points and scrollUpButton._points[1] and scrollUpButton._points[1].x, 28, "expected import scrollbar up button to sit in the right gutter")
+    assertEqual(scrollDownButton._points and scrollDownButton._points[1] and scrollDownButton._points[1].x, 28, "expected import scrollbar down button to sit in the right gutter")
+    assertTrue(type(multiButton.OnClick) == "function", "expected multi button click handler")
+    assertTrue(type(plusButton.OnClick) == "function", "expected plus button click handler")
+    assertTrue(type(jsonButton.OnClick) == "function", "expected JSON button click handler")
+    assertTrue(type(csvButton.OnClick) == "function", "expected CSV button click handler")
+    assertEqual(jsonButton._highlighted, nil, "expected selected JSON format button not to lock highlight")
+    assertEqual(csvButton._alpha, nil, "expected unselected CSV format button not to use transparency")
+    assertEqual(_G.KRTImportWindowFormatJsonButtonMiddle._vertexColor[1], 1, "expected selected JSON button to keep normal KRT red styling")
+    assertEqual(_G.KRTImportWindowFormatCsvButtonMiddle._vertexColor[1], 0.45, "expected unselected CSV button to use a muted red tint")
+
+    plusButton.OnClick(plusButton)
+    csvButton.OnClick(csvButton)
+    editBox:SetText("csv payload")
+    confirmButton.OnClick(confirmButton)
+
+    assertEqual(mode, "plus", "expected plus button to update reserve import mode")
+    assertEqual(plusButton._highlighted, nil, "expected selected Plus System button not to lock highlight")
+    assertEqual(multiButton._alpha, nil, "expected unselected Multi-reserve button not to use transparency")
+    assertEqual(jsonButton._alpha, nil, "expected unselected JSON button not to use transparency")
+    assertEqual(_G.KRTImportWindowModeMultiButtonMiddle._vertexColor[1], 0.45, "expected unselected Multi-reserve button to use a muted red tint")
+    assertEqual(_G.KRTImportWindowModePlusButtonMiddle._vertexColor[1], 1, "expected selected Plus System button to keep normal KRT red styling")
+    assertEqual(_G.KRTImportWindowFormatJsonButtonMiddle._vertexColor[1], 0.45, "expected unselected JSON button to use a muted red tint")
+    assertEqual(_G.KRTImportWindowFormatCsvButtonMiddle._vertexColor[1], 1, "expected selected CSV button to keep normal KRT red styling")
+    assertEqual(parseCalls[1].mode, "plus", "expected import to pass the selected reserve mode")
+    assertEqual(parseCalls[1].format, "csv", "expected import to pass the selected input format")
+    assertEqual(parseCalls[1].text, "csv payload", "expected import to read the edit box payload")
+    assertEqual(applyCount, 1, "expected successful compact import to apply parsed data")
+    assertTrue(registeredApis.Reserves ~= nil, "expected reserves UI API to remain registered")
+end)
+
+test("reserves import XML allocates expanded paste area", function()
+    local file = assert(io.open("!KRT/UI/Reserves.xml", "r"))
+    local xml = file:read("*a")
+    file:close()
+
+    assertTrue(xml:find('name="$parentEditBoxPanel"', 1, true) ~= nil, "expected import XML to include a visible paste-area panel")
+    assertTrue(xml:find('<AbsDimension x="20" y="-78" />', 1, true) ~= nil, "expected mode buttons to start at the template-B left column")
+    assertTrue(xml:find('<AbsDimension x="20" y="-128" />', 1, true) ~= nil, "expected format buttons to start at the template-B left column")
+    assertTrue(xml:find('<AbsDimension x="14" y="0" />', 1, true) ~= nil, "expected paired buttons to use the template-B compact column gap")
+    assertTrue(xml:find('<AbsDimension x="300" y="130" />', 1, true) ~= nil, "expected import edit box border to exclude the external scrollbar gutter")
+    assertTrue(xml:find('<AbsDimension x="0" y="-162" />', 1, true) ~= nil, "expected narrowed edit box panel to match the current mockup center lane")
+    assertTrue(xml:find('<AbsDimension x="276" y="114" />', 1, true) ~= nil, "expected import scroll frame to fit inside the shortened edit box panel")
+    assertTrue(xml:find('<AbsDimension x="244" y="114" />', 1, true) ~= nil, "expected import edit box text area to stay inside the shortened scroll viewport")
+    assertTrue(xml:find('<AbsDimension x="20" y="51" />', 1, true) ~= nil, "expected import status lane to stay visible below the paste area")
+end)
+
 test("ui primitives expose pixel-aligned sizing helpers", function()
     local h = newHarness()
     _G.GetCurrentResolution = function()
@@ -10893,6 +11164,9 @@ test("reserved rolls exclude non-reservers and expose softres context in the dis
             end
             return { itemLink = link }
         end,
+        GetCurrentItemCount = function()
+            return 2
+        end,
     }
     h.addon.Services.Raid = {
         ClearRaidIcons = function() end,
@@ -10979,6 +11253,8 @@ test("reserved rolls exclude non-reservers and expose softres context in the dis
     assertEqual(model.srContext.missingReserveCount, 1, "expected SR model context to count reservers outside raid")
     assertEqual(model.srContext.eligibleReserveNames[1], "Alice", "expected SR model context to list eligible reservers")
     assertEqual(model.srContext.missingReserveNames[1], "Bob", "expected SR model context to list missing reservers")
+    assertEqual(model.srSummaryText, "SR 1 present / 1 missing", "expected SR model to expose compact present/missing text")
+    assertEqual(model.lootCopyText, "Copies: 2", "expected roll display model to expose loot-window copy count")
     assertEqual(model.resolution.autoWinners[1].name, "Alice", "expected resolver to pick only the eligible SR roller")
     assertTrue(alice ~= nil and alice.isReserved == true and alice.isEligible == true, "expected Alice to remain an eligible SR row")
     assertTrue(bob ~= nil and bob.isReserved == true and bob.isEligible ~= true, "expected out-of-raid reserver to stay visible but ineligible")
@@ -11559,10 +11835,10 @@ test("master workflow model names rolling and ready states without changing stat
     assertEqual(idle.statusText, "Select or drag an item to start.", "expected idle status text to stay unchanged")
     assertEqual(ready.name, "ready", "expected normal loot state to be named ready")
     assertEqual(ready.statusText, "Ready. Start a roll or use Hold, Bank, or DE.", "expected ready status text to stay unchanged")
-    assertEqual(srReady.name, "ready", "expected SoftRes context to avoid changing the ready workflow name")
-    assertEqual(srReady.statusText, "Ready. Start a roll or use Hold, Bank, or DE.", "expected SoftRes context to avoid changing ready status text")
+    assertEqual(srReady.name, "ready", "expected SoftRes context to keep the ready workflow name")
+    assertEqual(srReady.statusText, "Ready. SR 1 present / 1 missing.", "expected ready state to summarize present and missing SoftRes players")
     assertEqual(srRolling.name, "rolling", "expected SR rolling context to keep the normal rolling workflow name")
-    assertEqual(srRolling.statusText, "Rolls are open. Responses: 0.", "expected SR rolling context to avoid adding row/status clutter")
+    assertEqual(srRolling.statusText, "Rolls are open. SR 1 present / 1 missing. Responses: 0.", "expected SR rolling state to keep SoftRes context visible")
     assertEqual(tie.name, "resolve_tie", "expected manual tie state to be named explicitly")
     assertEqual(tie.statusText, "Tie at the cutoff. Select winners manually before awarding.", "expected tie status text to stay unchanged")
 end)
@@ -12100,6 +12376,67 @@ test("master item selection popup stays clickable", function()
     firstButton:OnClick("LeftButton")
 
     assertEqual(selectedIndex, 1, "expected clicking the selection popup button to pick the corresponding loot index")
+end)
+
+test("master workflow model exposes compact session winners", function()
+    local h = newHarness()
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return nil
+        end,
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    loadMasterController(h)
+
+    local Private = h.addon.Controllers.Master._Private
+    local winners = Private.BuildSessionWinnersModel({
+        resolution = {
+            autoWinners = {
+                { name = "Alice", roll = 99 },
+            },
+            tiedNames = { "Bob", "Cara" },
+            requiresManualResolution = true,
+        },
+    })
+
+    assertEqual(#winners.rows, 3, "expected compact session winners to include automatic and tied candidates")
+    assertEqual(winners.rows[1].name, "Alice", "expected automatic winner first")
+    assertEqual(winners.rows[1].state, "auto", "expected automatic winner state")
+    assertEqual(winners.rows[2].name, "Bob", "expected first tied candidate")
+    assertEqual(winners.rows[2].state, "tied", "expected tied candidate state")
+    assertEqual(winners.summaryText, "Winner: Alice; Tie: Bob, Cara", "expected compact winners summary text")
 end)
 
 test("master loot reserve ui state exposes reserved players", function()
@@ -13062,6 +13399,7 @@ test("master award button triggers reroll for single-select ties", function()
     local link = h.registerItem(9308, "Mastertieblade")
     local rerollNames
     local refreshCount = 0
+    local distributionStates = {}
 
     h.addon.Services.Loot = {
         GetItem = function()
@@ -13069,6 +13407,13 @@ test("master award button triggers reroll for single-select ties", function()
         end,
         GetItemLink = function()
             return link
+        end,
+        SetDistributionState = function(_, kind, payload)
+            distributionStates[#distributionStates + 1] = {
+                kind = kind,
+                payload = payload,
+            }
+            return true
         end,
     }
     h.addon.Services.Rolls = {
@@ -13119,6 +13464,10 @@ test("master award button triggers reroll for single-select ties", function()
     assertTrue(Master._Private.BtnAward() == true, "expected single-select tie to trigger a reroll flow")
     assertEqual(rerollNames[1], "Alice", "expected tie reroll to receive the tied players in order")
     assertEqual(rerollNames[2], "Bob", "expected tie reroll to receive the tied players in order")
+    assertEqual(distributionStates[1].kind, "tie_start", "expected tie reroll to publish tied names before reopening the roll")
+    assertEqual(distributionStates[1].payload.names[1], "Alice", "expected tie-start distribution to include Alice")
+    assertEqual(distributionStates[1].payload.names[2], "Bob", "expected tie-start distribution to include Bob")
+    assertEqual(distributionStates[2].kind, "roll_start", "expected tie reroll to publish the reopened roll after tie state")
     assertEqual(refreshCount, 1, "expected tie reroll to request a UI refresh")
 end)
 
@@ -13538,6 +13887,45 @@ test("reserves import accepts Base64 encoded RaidRes JSON", function()
     assertEqual(parsed.reservesData.bob.reserves[1].rawID, 1301, "expected Bob item id")
 end)
 
+test("reserves import accepts Gargul zlib encoded SoftRes JSON", function()
+    local h = newHarness()
+    local json = table.concat({
+        '{"metadata":{"id":"GARGUL1","origin":"softres.it","url":"https://softres.it/raid/GARGUL1"},',
+        '"softreserves":[',
+        '{"name":"Alice","class":"mage","plusOnes":1,"items":[{"id":1201,"quality":4}]}',
+        '],"hardreserves":[]}',
+    })
+
+    _G.KRT_Reserves = {}
+    h:load("!KRT/Libs/LibStub/LibStub.lua")
+    h:load("!KRT/Libs/LibDeflate/LibDeflate.lua")
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Modules/Json.lua")
+    h:load("!KRT/Modules/LootSources.lua")
+    h.addon.LootSources._SetDataForTests({
+        [1201] = {
+            { npcId = 16061, npcName = "Instructor Razuvious", raid = "Naxxramas", kind = "boss" },
+        },
+    })
+    h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Aliases.lua")
+    h:load("!KRT/Services/Reserves/Display.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local lib = _G.LibStub("LibDeflate")
+    local encoded = h.addon.Base64.Encode(lib:CompressZlib(json))
+    local parsed = h.addon.Services.Reserves:ParseImport(encoded, "multi", { format = "json" })
+
+    assertTrue(type(parsed) == "table", "expected Gargul zlib/Base64 SoftRes import to parse")
+    assertEqual(parsed.format, "encoded-json", "expected Gargul import to use encoded JSON path")
+    assertEqual(parsed.sourceId, "GARGUL1", "expected Gargul metadata id to be preserved")
+    assertEqual(parsed.sourceOrigin, "softres.it", "expected Gargul metadata origin to be preserved")
+    assertEqual(parsed.nPlayers, 1, "expected one Gargul reserve player")
+    assertEqual(parsed.reservesData.alice.reserves[1].rawID, 1201, "expected Gargul item id")
+    assertEqual(parsed.reservesData.alice.reserves[1].plus, 1, "expected Gargul plusOnes to map to plus")
+    assertEqual(parsed.reservesData.alice.reserves[1].source, nil, "expected Gargul import to avoid boss grouping for JSON data")
+end)
+
 test("reserves import keeps plain CSV behavior before encoded fallback", function()
     local h = newHarness()
     _G.KRT_Reserves = {}
@@ -13559,6 +13947,41 @@ test("reserves import keeps plain CSV behavior before encoded fallback", functio
     assertEqual(parsed.mode, "plus", "expected CSV-selected mode to remain intact")
     assertEqual(parsed.reservesData.alice.reserves[1].rawID, 1201, "expected CSV row item id")
     assertEqual(parsed.reservesData.alice.reserves[1].plus, 4, "expected CSV plus value")
+end)
+
+test("reserves import explicit format prevents cross-format fallback", function()
+    local h = newHarness()
+    local json = table.concat({
+        '{"metadata":{"id":"FORMAT1","origin":"raidres"},',
+        '"softreserves":[{"name":"Alice","items":[{"id":1201,"quality":4}]}]}',
+    })
+
+    _G.KRT_Reserves = {}
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Modules/Json.lua")
+    h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Aliases.lua")
+    h:load("!KRT/Services/Reserves/Display.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local encoded = h.addon.Base64.Encode(json)
+    local csv = table.concat({
+        '"item","itemid","from","name","class","spec","note","plus"',
+        '"Coldsteel",1201,"Naxx","Alice","MAGE","Arcane","main",4',
+    }, "\n")
+    local parsedJson = h.addon.Services.Reserves:ParseImport(encoded, "multi", { format = "json" })
+    local parsedCsv = h.addon.Services.Reserves:ParseImport(csv, "plus", { format = "csv" })
+    local wrongCsvAsJson, csvAsJsonReason = h.addon.Services.Reserves:ParseImport(csv, "multi", { format = "json" })
+    local wrongJsonAsCsv, jsonAsCsvReason = h.addon.Services.Reserves:ParseImport(encoded, "multi", { format = "csv" })
+
+    assertTrue(type(parsedJson) == "table", "expected explicit JSON format to parse encoded RaidRes JSON")
+    assertEqual(parsedJson.format, "encoded-json", "expected explicit JSON import to preserve encoded marker")
+    assertTrue(type(parsedCsv) == "table", "expected explicit CSV format to parse CSV")
+    assertEqual(parsedCsv.format, nil, "expected explicit CSV import not to be marked encoded JSON")
+    assertEqual(wrongCsvAsJson, nil, "expected JSON-selected import to reject CSV text")
+    assertEqual(csvAsJsonReason, "JSON_INVALID", "expected CSV text rejected as invalid encoded JSON")
+    assertEqual(wrongJsonAsCsv, nil, "expected CSV-selected import to reject encoded JSON")
+    assertEqual(jsonAsCsvReason, "NO_ROWS", "expected encoded JSON rejected as missing CSV rows")
 end)
 
 test("reserves item-info updates coalesce into a single refresh", function()

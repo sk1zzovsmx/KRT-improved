@@ -6,6 +6,7 @@
     "CallbackHandler-1.0": "latest",
     "LibBossIDs-1.0": "latest",
     "LibCompat-1.0": "latest",
+    "LibDeflate": "1.0.2-release",
     "LibDeformat-3.0": "latest",
     "LibLogger-1.0": "latest",
     "LibStub": "latest"

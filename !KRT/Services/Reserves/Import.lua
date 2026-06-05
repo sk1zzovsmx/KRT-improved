@@ -236,10 +236,16 @@ end
 
 local function maybeDecompressZlib(text)
     local libstub = _G and _G.LibStub
-    if type(libstub) ~= "function" then
+    if type(libstub) ~= "function" and type(libstub) ~= "table" then
         return nil, "DEFLATE_UNAVAILABLE"
     end
-    local ok, lib = pcall(libstub, "LibDeflate")
+
+    local ok, lib
+    if type(libstub) == "table" and type(libstub.GetLibrary) == "function" then
+        ok, lib = pcall(libstub.GetLibrary, libstub, "LibDeflate", true)
+    else
+        ok, lib = pcall(libstub, "LibDeflate")
+    end
     if not ok or type(lib) ~= "table" or type(lib.DecompressZlib) ~= "function" then
         return nil, "DEFLATE_UNAVAILABLE"
     end
@@ -305,7 +311,7 @@ local function getJsonPlus(item, entry)
         end
     end
     if type(entry) == "table" then
-        return tonumber(entry.sr_plus or entry.srPlus or entry.plus) or 0
+        return tonumber(entry.sr_plus or entry.srPlus or entry.plus or entry.plusOnes) or 0
     end
     return 0
 end
@@ -337,7 +343,7 @@ local function appendSoftResJsonRows(rows, data)
                         itemId = itemId,
                         player = playerName,
                         playerKey = playerKey,
-                        source = "encoded-json",
+                        source = nil,
                         class = entry.class,
                         spec = entry.role or entry.spec,
                         note = item.note or entry.note,
@@ -518,19 +524,25 @@ function Import.BuildParser()
         end
 
         local resolvedMode = (mode == "plus" or mode == "multi") and mode or service:GetImportMode()
+        local requestedFormat = type(opts) == "table" and opts.format or nil
+        requestedFormat = (requestedFormat == "json" or requestedFormat == "csv") and requestedFormat or nil
         local strategy = getImportStrategy(service, resolvedMode)
 
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesParseStart)
         end
 
-        local csvAttempted = looksLikeCSV(text)
+        local csvAttempted = requestedFormat == "csv" or (not requestedFormat and looksLikeCSV(text))
         local rows, importStats
         local encodedData
         if csvAttempted then
             rows, importStats = parseCSVRows(text)
         end
-        if not rows or #rows == 0 then
+        if requestedFormat == "csv" and (not rows or #rows == 0) then
+            addon:warn(L.WarnNoValidRows)
+            return nil, "NO_ROWS"
+        end
+        if requestedFormat ~= "csv" and (not rows or #rows == 0) then
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogReservesEncodedImportStart)
             end
@@ -538,7 +550,13 @@ function Import.BuildParser()
             local encodedReason, decompressionReason, decodedText
             rows, importStats, encodedData, encodedReason, decompressionReason, decodedText = parseEncodedRows(text)
             if not rows or #rows == 0 then
-                if csvAttempted then
+                if requestedFormat == "json" then
+                    addon:warn(L.WarnReservesEncodedImportInvalid)
+                    if isDebugEnabled() then
+                        addon:warn(Diag.W.LogReservesEncodedImportFailed:format(tostring(encodedReason or "JSON_INVALID")))
+                    end
+                    return nil, "JSON_INVALID"
+                elseif csvAttempted then
                     addon:warn(L.WarnNoValidRows)
                     return nil, "NO_ROWS"
                 end

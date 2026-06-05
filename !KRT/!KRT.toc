@@ -16,6 +16,7 @@
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\LibBossIDs-1.0\lib.xml
+Libs\LibDeflate\LibDeflate.lua
 Libs\LibDeformat-3.0\lib.xml
 Libs\LibCompat-1.0\lib.xml
 Libs\LibLogger-1.0\lib.xml

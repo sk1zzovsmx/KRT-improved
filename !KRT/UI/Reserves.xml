@@ -72,7 +72,7 @@
 	<!-- ====== Start of Reserve Import Window ====== -->
 	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
 		<Size>
-			<AbsDimension x="400" y="300" />
+			<AbsDimension x="400" y="390" />
 		</Size>
 		<Anchors>
 			<Anchor point="CENTER" />
@@ -88,7 +88,8 @@
 				<AbsInset top="3" right="3" bottom="2" left="2" />
 			</BackgroundInsets>
 		</Backdrop>
-		<Frames>
+		<Layers>
+			<Layer level="OVERLAY">
 			<FontString name="$parentHint" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
 				<Size>
 					<AbsDimension x="360" y="24" />
@@ -104,6 +105,30 @@
 					<AbsInset top="0" right="0" bottom="0" left="0" />
 				</TextInsets>
 			</FontString>
+			<FontString name="$parentModeLabel" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
+				<Size>
+					<AbsDimension x="160" y="16" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="20" y="-58" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</FontString>
+			<FontString name="$parentFormatLabel" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
+				<Size>
+					<AbsDimension x="160" y="16" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="20" y="-108" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</FontString>
 			<FontString name="$parentStatus" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 				<Size>
 					<AbsDimension x="360" y="18" />
@@ -111,41 +136,98 @@
 				<Anchors>
 					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="20" y="52" />
+							<AbsDimension x="20" y="51" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 			</FontString>
-
-			<!-- Import mode: Multi-reserve vs Plus System -->
-			<Slider name="$parentModeSlider" inherits="OptionsSliderTemplate">
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parentModeMultiButton" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="260" y="16" />
+					<AbsDimension x="120" y="24" />
 				</Size>
 				<Anchors>
-					<Anchor point="TOP" relativePoint="TOP">
+					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-60" />
+							<AbsDimension x="20" y="-78" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-			</Slider>
-			<!-- Multiline EditBox for CSV -->
-			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
+			</Button>
+			<Button name="$parentModePlusButton" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="340" y="160" />
+					<AbsDimension x="120" y="24" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentModeMultiButton" relativePoint="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="14" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentFormatJsonButton" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="96" y="24" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="20" y="-128" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentFormatCsvButton" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="96" y="24" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentFormatJsonButton" relativePoint="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="14" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Frame name="$parentEditBoxPanel">
+				<Size>
+					<AbsDimension x="300" y="130" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOP" relativePoint="TOP">
 						<Offset>
-							<AbsDimension x="-5" y="-92" />
+							<AbsDimension x="0" y="-162" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark" edgeFile="Interface\Tooltips\UI-Tooltip-Border">
+					<EdgeSize>
+						<AbsValue val="12" />
+					</EdgeSize>
+					<BackgroundInsets>
+						<AbsInset top="2" right="2" bottom="2" left="2" />
+					</BackgroundInsets>
+				</Backdrop>
+			</Frame>
+			<!-- Multiline EditBox for CSV or encoded JSON -->
+			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
+				<Size>
+					<AbsDimension x="276" y="114" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentEditBoxPanel" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="10" y="-8" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 				<ScrollChild>
-					<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
+					<EditBox name="KRTImportEditBox" multiLine="true" autoFocus="false" font="GameFontHighlightSmall">
 						<Size>
-							<AbsDimension x="320" y="160" />
+							<AbsDimension x="244" y="114" />
 						</Size>
 					</EditBox>
 				</ScrollChild>

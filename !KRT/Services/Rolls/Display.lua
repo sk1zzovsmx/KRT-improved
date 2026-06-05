@@ -8,6 +8,7 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local L = feature.L
 local Services = feature.Services
 local rollTypes = feature.rollTypes
 
@@ -96,6 +97,35 @@ local function buildSrContext(ctx, itemId, currentRollType)
         missingReserveText = reserveContext.missingPlayersText or "",
         rosterFilterApplied = reserveContext.rosterFilterApplied == true,
     }
+end
+
+local function buildSrSummaryText(srContext)
+    if type(srContext) ~= "table" then
+        return nil
+    end
+
+    local eligible = tonumber(srContext.eligibleReserveCount) or 0
+    local missing = tonumber(srContext.missingReserveCount) or 0
+    local total = tonumber(srContext.totalReserveCount) or 0
+
+    if eligible > 0 and missing > 0 then
+        return L.StrRollSrSummaryPresentMissing:format(eligible, missing)
+    end
+    if eligible > 0 then
+        return L.StrRollSrSummaryPresent:format(eligible)
+    end
+    if total > 0 then
+        return L.StrRollSrSummaryNoPresent
+    end
+    return L.StrRollSrSummaryFallback
+end
+
+local function buildLootCopyText(ctx)
+    local count = ctx.getCurrentItemCount and tonumber(ctx.getCurrentItemCount()) or nil
+    if not count or count <= 1 then
+        return nil
+    end
+    return L.StrRollLootCopies:format(count)
 end
 
 -- ----- Public methods ----- --
@@ -228,6 +258,8 @@ function Display.BuildModel(ctx)
         winnerSuggestions = resolution.autoWinners,
         countdownExpired = state.countdownExpired == true,
         srContext = srContext,
+        srSummaryText = buildSrSummaryText(srContext),
+        lootCopyText = buildLootCopyText(ctx),
         outOfFlowCount = outOfFlowCount,
     }
 end

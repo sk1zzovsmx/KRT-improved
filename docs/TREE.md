@@ -40,6 +40,8 @@
 |   |   |   |-- lib.xml
 |   |   |   |-- LibCompat-1.0.lua
 |   |   |   \\-- LibCompat-1.0.toc
+|   |   |-- LibDeflate
+|   |   |   \\-- LibDeflate.lua
 |   |   |-- LibDeformat-3.0
 |   |   |   |-- lib.xml
 |   |   |   |-- LibDeformat-3.0.lua

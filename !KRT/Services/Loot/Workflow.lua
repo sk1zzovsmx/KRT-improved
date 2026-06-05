@@ -59,6 +59,41 @@ local function copyAward(award)
     }
 end
 
+local WORKFLOW_STEPS = {
+    "loot_window",
+    "item_selected",
+    "rolling",
+    "award_pending",
+    "award_confirmed",
+    "trade_pending",
+    "trade_confirmed",
+}
+
+local function buildSteps(activePhase)
+    local steps = {}
+    for i = 1, #WORKFLOW_STEPS do
+        local phase = WORKFLOW_STEPS[i]
+        steps[i] = {
+            phase = phase,
+            active = phase == activePhase,
+        }
+    end
+    return steps
+end
+
+local function buildSummary(ctx)
+    if ctx.phase == "award_pending" and ctx.pendingAward and ctx.pendingAward.playerName then
+        return "award_pending: " .. tostring(ctx.pendingAward.playerName)
+    end
+    if ctx.phase == "trade_pending" and ctx.trade and ctx.trade.playerName then
+        return "trade_pending: " .. tostring(ctx.trade.playerName)
+    end
+    if ctx.phase == "rolling" and ctx.selectedItemLink then
+        return "rolling: " .. tostring(ctx.selectedItemLink)
+    end
+    return tostring(ctx.phase or "idle")
+end
+
 local function recordPhase(ctx, phase)
     ctx.phase = phase
     ctx.sequence = (tonumber(ctx.sequence) or 0) + 1
@@ -171,6 +206,8 @@ function Workflow.BuildSnapshot(ctx)
     end
     return {
         phase = ctx.phase,
+        summaryText = buildSummary(ctx),
+        steps = buildSteps(ctx.phase),
         sequence = tonumber(ctx.sequence) or 0,
         raidNum = ctx.raidNum,
         source = ctx.source,

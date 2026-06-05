@@ -39,6 +39,16 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **SoftRes import wizard** - Reworked the SoftRes import popup into a compact
+  chooser with explicit Multi-reserve/Plus System and JSON/CSV buttons, defaulting
+  to JSON for RaidRes and softres.it Gargul export payloads, bundling LibDeflate
+  so zlib-compressed Gargul exports decode without a second addon loaded, while
+  keeping CSV imports available. Encoded JSON imports now stay in one un-sourced
+  reserve group instead of inferring boss labels from static loot-source data.
+- **Master Loot flow visibility** - Added readable loot workflow snapshots,
+  SoftRes present/missing and loot-copy summaries in roll display models,
+  `tie_start` distribution updates for tie rerolls, and compact session winner
+  summaries that distinguish automatic winners from tied candidates.
 - **Interface Options panel** - Added a KRT entry under
   Interface > AddOns that mirrors the existing configuration controls while
   keeping the Loot Master configuration popup available in its current workflow.

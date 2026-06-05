@@ -419,6 +419,13 @@ do
             end,
             getRaidService = getRaidService,
             getItemReserveContext = getItemReserveContext,
+            getCurrentItemCount = function()
+                local loot = Services.Loot
+                if loot and loot.GetCurrentItemCount then
+                    return loot:GetCurrentItemCount()
+                end
+                return tonumber(lootState.selectedItemCount) or 1
+            end,
             getCurrentRaid = function()
                 return Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
             end,

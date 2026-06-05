@@ -662,13 +662,18 @@ do
     local ImportUI = Import._ui
     local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
     local MODE_MULTI, MODE_PLUS = 0, 1
+    local importFormat = "json"
 
     function ImportUI.AcquireRefs(frame)
         return {
             cancelButton = _G["KRTImportCancelButton"],
             confirmButton = _G["KRTImportConfirmButton"],
             editBox = _G["KRTImportEditBox"],
-            modeSlider = _G["KRTImportWindowModeSlider"],
+            formatCsvButton = _G["KRTImportWindowFormatCsvButton"],
+            formatJsonButton = _G["KRTImportWindowFormatJsonButton"],
+            modeMultiButton = _G["KRTImportWindowModeMultiButton"],
+            modePlusButton = _G["KRTImportWindowModePlusButton"],
+            scrollFrame = _G["KRTImportScrollFrame"],
             status = _G["KRTImportWindowStatus"],
             frame = frame,
         }
@@ -690,15 +695,7 @@ do
         return "multi"
     end
 
-    local function getImportModeValue()
-        return (getImportModeString() == "plus") and MODE_PLUS or MODE_MULTI
-    end
-
-    local function getModeSlider()
-        return _G["KRTImportWindowModeSlider"]
-    end
-
-    local setImportMode, onModeSliderLoad, onModeSliderChanged, importFromEditBox
+    local setImportMode, setImportFormat, refreshChoiceButtons, importFromEditBox
 
     local function setImportStatus(text, r, g, b)
         local status = _G["KRTImportWindowStatus"]
@@ -752,7 +749,7 @@ do
                     return
                 end
                 setImportMode(MODE_MULTI)
-                local parsed = Reserves and Reserves.ParseImport and Reserves:ParseImport(data.csv, "multi")
+                local parsed = Reserves and Reserves.ParseImport and Reserves:ParseImport(data.csv, "multi", { source = "import_window", format = "csv" })
                 if not parsed then
                     setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
                     return
@@ -786,6 +783,30 @@ do
         if hint then
             hint:SetText(L.StrImportReservesHint)
         end
+        local modeLabel = _G["KRTImportWindowModeLabel"]
+        if modeLabel then
+            modeLabel:SetText(L.StrImportReserveSystemLabel)
+        end
+        local formatLabel = _G["KRTImportWindowFormatLabel"]
+        if formatLabel then
+            formatLabel:SetText(L.StrImportFormatLabel)
+        end
+        local modeMultiButton = _G["KRTImportWindowModeMultiButton"]
+        if modeMultiButton then
+            modeMultiButton:SetText(L.StrImportModeMulti)
+        end
+        local modePlusButton = _G["KRTImportWindowModePlusButton"]
+        if modePlusButton then
+            modePlusButton:SetText(L.StrImportModePlus)
+        end
+        local formatJsonButton = _G["KRTImportWindowFormatJsonButton"]
+        if formatJsonButton then
+            formatJsonButton:SetText(L.StrImportFormatJson)
+        end
+        local formatCsvButton = _G["KRTImportWindowFormatCsvButton"]
+        if formatCsvButton then
+            formatCsvButton:SetText(L.StrImportFormatCsv)
+        end
 
         local confirmButton = _G["KRTImportConfirmButton"]
         if confirmButton then
@@ -800,7 +821,63 @@ do
         ImportUI.Localized = true
     end
 
+    local function configureImportEditBox(editBox, scrollFrame)
+        if not editBox then
+            return
+        end
+        if editBox.SetMultiLine then
+            editBox:SetMultiLine(true)
+        end
+        if editBox.SetWidth then
+            editBox:SetWidth(244)
+        end
+        if scrollFrame and scrollFrame.SetScrollChild then
+            scrollFrame:SetScrollChild(editBox)
+        end
+        if editBox.SetTextInsets then
+            editBox:SetTextInsets(8, 8, 8, 8)
+        end
+        if editBox.SetJustifyH then
+            editBox:SetJustifyH("LEFT")
+        end
+        if editBox.SetJustifyV then
+            editBox:SetJustifyV("TOP")
+        end
+        if editBox.SetWordWrap then
+            editBox:SetWordWrap(true)
+        end
+    end
+
+    local function adjustImportScrollBar(scrollFrame)
+        if not (scrollFrame and scrollFrame.GetName) then
+            return
+        end
+
+        local scrollName = scrollFrame:GetName()
+        local scrollBar = scrollFrame.ScrollBar or _G[scrollName .. "ScrollBar"]
+        if not scrollBar then
+            return
+        end
+
+        local upButton = _G[scrollBar:GetName() .. "ScrollUpButton"]
+        local downButton = _G[scrollBar:GetName() .. "ScrollDownButton"]
+        if upButton then
+            upButton:ClearAllPoints()
+            upButton:SetPoint("TOP", scrollFrame, "TOPRIGHT", 28, -4)
+        end
+        if downButton then
+            downButton:ClearAllPoints()
+            downButton:SetPoint("BOTTOM", scrollFrame, "BOTTOMRIGHT", 28, 8)
+        end
+
+        scrollBar:ClearAllPoints()
+        scrollBar:SetPoint("TOP", scrollFrame, "TOPRIGHT", 28, -20)
+        scrollBar:SetPoint("BOTTOM", scrollFrame, "BOTTOMRIGHT", 28, 24)
+    end
+
     local function bindImportHandlers(_, _, refs)
+        configureImportEditBox(refs.editBox, refs.scrollFrame)
+        adjustImportScrollBar(refs.scrollFrame)
         Frames.SetScriptSafely(refs.cancelButton, "OnClick", function()
             Import:Hide()
         end)
@@ -810,13 +887,51 @@ do
         Frames.SetScriptSafely(refs.editBox, "OnEscapePressed", function()
             Import:Hide()
         end)
-        Frames.SetScriptSafely(refs.modeSlider, "OnValueChanged", function(self, value)
-            onModeSliderChanged(self, value)
+        Frames.SetScriptSafely(refs.modeMultiButton, "OnClick", function()
+            setImportMode(MODE_MULTI)
         end)
-        onModeSliderLoad(refs.modeSlider)
+        Frames.SetScriptSafely(refs.modePlusButton, "OnClick", function()
+            setImportMode(MODE_PLUS)
+        end)
+        Frames.SetScriptSafely(refs.formatJsonButton, "OnClick", function()
+            setImportFormat("json")
+        end)
+        Frames.SetScriptSafely(refs.formatCsvButton, "OnClick", function()
+            setImportFormat("csv")
+        end)
+        refreshChoiceButtons()
     end
 
-    setImportMode = function(modeValue, suppressSlider)
+    local function setButtonSelected(button, selected)
+        if not button then
+            return
+        end
+
+        local name = button.GetName and button:GetName()
+        if name then
+            local suffixes = { "Left", "Middle", "Right" }
+            for i = 1, #suffixes do
+                local region = _G[name .. suffixes[i]]
+                if region and region.SetVertexColor then
+                    if selected then
+                        region:SetVertexColor(1, 1, 1)
+                    else
+                        region:SetVertexColor(0.45, 0.18, 0.18)
+                    end
+                end
+            end
+        end
+    end
+
+    refreshChoiceButtons = function()
+        local mode = getImportModeString()
+        setButtonSelected(_G["KRTImportWindowModeMultiButton"], mode ~= "plus")
+        setButtonSelected(_G["KRTImportWindowModePlusButton"], mode == "plus")
+        setButtonSelected(_G["KRTImportWindowFormatJsonButton"], importFormat == "json")
+        setButtonSelected(_G["KRTImportWindowFormatCsvButton"], importFormat == "csv")
+    end
+
+    setImportMode = function(modeValue)
         local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
         if Reserves and Reserves.SetImportMode then
             Reserves:SetImportMode(mode, true)
@@ -827,53 +942,12 @@ do
             end
         end
 
-        if suppressSlider then
-            return
-        end
-
-        local slider = getModeSlider()
-        if slider and slider.SetValue then
-            slider:SetValue(getImportModeValue())
-        end
+        refreshChoiceButtons()
     end
 
-    onModeSliderLoad = function(slider)
-        if not slider then
-            return
-        end
-        slider:SetMinMaxValues(MODE_MULTI, MODE_PLUS)
-        slider:SetValueStep(1)
-        if slider.SetObeyStepOnDrag then
-            slider:SetObeyStepOnDrag(true)
-        end
-
-        local low = _G[slider:GetName() .. "Low"]
-        local high = _G[slider:GetName() .. "High"]
-        local text = _G[slider:GetName() .. "Text"]
-        if low then
-            low:SetText(L.StrImportModeMulti or "Multi-reserve")
-        end
-        if high then
-            high:SetText(L.StrImportModePlus or "Plus System")
-        end
-        if text then
-            text:SetText(L.StrImportModeLabel or "")
-        end
-
-        slider:SetValue(getImportModeValue())
-    end
-
-    onModeSliderChanged = function(slider, value)
-        if not slider then
-            return
-        end
-        local modeValue = tonumber(value) or MODE_MULTI
-        if modeValue >= 0.5 then
-            modeValue = MODE_PLUS
-        else
-            modeValue = MODE_MULTI
-        end
-        setImportMode(modeValue, true)
+    setImportFormat = function(format)
+        importFormat = (format == "csv") and "csv" or "json"
+        refreshChoiceButtons()
     end
 
     local function refreshImportFrame()
@@ -881,10 +955,7 @@ do
             ImportUI.Localize()
         end
 
-        local slider = getModeSlider()
-        if slider and slider.SetValue then
-            slider:SetValue(getImportModeValue())
-        end
+        refreshChoiceButtons()
 
         local status = _G["KRTImportWindowStatus"]
         if status and (status:GetText() == nil or status:GetText() == "") then
@@ -941,24 +1012,24 @@ do
             return false, 0
         end
 
-        local csv = editBox:GetText()
-        if type(csv) ~= "string" or not csv:match("%S") then
+        local importText = editBox:GetText()
+        if type(importText) ~= "string" or not importText:match("%S") then
             setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
             addon:warn(Diag.W.LogReservesImportFailedEmpty)
             return false, 0, "EMPTY"
         end
 
         if isDebugEnabled() then
-            addon:debug(Diag.D.LogSRImportRequested:format(#csv))
+            addon:debug(Diag.D.LogSRImportRequested:format(#importText))
         end
         ensureWrongCSVPopup()
 
         local mode = getImportModeString()
-        local parsed, errCode, errData = Reserves:ParseImport(csv, mode, { source = "import_window" })
+        local parsed, errCode, errData = Reserves:ParseImport(importText, mode, { source = "import_window", format = importFormat })
         if not parsed then
             if errCode == "CSV_WRONG_FOR_PLUS" then
                 setImportStatus(L.ErrCSVWrongForPlusShort, 1, 0.2, 0.2)
-                local popupData = { csv = csv }
+                local popupData = { csv = importText }
                 if type(errData) == "table" then
                     for key, value in pairs(errData) do
                         popupData[key] = value
