@@ -14,21 +14,21 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 - **Master Looter toolkit**: roll workflow (MS / OS / SR / Free), countdown,
   native assignment grid, multi-award, hold/bank/DE targets, and trade helpers.
 - **Master Loot automation**: optional boss-target Master Loot switching,
-  RollFor-style screen notice, opened-loot autospam, and SoftRes-aware loot
+  configurable KRT screen notice, opened-loot autospam, and SoftRes-aware loot
   announce lines.
 - **SoftRes Reserves integration**:
-  - JSON imports for RaidRes / softres.it / Gargul payloads, plus CSV fallback
+  - JSON imports for supported compressed and plain reserve exports, plus CSV fallback
   - **Multi-reserve** support (players can reserve the same item multiple times / quantity > 1)
   - **Plus System (P+)** priority mode
   - Name aliases, readiness checks, LootFrame reserve hints, and chat-safe output
-- **Raid loot-source database**: AtlasLoot-backed Vanilla, The Burning Crusade,
+- **Raid loot-source database**: Vanilla, The Burning Crusade,
   and Wrath raid sources for passive Group Loot / Need Before Greed logging.
 - **Loot Counter**: track **MS loot wins per player** in the current raid session,
   with editable counters, reset confirmation, and grouped spam output.
 - **Loot History + Raid Attendance**: persistent raid sessions with roster,
   bosses, attendance, loot, passive Group Loot metadata, CSV export, and sync.
 - **Interface Options panels**: KRT AddOns subpanels for Master Loot, Loot
-  History, LFM Spam, Raid Warning, and Help without Ace dependencies.
+  History, LFM Spam, Raid Warning, and Help without external options dependencies.
 - **Pre-saved Raid Warnings** for reusable raid calls.
 - **LFM Spammer** with composition builder and achievement ID helper.
 - **Minimap button menu** + consolidated **/krt** slash commands.
@@ -63,7 +63,7 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 
 - **Import SoftRes reserves**
   - `/krt res import`
-  - JSON imports are preferred for RaidRes / softres.it / Gargul exports.
+  - JSON imports are preferred for supported compressed and plain reserve exports.
   - CSV imports remain available for classic SoftRes exports.
   - Or click the **Reserves** button in the Master Looter window (it opens Import if no reserves are loaded yet).
 

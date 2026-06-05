@@ -195,7 +195,7 @@ Options:
 - Services must not reference frames, Widgets, Controllers, `addon.UI.Scaffold`, or shared UI helper modules.
 
 Logger visual direction:
-- Wrath raid-log look inspired by MizusRaidTracker.
+- Wrath raid-log look with compact dark tables, yellow section titles, and green selected rows.
 - Blizzard dialog frame, compact dark tables, yellow section titles, green selected rows.
 - Default KRT buttons outside list panels.
 - Loot item icons keep about `28x28` click target, centered `26x26` icon, and `32x32` quickslot border.

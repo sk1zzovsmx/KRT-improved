@@ -24,11 +24,11 @@ Release-Version: 0.8.0-beta.1
   available during migration, kept CSV export on the compact label, and made
   Master Loot prefer the real boss context over shared static dataset fallback
   when the boss source is known.
-- **AtlasLoot raid dataset coverage** - Added a build-time AtlasLoot raid
-  source generator and regenerated the Vanilla, The Burning Crusade, and
-  Wrath loot-source shards from reviewed raid boss, world-boss, and encounter
-  tables, keeping non-raid AtlasLoot sections out of runtime data and preserving
-  separate Classic/Wrath records for raids such as Naxxramas and Onyxia's Lair.
+- **Raid dataset coverage** - Added a build-time raid source generator and
+  regenerated the Vanilla, The Burning Crusade, and Wrath loot-source shards
+  from reviewed raid boss, world-boss, and encounter tables, keeping non-raid
+  sections out of runtime data and preserving separate Classic/Wrath records
+  for raids such as Naxxramas and Onyxia's Lair.
 - **Naxxramas 25 loot-source data** - Corrected Seized Beauty (`40108`) so it
   is treated as a shared Naxxramas 25 drop across Anub'Rekhan, Grand Widow
   Faerlina, Instructor Razuvious, Noth the Plaguebringer, and Patchwerk.
@@ -44,8 +44,8 @@ Release-Version: 0.8.0-beta.1
   so existing raid history can still load safely.
 
 - **Wrath raid loot-source recognition** - Expanded the Naxxramas 10/25
-  and Onyxia level 80 loot-source tables from the AtlasLoot WotLK database
-  so Logger source attribution recognizes missing boss drops such as
+  and Onyxia level 80 loot-source tables from the local raid dataset so
+  Logger source attribution recognizes missing boss drops such as
   Dawnwalkers, Rescinding Grips, Mantle of the Locusts, and Flowing
   Sapphiron Drape, while keeping classic Onyxia data separated from Wrath
   raid-size modes and shared Naxxramas drops ambiguous until recent boss
@@ -75,7 +75,7 @@ Release-Version: 0.8.0-beta.1
   loot.
 - **Loot method automation** - Added opt-in Master Loot options to switch
   to Master Loot when a raid leader targets a recognized raid boss and to
-  show a configurable RollFor-style KRT screen notice when it fires, then ask
+  show a configurable KRT screen notice when it fires, then ask
   before restoring Group Loot after boss loot is cleared.
 - **Opened-loot autospam** - Added opt-in Master Loot options to announce
   opened loot automatically and, when enabled with loot autospam, add SoftRes
@@ -84,10 +84,11 @@ Release-Version: 0.8.0-beta.1
   groups reserved-item lines after the full opened-loot list.
 - **SoftRes import wizard** - Reworked the SoftRes import popup into a compact
   chooser with explicit Multi-reserve/Plus System and JSON/CSV buttons, defaulting
-  to JSON for RaidRes and softres.it Gargul export payloads, bundling LibDeflate
-  so zlib-compressed Gargul exports decode without a second addon loaded, while
-  keeping CSV imports available. Encoded JSON imports now stay in one un-sourced
-  reserve group instead of inferring boss labels from static loot-source data.
+  to JSON for supported compressed and plain reserve export payloads, bundling
+  decompression support so compressed imports decode without extra dependencies,
+  while keeping CSV imports available. Encoded JSON imports now stay in one
+  un-sourced reserve group instead of inferring boss labels from static
+  loot-source data.
 - **Master Loot flow visibility** - Added readable loot workflow snapshots,
   SoftRes present/missing and loot-copy summaries in roll display models,
   `tie_start` distribution updates for tie rerolls, and compact session winner
@@ -98,9 +99,9 @@ Release-Version: 0.8.0-beta.1
   The AddOns entry now uses KRT subcategories for Master Loot, Loot History,
   LFM Spam, Raid Warning, and Help, with the Master Loot options panel
   scrollable and grouped slash-command guidance available under Help.
-- **Interface Options layout renderer** - Added a local AceConfig-style
-  options layout renderer with fixed text and command columns for every KRT
-  AddOns subpanel, without adding an Ace dependency.
+- **Interface Options layout renderer** - Added a local options layout renderer
+  with fixed text and command columns for every KRT AddOns subpanel, without
+  adding an external options dependency.
 - **Interface Options overview** - Added a short overview to the root KRT
   AddOns panel explaining what the addon does, how it works, and why to use it.
 - **Configuration popup footer** - Removed the old author/link footer from the
@@ -339,9 +340,9 @@ Release-Version: 0.8.0-beta.1
   classifier for ignored items, enchanting materials, and quality BoE loot,
   including 3.3.5a tooltip-based bind detection; it does not auto-award or
   auto-trade items.
-- **Logger UI polish** - Refreshed the Logger toward a MizusRaidTracker-style
-  Wrath raid-log look with dark compact tables, yellow section titles,
-  out-of-panel controls, and green selected rows.
+- **Logger UI polish** - Refreshed the Logger toward a Wrath raid-log look
+  with dark compact tables, yellow section titles, out-of-panel controls, and
+  green selected rows.
 - **Raid attendance ledger** - Added a per-player attendance ledger keyed by
   `playerNid`, updated from roster deltas, persisted as raid schema v4, and
   exported through a dedicated attendance CSV builder without replacing the
