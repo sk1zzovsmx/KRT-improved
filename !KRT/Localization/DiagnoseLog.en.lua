@@ -69,6 +69,9 @@ Diag.D.LogBossYellMatched = "[Boss] Yell matched text=%s boss=%s"
 Diag.D.LogBossUnitDiedMatched = "[Boss] UNIT_DIED matched npcId=%d boss=%s"
 Diag.D.LogBossUnitDiedIgnored = "[Boss] UNIT_DIED ignored npcId=%d boss=%s"
 Diag.D.LogBossDuplicateSuppressed = "[Boss] Duplicate suppressed boss=%s sourceNpcId=%d existingBossNid=%d delta=%d"
+Diag.D.LogLootSourceResolved = "[LootSource] Resolved itemId=%s raid=%s source=%s npcId=%d kind=%s confidence=%s"
+Diag.D.LogLootSourceMissing = "[LootSource] Missing itemId=%s raid=%s"
+Diag.D.LogLootSourceAmbiguous = "[LootSource] Ambiguous itemId=%s raid=%s candidates=%d"
 
 -- Master --
 Diag.E.LogMasterUILocalizationFailed = "[Master] UI localization failed; controls are still bound."
