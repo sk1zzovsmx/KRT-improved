@@ -66,6 +66,7 @@ for i = 1, #luaFiles do
     assertNotContains(source, "Import._ui", path .. " must store import lifecycle state through UI.ModuleState")
     assertNotContains(source, "Box._ui", path .. " must store popup lifecycle state through UI.ModuleState")
     assertNotContains(source, "local UiRoot = feature.UI", path .. " must name the UI root local UI")
+    assertNotContains(source, "_makeConfirmPopup", path .. " must define confirmation popups through UI.Popups")
 end
 
 local initSource = read("!KRT/Init.lua")

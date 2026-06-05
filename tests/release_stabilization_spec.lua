@@ -1367,6 +1367,13 @@ local function newHarness()
         }
     end
 
+    addon.UI.Popups.DefineConfirm = function(name, text, onAccept)
+        _G[name] = {
+            text = text,
+            onAccept = onAccept,
+        }
+    end
+
     addon.UI.Tooltips.Bind = function() end
 
     addon.UI.EditBoxes.SetValue = function(editBox, value)
@@ -1426,8 +1433,6 @@ local function newHarness()
             function controller:Touch()
                 self:Dirty()
             end
-
-            function controller:_makeConfirmPopup() end
 
             return controller
         end,

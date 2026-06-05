@@ -2278,7 +2278,7 @@ do
             end
         end
 
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, deleteRaids)
+        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, deleteRaids)
     end
 
     Bus.RegisterCallback(InternalEvents.RaidCreate, function(_, num)
@@ -2545,7 +2545,7 @@ do
             end
         end
 
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_BOSS", L.StrConfirmDeleteBoss, deleteBosses)
+        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_BOSS", L.StrConfirmDeleteBoss, deleteBosses)
     end
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()
@@ -2690,7 +2690,7 @@ do
             end
         end
 
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedBossAttendees)
+        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedBossAttendees)
     end
 
     local refreshEvents = {
@@ -2888,7 +2888,7 @@ do
             end
         end
 
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedRaidAttendees)
+        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedRaidAttendees)
     end
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()
@@ -3224,7 +3224,7 @@ do
             end
         end
 
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, deleteItem)
+        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, deleteItem)
     end
 
     local function resolveLoggerLootRaidId(source, raidIDOverride)
