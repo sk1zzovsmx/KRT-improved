@@ -21,6 +21,13 @@ function Add-SectionLine {
     $violations.Add("  $Line")
 }
 
+function Test-IsKrtVendoredLibPath {
+    param([string]$Path)
+
+    $normalized = ([System.IO.Path]::GetFullPath($Path) -replace "\\", "/")
+    return ($normalized -match "/!KRT/Libs/")
+}
+
 function Get-KrtOwnedLuaFiles {
     $all = New-Object System.Collections.Generic.List[System.IO.FileInfo]
 
@@ -28,7 +35,7 @@ function Get-KrtOwnedLuaFiles {
     if (Test-Path -LiteralPath $krtRoot) {
         $krtFiles = Get-ChildItem -LiteralPath $krtRoot -Recurse -File -Filter "*.lua"
         foreach ($f in $krtFiles) {
-            if ($f.FullName -match [regex]::Escape("\!KRT\Libs\")) {
+            if (Test-IsKrtVendoredLibPath -Path $f.FullName) {
                 continue
             }
             $all.Add($f)
@@ -64,7 +71,7 @@ function Get-KrtAddonLuaFiles {
 
     $krtFiles = Get-ChildItem -LiteralPath $krtRoot -Recurse -File -Filter "*.lua"
     foreach ($f in $krtFiles) {
-        if ($f.FullName -match [regex]::Escape("\!KRT\Libs\")) {
+        if (Test-IsKrtVendoredLibPath -Path $f.FullName) {
             continue
         }
         $all.Add($f)

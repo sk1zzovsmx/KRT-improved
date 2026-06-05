@@ -185,26 +185,6 @@
 |       |-- quality.yml
 |       |-- release-addon.yml
 |       \\-- release-router.yml
-|-- .venv
-|   |-- Include
-|   |-- Lib
-|   |   \\-- site-packages
-|   |       |-- pip
-|   |       |   \\-- ...
-|   |       \\-- pip-25.0.1.dist-info
-|   |           \\-- ...
-|   |-- Scripts
-|   |   |-- activate
-|   |   |-- activate.bat
-|   |   |-- Activate.ps1
-|   |   |-- deactivate.bat
-|   |   |-- pip.exe
-|   |   |-- pip3.12.exe
-|   |   |-- pip3.exe
-|   |   |-- python.exe
-|   |   \\-- pythonw.exe
-|   |-- .gitignore
-|   \\-- pyvenv.cfg
 |-- .vscode
 |   |-- mcp.json
 |   \\-- settings.json
@@ -214,9 +194,9 @@
 |   |       \\-- 2026-04-28-options-timer-refactor-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
+|   |-- API_REGISTRY.csv
 |   |-- API_REGISTRY_INTERNAL.csv
 |   |-- API_REGISTRY_PUBLIC.csv
-|   |-- API_REGISTRY.csv
 |   |-- ARCHITECTURE.md
 |   |-- DEV_CHECKS.md
 |   |-- FN_CLUSTERS.md
@@ -256,8 +236,8 @@
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1
-|   |-- krt_mcp_server.py
 |   |-- krt.py
+|   |-- krt_mcp_server.py
 |   |-- mech-bootstrap.ps1
 |   |-- mech-krt.ps1
 |   |-- pre-commit.ps1
