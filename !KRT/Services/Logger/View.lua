@@ -14,6 +14,7 @@ local GetLootSortName = Sort.GetLootSortName
 local twipe = table.wipe
 local tostring, tonumber = tostring, tonumber
 local date, time = date, time
+local strsub = string.sub
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "View")
@@ -29,6 +30,27 @@ local function getRaidQueries()
 end
 
 -- ----- Private helpers ----- --
+local function isBossFightRecord(boss)
+    if type(boss) ~= "table" then
+        return false
+    end
+
+    local sourceKind = boss.sourceKind
+    if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
+        return false
+    end
+
+    if boss.source == "LootSources" then
+        return false
+    end
+
+    local name = boss.name or boss.boss
+    if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
+        return false
+    end
+
+    return true
+end
 
 -- ----- Public methods ----- --
 
@@ -127,7 +149,7 @@ function View:FillBossAttendeesList(out, raid, bossNid)
         return
     end
     local bossKill = Store:GetBoss(raid, bossNid)
-    if not (bossKill and bossKill.players and raid.players) then
+    if not (bossKill and isBossFightRecord(bossKill) and bossKill.players and raid.players) then
         return
     end
 
@@ -169,7 +191,7 @@ function View:GetPlayerBossParticipationList(out, raid, playerNid)
     for i = 1, #bosses do
         local boss = bosses[i]
         local players = boss and boss.players
-        if type(players) == "table" then
+        if isBossFightRecord(boss) and type(players) == "table" then
             for j = 1, #players do
                 if tonumber(players[j]) == selectedPlayerNid then
                     n = n + 1

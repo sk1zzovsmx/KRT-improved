@@ -1008,21 +1008,8 @@ do
         end
 
         local currentTime = tonumber(now) or Time.GetCurrentTime()
+        -- Static loot-source records attribute items only; real boss events own attendance snapshots.
         local players = {}
-        local seenPlayers = {}
-        for unit in addon.UnitIterator(true) do
-            if UnitIsConnected(unit) then
-                local name = UnitName(unit)
-                if name then
-                    local resolvedName = Strings.NormalizeName(name, true) or name
-                    local playerNid = ensureRaidPlayerNid(resolvedName, raidNum)
-                    if playerNid > 0 and not seenPlayers[playerNid] then
-                        seenPlayers[playerNid] = true
-                        tinsert(players, playerNid)
-                    end
-                end
-            end
-        end
 
         local bossNid = tonumber(raid.nextBossNid) or 1
         raid.nextBossNid = bossNid + 1

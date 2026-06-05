@@ -6,6 +6,7 @@ local function read(path)
 end
 
 local logger = read("!KRT/Controllers/Logger.lua")
+local loggerXml = read("!KRT/UI/Logger.xml")
 local visuals = read("!KRT/Modules/UI/Visuals.lua")
 local listController = read("!KRT/Modules/UI/ListController.lua")
 
@@ -36,10 +37,20 @@ assert(logger:find("applyBossListColumnWidths", 1, true), "Logger boss header wi
 assert(logger:find("applyBossRowColumnWidths", 1, true), "Logger boss row widths must be applied centrally")
 assert(logger:find("LOGGER_LOOT_ROW_HEIGHT", 1, true), "Logger loot row height must be explicit")
 assert(logger:find("LOGGER_COMPACT_ROW_HEIGHT", 1, true), "Logger compact row height must be explicit")
+assert(logger:find("ToggleLootHistory", 1, true), "Logger must expose a dedicated Loot History opener")
+assert(logger:find("ToggleRaidAttendance", 1, true), "Logger must expose a dedicated Raid Attendance opener")
+assert(logger:find("KRTRaidAttendanceRaids", 1, true), "Logger must bind a separate Raid Attendance raids panel")
+assert(logger:find("KRTRaidAttendanceRaidAttendees", 1, true), "Logger must bind a separate Raid Attendance attendees panel")
+assert(logger:find("KRTRaidAttendanceBosses", 1, true), "Logger must bind a separate Raid Attendance boss participation panel")
 assert(logger:find("setLoggerRowIndex", 1, true), "Logger row striping must reset on row reuse")
 assert(logger:find("setLoggerRowIndex(row, visibleIndex)", 1, true), "Logger row striping must use visible list position")
 assert(logger:find("rightInset = 0", 1, true), "Logger lists must keep the existing scrollbar inset policy")
 assert(logger:find("setPanelVisible%(refs%.bossAttendees, false%)", 1, false), "Logger refresh must keep the boss attendee panel hidden")
+
+assert(loggerXml:find('Frame name="KRTRaidAttendance"', 1, true), "Logger XML must define a distinct Raid Attendance frame")
+assert(loggerXml:find('Frame name="KRTRaidAttendanceRaids"', 1, true), "Raid Attendance XML must define a separate raids list")
+assert(loggerXml:find('Frame name="KRTRaidAttendanceRaidAttendees"', 1, true), "Raid Attendance XML must define a separate attendees list")
+assert(loggerXml:find('Frame name="KRTRaidAttendanceBosses"', 1, true), "Raid Attendance XML must define a separate boss participation list")
 
 assert(visuals:find("isLoggerRow%(row%)", 1, false), "Logger row visuals must stay scoped to Logger rows")
 assert(visuals:find("0%.08, 0%.52, 0%.10", 1, false), "Logger selected rows must remain green")

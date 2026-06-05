@@ -219,6 +219,7 @@
 |   |-- fixtures
 |   |   \\-- sv
 |   |       \\-- canonical-minimal-01.lua
+|   |-- controllers_cleanup_spec.lua
 |   |-- logger_visual_refresh_spec.lua
 |   |-- module_registry_database_spec.lua
 |   |-- module_registry_modules_spec.lua

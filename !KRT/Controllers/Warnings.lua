@@ -19,8 +19,7 @@ local UIPrimitives = addon.UIPrimitives
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
-local tinsert, twipe = table.insert, table.wipe
-local ipairs = ipairs
+local tinsert, tremove = table.insert, table.remove
 
 local tonumber = tonumber
 
@@ -52,6 +51,13 @@ do
     local isEdit = false
 
     -- ----- Private helpers ----- --
+    local function getWarningsStore()
+        if type(KRT_Warnings) ~= "table" then
+            KRT_Warnings = {}
+        end
+        return KRT_Warnings
+    end
+
     function UI.AcquireRefs(frame)
         return {
             name = Frames.GetRef(frame, "Name"),
@@ -81,7 +87,8 @@ do
         end
         local bName = btn:GetName()
         local wID = tonumber(_G[bName .. "ID"]:GetText())
-        if KRT_Warnings[wID] == nil then
+        local warnings = getWarningsStore()
+        if warnings[wID] == nil then
             return
         end
         if IsControlKeyDown() then
@@ -114,8 +121,9 @@ do
         _rowParts = { "ID", "Name" },
 
         getData = function(out)
-            for i = 1, #KRT_Warnings do
-                local w = KRT_Warnings[i]
+            local warnings = getWarningsStore()
+            for i = 1, #warnings do
+                local w = warnings[i]
                 out[i] = { id = i, name = w and w.name or "" }
             end
         end,
@@ -240,7 +248,8 @@ do
         local draftContent = Strings.TrimText(contentBox:GetText())
 
         if selectedID ~= nil then
-            local w = KRT_Warnings[selectedID]
+            local warnings = getWarningsStore()
+            local w = warnings[selectedID]
             if w == nil then
                 selectedID = nil
                 return
@@ -264,15 +273,15 @@ do
         if btn == nil or selectedID == nil then
             return
         end
-        local oldWarnings = {}
-        for i, w in ipairs(KRT_Warnings) do
-            if i ~= selectedID then
-                tinsert(oldWarnings, w)
-            end
+        local warnings = getWarningsStore()
+        if warnings[selectedID] == nil then
+            selectedID = nil
+            warningsDirty = true
+            module:RequestRefresh()
+            return
         end
-        twipe(KRT_Warnings)
-        KRT_Warnings = oldWarnings
-        local count = #KRT_Warnings
+        tremove(warnings, selectedID)
+        local count = #warnings
         if count <= 0 then
             selectedID = nil
         elseif count == 1 then
@@ -286,21 +295,19 @@ do
 
     -- Announce Warning:
     function announceWarning(wID)
-        if KRT_Warnings == nil then
-            return
-        end
+        local warnings = getWarningsStore()
         if wID == nil then
             wID = (selectedID ~= nil) and selectedID or tempSelectedID
         end
 
         wID = tonumber(wID)
-        if not wID or wID <= 0 or KRT_Warnings[wID] == nil then
+        if not wID or wID <= 0 or warnings[wID] == nil then
             return
         end
 
         tempSelectedID = nil -- Always clear temporary selected id:
 
-        return ChatApi.AnnounceWarningMessage(Chat, KRT_Warnings[wID].content)
+        return ChatApi.AnnounceWarningMessage(Chat, warnings[wID].content)
     end
 
     function module:RequestAnnounce(wID)
@@ -337,9 +344,10 @@ do
         if not frameName then
             return
         end
-        if selectedID and KRT_Warnings[selectedID] then
-            _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
-            _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
+        local warnings = getWarningsStore()
+        if selectedID and warnings[selectedID] then
+            _G[frameName .. "OutputName"]:SetText(warnings[selectedID].name)
+            _G[frameName .. "OutputContent"]:SetText(warnings[selectedID].content)
             _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
         else
             _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
@@ -380,27 +388,25 @@ do
             return
         end
         local savedID
-        if type(KRT_Warnings) ~= "table" then
-            KRT_Warnings = {}
-        end
+        local warnings = getWarningsStore()
         wID = wID and tonumber(wID) or 0
         wName = Strings.TrimText(wName)
         wContent = Strings.TrimText(wContent)
         if wName == "" then
-            wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
+            wName = (isEdit and wID > 0) and wID or (#warnings + 1)
         end
         if wContent == "" then
             addon:error(L.StrWarningsError)
             return
         end
-        if isEdit and wID > 0 and KRT_Warnings[wID] ~= nil then
-            KRT_Warnings[wID].name = wName
-            KRT_Warnings[wID].content = wContent
+        if isEdit and wID > 0 and warnings[wID] ~= nil then
+            warnings[wID].name = wName
+            warnings[wID].content = wContent
             savedID = wID
             isEdit = false
         else
-            tinsert(KRT_Warnings, { name = wName, content = wContent })
-            savedID = #KRT_Warnings
+            tinsert(warnings, { name = wName, content = wContent })
+            savedID = #warnings
         end
 
         Frames.ResetEditBox(_G[frameName .. "Name"])

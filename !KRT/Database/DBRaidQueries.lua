@@ -12,6 +12,7 @@ local GetLootSortName = Sort and Sort.GetLootSortName
 
 local pairs, type = pairs, type
 local tonumber, tostring = tonumber, tostring
+local strsub = string.sub
 
 -- Raid read-only projection/query service.
 do
@@ -111,6 +112,28 @@ do
             end
         end
         return nil
+    end
+
+    local function isBossFightRecord(boss)
+        if type(boss) ~= "table" then
+            return false
+        end
+
+        local sourceKind = boss.sourceKind
+        if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
+            return false
+        end
+
+        if boss.source == "LootSources" then
+            return false
+        end
+
+        local name = boss.name or boss.boss
+        if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
+            return false
+        end
+
+        return true
     end
 
     local function summarizeAttendance(entry, fallbackJoin, fallbackLeave)
@@ -261,7 +284,7 @@ do
         local runtime = ensureRuntime(raid)
         local bossByNid = runtime and runtime.bossByNid or nil
         local bossKill = bossByNid and bossByNid[queryNid] or nil
-        if not (bossKill and type(bossKill.players) == "table") then
+        if not (bossKill and isBossFightRecord(bossKill) and type(bossKill.players) == "table") then
             if out then
                 appendRows(out, rows)
                 return out

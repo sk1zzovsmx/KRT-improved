@@ -231,6 +231,8 @@ Diag.E.LogLoggerLootLogRequestPayloadInvalid = "[Logger] LoggerLootLogRequest in
 
 -- Syncer --
 Diag.D.LogSyncRequestSent = "[Sync] Request sent req=%s raidNid=%s"
+Diag.D.LogSyncBase64EncodeFailed = "[Sync] Base64 encode failed for payload"
+Diag.D.LogSyncBase64DecodeFailed = "[Sync] Base64 decode failed for payload"
 Diag.D.LogSyncRequestReceived = "[Sync] Request received from=%s req=%s raidNid=%s"
 Diag.D.LogSyncSnapshotSent = "[Sync] Snapshot sent to=%s req=%s raidNid=%s chunks=%d bytes=%d"
 Diag.D.LogSyncChunkReceived = "[Sync] Chunk received from=%s req=%s part=%d/%d"

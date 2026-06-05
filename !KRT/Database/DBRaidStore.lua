@@ -12,6 +12,7 @@ local Time = feature.Time
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
 local tostring, tonumber = tostring, tonumber
+local strsub = string.sub
 local tconcat = table.concat
 
 -- Raid storage service.
@@ -42,6 +43,28 @@ do
             map[key] = nil
         end
         return map
+    end
+
+    local function isBossFightRecord(boss)
+        if type(boss) ~= "table" then
+            return false
+        end
+
+        local sourceKind = boss.sourceKind
+        if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
+            return false
+        end
+
+        if boss.source == "LootSources" then
+            return false
+        end
+
+        local name = boss.name or boss.boss
+        if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
+            return false
+        end
+
+        return true
     end
 
     local function createNidAllocator(initialNext)
@@ -506,37 +529,39 @@ do
 
                 local attendees = {}
                 local seen = {}
-                local rawPlayers = boss.players
-                if type(rawPlayers) == "table" then
-                    for j = 1, #rawPlayers do
-                        local rawPlayer = rawPlayers[j]
-                        local playerNid = tonumber(rawPlayer)
-                        if playerNid and playerNid > 0 and validPlayerNids[playerNid] and not seen[playerNid] then
-                            seen[playerNid] = true
-                            attendees[#attendees + 1] = playerNid
-                        end
-                    end
-                end
-                if #attendees == 0 then
-                    local killTime = tonumber(boss.time) or 0
-                    for j = 1, #players do
-                        local player = players[j]
-                        local playerNid = player and tonumber(player.playerNid) or nil
-                        if playerNid and validPlayerNids[playerNid] and not seen[playerNid] then
-                            local include = true
-                            if killTime > 0 then
-                                local joinTime = tonumber(player.join)
-                                if joinTime and joinTime > killTime then
-                                    include = false
-                                end
-                                local leaveTime = tonumber(player.leave)
-                                if leaveTime and leaveTime > 0 and leaveTime < killTime then
-                                    include = false
-                                end
-                            end
-                            if include then
+                if isBossFightRecord(boss) then
+                    local rawPlayers = boss.players
+                    if type(rawPlayers) == "table" then
+                        for j = 1, #rawPlayers do
+                            local rawPlayer = rawPlayers[j]
+                            local playerNid = tonumber(rawPlayer)
+                            if playerNid and playerNid > 0 and validPlayerNids[playerNid] and not seen[playerNid] then
                                 seen[playerNid] = true
                                 attendees[#attendees + 1] = playerNid
+                            end
+                        end
+                    end
+                    if #attendees == 0 then
+                        local killTime = tonumber(boss.time) or 0
+                        for j = 1, #players do
+                            local player = players[j]
+                            local playerNid = player and tonumber(player.playerNid) or nil
+                            if playerNid and validPlayerNids[playerNid] and not seen[playerNid] then
+                                local include = true
+                                if killTime > 0 then
+                                    local joinTime = tonumber(player.join)
+                                    if joinTime and joinTime > killTime then
+                                        include = false
+                                    end
+                                    local leaveTime = tonumber(player.leave)
+                                    if leaveTime and leaveTime > 0 and leaveTime < killTime then
+                                        include = false
+                                    end
+                                end
+                                if include then
+                                    seen[playerNid] = true
+                                    attendees[#attendees + 1] = playerNid
+                                end
                             end
                         end
                     end

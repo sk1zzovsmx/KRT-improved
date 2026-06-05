@@ -131,6 +131,21 @@ do
     local clearSpammer
 
     -- ----- Private helpers ----- --
+    local function getSpammerStore()
+        if type(KRT_Spammer) ~= "table" then
+            KRT_Spammer = {}
+        end
+        return KRT_Spammer
+    end
+
+    local function getSpammerChannels(store)
+        store = store or getSpammerStore()
+        if type(store.Channels) ~= "table" then
+            store.Channels = {}
+        end
+        return store.Channels
+    end
+
     function UI.AcquireRefs(frame)
         local refs = {
             clearBtn = Frames.GetRef(frame, "ClearBtn"),
@@ -256,6 +271,7 @@ do
     local function syncDurationNow()
         local value
         local frame = getFrame()
+        local store = getSpammerStore()
 
         if frame and frame:IsShown() then
             local box = getNamedPart("Duration")
@@ -270,13 +286,13 @@ do
         end
 
         if not value or value == "" then
-            value = (KRT_Spammer and KRT_Spammer.Duration) or DEFAULT_DURATION_STR
+            value = store.Duration or DEFAULT_DURATION_STR
             value = tostring(value)
         end
 
         duration = value
         lastState.duration = value
-        KRT_Spammer.Duration = value
+        store.Duration = value
     end
 
     -- Deterministic: ensure preview/output is computed before Start/Resume
@@ -426,9 +442,10 @@ do
 
         local boxName = box:GetName()
         local target = gsub(boxName, frameName, "")
+        local store = getSpammerStore()
 
         if find(target, "Chat") then
-            KRT_Spammer.Channels = KRT_Spammer.Channels or {}
+            local channels = getSpammerChannels(store)
 
             local channel = gsub(target, "Chat", "")
             local id = tonumber(channel) or select(1, GetChannelName(channel))
@@ -438,20 +455,20 @@ do
             local checked = box:GetChecked()
             checked = (checked == true or checked == 1)
 
-            local existed = tContains(KRT_Spammer.Channels, channel)
+            local existed = tContains(channels, channel)
             if checked and not existed then
-                tinsert(KRT_Spammer.Channels, channel)
+                tinsert(channels, channel)
             elseif not checked and existed then
-                local i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                local i = addon.tIndexOf(channels, channel)
                 while i do
-                    tremove(KRT_Spammer.Channels, i)
-                    i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                    tremove(channels, i)
+                    i = addon.tIndexOf(channels, channel)
                 end
             end
         else
             local value = Strings.TrimText(box:GetText())
             value = (value == "") and nil or value
-            KRT_Spammer[target] = value
+            store[target] = value
             box:ClearFocus()
         end
 
@@ -472,6 +489,7 @@ do
 
     startSpam = function()
         ensureReadyForStart()
+        local store = getSpammerStore()
 
         if not addon.WithinRange(strlen(finalOutput), 4, 255) then
             return
@@ -483,7 +501,7 @@ do
             ChatApi.StartSpamCycle(Chat, {
                 duration = duration,
                 output = finalOutput,
-                channels = KRT_Spammer.Channels,
+                channels = getSpammerChannels(store),
                 resetCountdown = false,
                 resetRun = false,
                 onTick = refreshSpamUi,
@@ -497,7 +515,7 @@ do
             ChatApi.StartSpamCycle(Chat, {
                 duration = duration,
                 output = finalOutput,
-                channels = KRT_Spammer.Channels,
+                channels = getSpammerChannels(store),
                 resetCountdown = true,
                 resetRun = true,
                 onTick = refreshSpamUi,
@@ -547,9 +565,10 @@ do
 
     -- Clear
     clearSpammer = function()
-        for k, _ in pairs(KRT_Spammer) do
+        local store = getSpammerStore()
+        for k, _ in pairs(store) do
             if k ~= "Channels" then
-                KRT_Spammer[k] = nil
+                store[k] = nil
             end
         end
 
@@ -563,7 +582,7 @@ do
         end
 
         local durationBox = getNamedPart("Duration")
-        KRT_Spammer.Duration = DEFAULT_DURATION_STR
+        store.Duration = DEFAULT_DURATION_STR
         duration = DEFAULT_DURATION_STR
 
         if durationBox then
@@ -633,14 +652,14 @@ do
                 return
             end
 
-            box:SetScript("OnEditFocusGained", function()
+            Frames.SetScriptSafely(box, "OnEditFocusGained", function()
                 local runtime = getSpamRuntimeState()
                 if runtime.ticking and not runtime.paused then
                     pauseSpam()
                 end
             end)
 
-            box:SetScript("OnTextChanged", function(_, isUserInput)
+            Frames.SetScriptSafely(box, "OnTextChanged", function(_, isUserInput)
                 if inputsLocked then
                     return
                 end
@@ -650,11 +669,11 @@ do
                 end
             end)
 
-            box:SetScript("OnEnterPressed", function(self)
+            Frames.SetScriptSafely(box, "OnEnterPressed", function(self)
                 self:ClearFocus()
             end)
 
-            box:SetScript("OnEditFocusLost", function(self)
+            Frames.SetScriptSafely(box, "OnEditFocusLost", function(self)
                 saveSpammer(self)
             end)
         end
@@ -822,7 +841,8 @@ do
         end
 
         duration = lastState.duration or DEFAULT_DURATION_STR
-        KRT_Spammer.Duration = duration
+        local store = getSpammerStore()
+        store.Duration = duration
 
         updateControls()
     end
@@ -835,11 +855,12 @@ do
         end
 
         if not loaded then
-            KRT_Spammer.Duration = KRT_Spammer.Duration or DEFAULT_DURATION_STR
+            local store = getSpammerStore()
+            store.Duration = store.Duration or DEFAULT_DURATION_STR
 
             resetAllChannelCheckboxes()
 
-            for k, v in pairs(KRT_Spammer) do
+            for k, v in pairs(store) do
                 if k == "Channels" then
                     for i, c in ipairs(v) do
                         local id = tonumber(c) or select(1, GetChannelName(c))

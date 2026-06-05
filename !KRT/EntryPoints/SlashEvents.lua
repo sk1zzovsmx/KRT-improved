@@ -98,6 +98,7 @@ local slashHandlers = {}
 
 local cmdAchiev, cmdLFM, cmdConfig = { "ach", "achi", "achiev", "achievement" }, { "pug", "lfm", "group", "grouper" }, { "config", "conf", "options", "opt" }
 local cmdWarnings, cmdLogger = { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
+local cmdAttendance = { "attendance", "attendees", "att" }
 local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
 local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve", "sr", "softres" }, { "minimap", "mm" }, { "validate" }
 local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
@@ -129,6 +130,7 @@ local function showHelp()
     printHelp("ach", L.StrCmdAchiev)
     printHelp("warnings", L.StrCmdWarnings)
     printHelp("logger", L.StrCmdLogger)
+    printHelp("attendance", L.StrRaidAttendance)
     printHelp("debug", L.StrCmdDebug)
     printHelp("counter", L.StrCmdCounter)
     printHelp("reserves", L.StrCmdReserves)
@@ -501,13 +503,13 @@ local function handleDebugCommand(rest)
         if arg == "reset" then
             if addon.Timer and addon.Timer.RefreshStats then
                 addon.Timer.RefreshStats()
-                addon:info("Timer stats reset.")
+                addon:info(L.MsgTimerStatsReset)
             end
         else
             if addon.Timer and addon.Timer.ShowStats then
                 addon.Timer.ShowStats(arg)
             else
-                addon:warn("Timer module not available.")
+                addon:warn(L.MsgTimerModuleUnavailable)
             end
         end
         return
@@ -675,7 +677,9 @@ end
 local function handleLoggerCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        Database.RequestControllerMethod("Logger", "Toggle")
+        Database.RequestControllerMethod("Logger", "ToggleLootHistory")
+    elseif sub == "attendance" or sub == "attendees" or sub == "att" then
+        Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")
     elseif sub == "req" then
         callSyncerMethodWithTarget("RequestLoggerReq", arg)
     elseif sub == "push" then
@@ -689,6 +693,10 @@ local function handleLoggerCommand(rest)
         printHelp("push <raidId|raidNid> <player>", L.StrCmdLoggerPush)
         printHelp("sync", L.StrCmdLoggerSync)
     end
+end
+
+local function handleAttendanceCommand()
+    Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")
 end
 
 local function handleLootCommand(rest)
@@ -1044,6 +1052,9 @@ local function handleHelpCommand(rest)
         handlePerfCommand("help")
     elseif topic == "rw" or topic == "warn" or topic == "warning" or topic == "warnings" then
         handleWarningsCommand("help")
+    elseif topic == "attendance" or topic == "attendees" or topic == "att" then
+        addon:info(format(L.StrCmdCommands, "krt attendance"), "KRT")
+        printHelp("toggle", L.StrRaidAttendance)
     elseif topic == "lfm" or topic == "pug" or topic == "group" or topic == "grouper" then
         handleLfmCommand("help")
     elseif topic == "config" or topic == "conf" or topic == "options" or topic == "opt" then
@@ -1114,6 +1125,7 @@ registerAliases(cmdAchiev, handleAchievementCommand)
 registerAliases(cmdConfig, handleConfigCommand)
 registerAliases(cmdWarnings, handleWarningsCommand)
 registerAliases(cmdLogger, handleLoggerCommand)
+registerAliases(cmdAttendance, handleAttendanceCommand)
 registerAliases(cmdLoot, handleLootCommand)
 registerAliases(cmdCounter, handleCounterCommand)
 registerAliases(cmdReserves, handleReservesCommand)

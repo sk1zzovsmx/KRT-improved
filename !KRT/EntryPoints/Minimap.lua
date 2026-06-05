@@ -95,7 +95,7 @@ local function buildMenu()
     end
     return {
         {
-            text = MASTER_LOOTER,
+            text = L.StrLootMaster,
             notCheckable = 1,
             disabled = disableLootActions,
             func = function()
@@ -103,7 +103,7 @@ local function buildMenu()
             end,
         },
         {
-            text = L.StrRaidReserves,
+            text = L.StrLootReserve,
             notCheckable = 1,
             disabled = disableReservesActions,
             func = function()
@@ -123,10 +123,18 @@ local function buildMenu()
             end,
         },
         {
-            text = L.StrLootLogger,
+            text = L.StrLootHistory,
             notCheckable = 1,
             func = function()
-                Database.RequestControllerMethod("Logger", "Toggle")
+                Database.RequestControllerMethod("Logger", "ToggleLootHistory")
+            end,
+        },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        {
+            text = L.StrRaidAttendance,
+            notCheckable = 1,
+            func = function()
+                Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },

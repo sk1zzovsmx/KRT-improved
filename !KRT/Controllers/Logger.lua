@@ -79,6 +79,9 @@ local loggerPanelNames = {
     "KRTLoggerBossAttendees",
     "KRTLoggerRaidAttendees",
     "KRTLoggerLoot",
+    "KRTRaidAttendanceRaids",
+    "KRTRaidAttendanceRaidAttendees",
+    "KRTRaidAttendanceBosses",
 }
 
 local loggerHeaderSuffixes = {
@@ -1421,7 +1424,7 @@ do
         if not UI.Loaded then
             return
         end
-        Frames.SetFrameTitle(UI.FrameName, L.StrLootLogger)
+        Frames.SetFrameTitle(UI.FrameName, L.StrLootHistory)
     end
 
     local function refreshLoggerFrame()
@@ -1443,18 +1446,16 @@ do
                 refs.historyTabBtn:SetID(1)
             end
             refs.historyTabBtn:SetText(L.StrLootTab)
-            Frames.SetScriptSafely(refs.historyTabBtn, "OnClick", function()
-                setActiveLoggerTab("loot")
-            end)
+            Frames.SetScriptSafely(refs.historyTabBtn, "OnClick", nil)
+            UIPrimitives.ShowHide(refs.historyTabBtn, false)
         end
         if refs.attendanceTabBtn then
             if refs.attendanceTabBtn.SetID then
                 refs.attendanceTabBtn:SetID(2)
             end
             refs.attendanceTabBtn:SetText(L.StrAttendanceTab)
-            Frames.SetScriptSafely(refs.attendanceTabBtn, "OnClick", function()
-                setActiveLoggerTab("attendance")
-            end)
+            Frames.SetScriptSafely(refs.attendanceTabBtn, "OnClick", nil)
+            UIPrimitives.ShowHide(refs.attendanceTabBtn, false)
         end
         if PanelTemplates_SetNumTabs then
             PanelTemplates_SetNumTabs(frame, 2)
@@ -1492,6 +1493,14 @@ do
             refreshLoggerFrame()
         end,
     })
+
+    local baseToggleLoggerFrame = module.Toggle
+    module._toggleLootHistoryView = function()
+        module.activeTab = "loot"
+        if baseToggleLoggerFrame then
+            return baseToggleLoggerFrame(module)
+        end
+    end
 
     -- Selectors
     selectRaid = function(btn, button, opts)
@@ -1727,7 +1736,7 @@ do
                 local button = _G[frameName .. entry.suffix]
                 if button then
                     button:SetText(entry.label)
-                    button:SetScript("OnClick", function(btn)
+                    Frames.SetScriptSafely(button, "OnClick", function(btn)
                         local parent = btn and btn.GetParent and btn:GetParent() or nil
                         applySelectedLootRollType(parent and parent.lootNid, rollType)
                         StaticPopup_Hide(ROLLTYPE_POPUP_KEY)
@@ -2330,11 +2339,16 @@ do
         if raidIdType ~= "number" and raidIdType ~= "string" then
             return
         end
-        if not isLoggerViewingCurrentRaid() then
-            return
+        local loggerOpen = isLoggerViewingCurrentRaid()
+        local attendanceViewOpen = module._isRaidAttendanceViewingCurrentRaid
+        local attendanceRefresh = module._requestAttendanceBoundListsRefresh
+        local attendanceOpen = attendanceViewOpen and attendanceViewOpen()
+        if loggerOpen then
+            requestRosterBoundListsRefresh()
         end
-
-        requestRosterBoundListsRefresh()
+        if attendanceOpen and attendanceRefresh then
+            attendanceRefresh()
+        end
     end)
 end
 
@@ -3288,6 +3302,542 @@ do
     end)
 end
 
+-- Dedicated Raid Attendance frame.
+local function initializeRaidAttendanceFrame()
+    local ATTENDANCE_FRAME_NAME = "KRTRaidAttendance"
+    local ATTENDANCE_RAIDS_FRAME = "KRTRaidAttendanceRaids"
+    local ATTENDANCE_PLAYERS_FRAME = "KRTRaidAttendanceRaidAttendees"
+    local ATTENDANCE_BOSSES_FRAME = "KRTRaidAttendanceBosses"
+
+    local getAttendanceFrame = Frames.MakeFrameGetter(ATTENDANCE_FRAME_NAME)
+    local Store = module.Store
+    local View = module.View
+    local Actions = module.Actions
+    local attendanceUi = module._attendanceUi or {
+        Loaded = false,
+        Bound = false,
+        FrameName = nil,
+    }
+    module._attendanceUi = attendanceUi
+
+    module.attendanceSelectedRaid = module.attendanceSelectedRaid or nil
+    module.attendanceSelectedPlayer = module.attendanceSelectedPlayer or nil
+    module.attendanceSelectedBoss = module.attendanceSelectedBoss or nil
+
+    local attendanceRaidsController
+    local attendancePlayersController
+    local attendanceBossesController
+    local updateRaidAttendanceFromRoster
+    local deleteSelectedRaidAttendancePlayer
+
+    local function getAttendanceRaid()
+        local raidId = module.attendanceSelectedRaid
+        if not raidId then
+            return nil
+        end
+        return Store:GetRaid(raidId), raidId
+    end
+
+    local function markAttendanceListsDirty()
+        if attendanceRaidsController then
+            attendanceRaidsController:Dirty()
+        end
+        if attendancePlayersController then
+            attendancePlayersController:Dirty()
+        end
+        if attendanceBossesController then
+            attendanceBossesController:Dirty()
+        end
+    end
+
+    local function touchAttendanceSelectionLists()
+        if attendanceRaidsController then
+            attendanceRaidsController:Touch()
+        end
+        if attendancePlayersController then
+            attendancePlayersController:Touch()
+        end
+        if attendanceBossesController then
+            attendanceBossesController:Dirty()
+        end
+    end
+
+    local function setAttendanceSelectedRaid(raidId)
+        module.attendanceSelectedRaid = raidId and (tonumber(raidId) or raidId) or nil
+        module.attendanceSelectedPlayer = nil
+        touchAttendanceSelectionLists()
+    end
+
+    local function selectAttendanceRaid(btn, button)
+        if button and button ~= "LeftButton" then
+            return
+        end
+        local raidNid = btn and btn.GetID and btn:GetID()
+        local raidId = raidNid and Database.GetRaidIdByNid(raidNid) or nil
+        setAttendanceSelectedRaid(raidId)
+    end
+
+    local function selectAttendancePlayer(btn, button)
+        if button and button ~= "LeftButton" then
+            return
+        end
+        local playerNid = btn and btn.GetID and btn:GetID()
+        module.attendanceSelectedPlayer = playerNid and (tonumber(playerNid) or playerNid) or nil
+        if attendancePlayersController then
+            attendancePlayersController:Touch()
+        end
+        if attendanceBossesController then
+            attendanceBossesController:Dirty()
+        end
+    end
+
+    local function setAttendancePanelVisible(frame, visible)
+        if frame then
+            UIPrimitives.ShowHide(frame, visible)
+        end
+    end
+
+    local function placeAttendancePanel(frame, point, relativeTo, relativePoint, x, y, width, height)
+        if not frame then
+            return
+        end
+        if frame.ClearAllPoints then
+            frame:ClearAllPoints()
+        end
+        if frame.SetPoint then
+            frame:SetPoint(point, relativeTo, relativePoint, x, y)
+        end
+        if frame.SetSize then
+            frame:SetSize(width, height)
+        elseif frame.SetWidth and frame.SetHeight then
+            frame:SetWidth(width)
+            frame:SetHeight(height)
+        end
+    end
+
+    local function refreshRaidAttendanceLayout()
+        local refs = attendanceUi.refs or {}
+        local history = refs.history
+        setAttendancePanelVisible(refs.raids, true)
+        setAttendancePanelVisible(refs.raidAttendees, true)
+        setAttendancePanelVisible(refs.bosses, true)
+
+        placeAttendancePanel(refs.raids, "TOPLEFT", history, "TOPLEFT", 0, 0, 335, 430)
+        placeAttendancePanel(refs.raidAttendees, "TOPLEFT", refs.raids, "TOPRIGHT", 7, 0, 265, 430)
+        placeAttendancePanel(refs.bosses, "TOPLEFT", refs.raidAttendees, "TOPRIGHT", 7, 0, 335, 430)
+
+        applyRaidListColumnWidths(ATTENDANCE_RAIDS_FRAME)
+        applyAttendanceListColumnWidths(ATTENDANCE_PLAYERS_FRAME)
+        applyBossListColumnWidths(ATTENDANCE_BOSSES_FRAME)
+    end
+
+    module._isRaidAttendanceViewingCurrentRaid = function()
+        local frame = getAttendanceFrame()
+        if not (frame and frame.IsShown and frame:IsShown()) then
+            return false
+        end
+        local currentRaid = Database.GetCurrentRaid()
+        if not (currentRaid and module.attendanceSelectedRaid) then
+            return false
+        end
+        return tonumber(module.attendanceSelectedRaid) == tonumber(currentRaid)
+    end
+
+    module._requestAttendanceBoundListsRefresh = function()
+        if module._attendanceUiHandle then
+            module:CancelTimer(module._attendanceUiHandle)
+            module._attendanceUiHandle = nil
+        end
+        module._attendanceUiHandle = module:ScheduleTimer(function()
+            module._attendanceUiHandle = nil
+            if not module._isRaidAttendanceViewingCurrentRaid() then
+                return
+            end
+            markAttendanceListsDirty()
+        end, 0.25)
+    end
+
+    attendanceRaidsController = makeLoggerList(
+        {
+            keyName = "RaidAttendanceRaidsList",
+            poolTag = "logger-attendance-raids",
+            _rowParts = { "ID", "Date", "Zone", "Size" },
+
+            localize = function(n)
+                setPanelTitle(n, L.StrRaidsList)
+                _G[n .. "HeaderNum"]:SetText(L.StrNumber)
+                _G[n .. "HeaderDate"]:SetText(L.StrDate)
+                _G[n .. "HeaderZone"]:SetText(L.StrZone)
+                _G[n .. "HeaderSize"]:SetText(L.StrSize)
+                UIPrimitives.ShowHide(_G[n .. "CurrentBtn"], false)
+                UIPrimitives.ShowHide(_G[n .. "DeleteBtn"], false)
+                applyRaidListColumnWidths(n)
+                bindRaidSortHeaders(n, module.AttendanceRaids)
+            end,
+
+            getData = function(out)
+                fillRaidListData(out, "Logger.Attendance.Raids.GetData")
+            end,
+
+            rowName = function(n, _, i)
+                return n .. "RaidBtn" .. i
+            end,
+            rowTmpl = "KRTLoggerRaidButton",
+
+            drawRow = ListController.CreateRowDrawer(function(row, it)
+                if not row._krtAttendanceBound then
+                    Frames.SetScriptSafely(row, "OnClick", function(self, button)
+                        selectAttendanceRaid(self, button)
+                    end)
+                    row._krtAttendanceBound = true
+                end
+                local ui = row._p
+                applyRaidRowColumnWidths(ui, ATTENDANCE_RAIDS_FRAME)
+                ui.ID:SetText(it.seq or it.id)
+                ui.Date:SetText(it.dateFmt)
+                ui.Zone:SetText(it.zone)
+                ui.Size:SetText(it.sizeLabel or it.size)
+            end),
+
+            postUpdate = function(n)
+                applyRaidListColumnWidths(n)
+                local count = 0
+                if attendanceRaidsController and attendanceRaidsController.data then
+                    count = #attendanceRaidsController.data
+                end
+                setPanelTitle(n, getCountTitle(L.StrRaidsList, count))
+                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
+            end,
+
+            sorters = {
+                id = function(a, b, asc)
+                    return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
+                end,
+                date = function(a, b, asc)
+                    return CompareNumbers(a.date, b.date, asc, 0)
+                end,
+                zone = function(a, b, asc)
+                    return compareStrings(a.zone, b.zone, asc)
+                end,
+                size = function(a, b, asc)
+                    return CompareNumbers(a.size, b.size, asc, 0)
+                end,
+            },
+        },
+        "attendanceSelectedRaid",
+        nil,
+        {
+            transform = function(id)
+                return Database.GetRaidNidById(id)
+            end,
+            debugTag = "RaidAttendanceSelectRaid",
+        }
+    )
+
+    module.AttendanceRaids = module.AttendanceRaids or {}
+    ListController.BindListController(module.AttendanceRaids, attendanceRaidsController)
+
+    attendancePlayersController = makeLoggerList({
+        keyName = "RaidAttendancePlayersList",
+        poolTag = "logger-attendance-players",
+        _rowParts = { "Name", "Join", "Leave" },
+
+        localize = function(n)
+            setPanelTitle(n, L.StrRaidAttendees)
+            _G[n .. "HeaderName"]:SetText(L.StrName)
+            _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
+            _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
+            applyAttendanceListColumnWidths(n)
+            if _G[n .. "AddBtn"] then
+                _G[n .. "AddBtn"]:SetText(L.BtnUpdate)
+                Frames.SetScriptSafely(_G[n .. "AddBtn"], "OnClick", function()
+                    updateRaidAttendanceFromRoster()
+                end)
+            end
+            if _G[n .. "DeleteBtn"] then
+                _G[n .. "DeleteBtn"]:SetText(L.BtnDelete)
+                Frames.SetScriptSafely(_G[n .. "DeleteBtn"], "OnClick", function()
+                    deleteSelectedRaidAttendancePlayer()
+                end)
+            end
+
+            local frame = _G[n]
+            if frame and not frame._krtAttendanceBound then
+                Frames.SetScriptSafely(_G[n .. "HeaderName"], "OnClick", function()
+                    attendancePlayersController:Sort("name")
+                end)
+                Frames.SetScriptSafely(_G[n .. "HeaderJoin"], "OnClick", function()
+                    attendancePlayersController:Sort("join")
+                end)
+                Frames.SetScriptSafely(_G[n .. "HeaderLeave"], "OnClick", function()
+                    attendancePlayersController:Sort("leave")
+                end)
+                frame._krtAttendanceBound = true
+            end
+        end,
+
+        getData = function(out)
+            local raid = getAttendanceRaid()
+            if not raid then
+                return
+            end
+            View:FillRaidAttendeesList(out, raid)
+        end,
+
+        rowName = function(n, _, i)
+            return n .. "PlayerBtn" .. i
+        end,
+        rowTmpl = "KRTLoggerRaidAttendeeButton",
+
+        drawRow = ListController.CreateRowDrawer(function(row, it)
+            if not row._krtAttendanceBound then
+                Frames.SetScriptSafely(row, "OnClick", function(self, button)
+                    selectAttendancePlayer(self, button)
+                end)
+                row._krtAttendanceBound = true
+            end
+            local ui = row._p
+            applyAttendanceRowColumnWidths(ui, ATTENDANCE_PLAYERS_FRAME)
+            ui.Name:SetText(it.name)
+            local r, g, b = Colors.GetClassColor(it.class)
+            ui.Name:SetVertexColor(r, g, b)
+            ui.Join:SetText(it.joinFmt)
+            ui.Leave:SetText(it.leaveFmt)
+        end),
+
+        postUpdate = function(n)
+            applyAttendanceListColumnWidths(n)
+            local count = 0
+            if attendancePlayersController and attendancePlayersController.data then
+                count = #attendancePlayersController.data
+            end
+            local title = getCountContextTitle(L.StrRaidAttendees, count, getRaidContextLabel(module.attendanceSelectedRaid), nil)
+            setPanelTitle(n, title)
+            setFrameHint(n, "EmptyState", getRaidAttendeesEmptyStateText(count, module.attendanceSelectedRaid))
+
+            local addBtn = _G[n .. "AddBtn"]
+            if addBtn then
+                local currentRaid = Database.GetCurrentRaid()
+                local canUpdate = addon.IsInRaid() and currentRaid and module.attendanceSelectedRaid and (tonumber(currentRaid) == tonumber(module.attendanceSelectedRaid))
+                UIPrimitives.EnableDisable(addBtn, canUpdate)
+            end
+            local deleteBtn = _G[n .. "DeleteBtn"]
+            if deleteBtn then
+                UIPrimitives.EnableDisable(deleteBtn, module.attendanceSelectedPlayer ~= nil)
+            end
+        end,
+
+        sorters = {
+            name = function(a, b, asc)
+                return compareStrings(a.name, b.name, asc)
+            end,
+            join = function(a, b, asc)
+                return CompareNumbers(a.join, b.join, asc, 0)
+            end,
+            leave = function(a, b, asc)
+                local missing = asc and math.huge or -math.huge
+                return CompareNumbers(a.leave, b.leave, asc, missing)
+            end,
+        },
+    }, "attendanceSelectedPlayer", nil, { debugTag = "RaidAttendanceSelectPlayer" })
+
+    module.AttendancePlayers = module.AttendancePlayers or {}
+    ListController.BindListController(module.AttendancePlayers, attendancePlayersController)
+
+    attendanceBossesController = makeLoggerList({
+        keyName = "RaidAttendanceBossParticipationList",
+        poolTag = "logger-attendance-bosses",
+        _rowParts = { "ID", "Name", "Time", "Mode" },
+
+        localize = function(n)
+            setPanelTitle(n, L.StrBossParticipation)
+            _G[n .. "HeaderNum"]:SetText(L.StrNumber)
+            _G[n .. "HeaderName"]:SetText(L.StrName)
+            _G[n .. "HeaderTime"]:SetText(L.StrTime)
+            _G[n .. "HeaderMode"]:SetText(L.StrMode)
+            applyBossListColumnWidths(n)
+            UIPrimitives.ShowHide(_G[n .. "AddBtn"], false)
+            UIPrimitives.ShowHide(_G[n .. "EditBtn"], false)
+            UIPrimitives.ShowHide(_G[n .. "DeleteBtn"], false)
+
+            local frame = _G[n]
+            if frame and not frame._krtAttendanceBound then
+                Frames.SetScriptSafely(_G[n .. "HeaderNum"], "OnClick", function()
+                    attendanceBossesController:Sort("id")
+                end)
+                Frames.SetScriptSafely(_G[n .. "HeaderName"], "OnClick", function()
+                    attendanceBossesController:Sort("name")
+                end)
+                Frames.SetScriptSafely(_G[n .. "HeaderTime"], "OnClick", function()
+                    attendanceBossesController:Sort("time")
+                end)
+                Frames.SetScriptSafely(_G[n .. "HeaderMode"], "OnClick", function()
+                    attendanceBossesController:Sort("mode")
+                end)
+                frame._krtAttendanceBound = true
+            end
+        end,
+
+        getData = function(out)
+            local raid = getAttendanceRaid()
+            if not raid then
+                return
+            end
+            View:GetPlayerBossParticipationList(out, raid, module.attendanceSelectedPlayer)
+        end,
+
+        rowName = function(n, _, i)
+            return n .. "BossBtn" .. i
+        end,
+        rowTmpl = "KRTLoggerBossButton",
+
+        drawRow = ListController.CreateRowDrawer(function(row, it)
+            local ui = row._p
+            applyBossRowColumnWidths(ui, ATTENDANCE_BOSSES_FRAME)
+            ui.ID:SetText(it.seq)
+            ui.Name:SetText(it.name)
+            ui.Time:SetText(it.timeFmt)
+            ui.Mode:SetText(it.mode)
+        end),
+
+        postUpdate = function(n)
+            applyBossListColumnWidths(n)
+            local count = 0
+            if attendanceBossesController and attendanceBossesController.data then
+                count = #attendanceBossesController.data
+            end
+            local playerLabel = getPlayerContextLabel(module.attendanceSelectedRaid, module.attendanceSelectedPlayer)
+            setPanelTitle(n, getCountContextTitle(L.StrBossParticipation, count, playerLabel, nil))
+            if not module.attendanceSelectedRaid then
+                setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectRaid)
+            elseif not module.attendanceSelectedPlayer then
+                setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectPlayer)
+            else
+                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyBossParticipation or "")
+            end
+        end,
+
+        sorters = {
+            id = function(a, b, asc)
+                return CompareNumbers(a.seq, b.seq, asc, 0)
+            end,
+            name = function(a, b, asc)
+                return compareStrings(a.name, b.name, asc)
+            end,
+            time = function(a, b, asc)
+                return CompareNumbers(a.time, b.time, asc, 0)
+            end,
+            mode = function(a, b, asc)
+                return compareStrings(a.mode, b.mode, asc)
+            end,
+        },
+    }, "attendanceSelectedBoss", nil, { debugTag = "RaidAttendanceBossParticipation" })
+
+    module.AttendanceBosses = module.AttendanceBosses or {}
+    ListController.BindListController(module.AttendanceBosses, attendanceBossesController)
+
+    updateRaidAttendanceFromRoster = function()
+        local selectedRaid = tonumber(module.attendanceSelectedRaid)
+        if not selectedRaid then
+            return
+        end
+        if not addon.IsInRaid() then
+            addon:warn(Diag.W.ErrLoggerUpdateRosterNotInRaid)
+            return
+        end
+        if not (Database.GetCurrentRaid() and tonumber(Database.GetCurrentRaid()) == selectedRaid) then
+            addon:warn(Diag.W.ErrLoggerUpdateRosterNotCurrent)
+            return
+        end
+
+        Services.Raid:UpdateRaidRoster()
+        module.attendanceSelectedPlayer = nil
+        markAttendanceListsDirty()
+    end
+
+    deleteSelectedRaidAttendancePlayer = function()
+        local selectedRaid = module.attendanceSelectedRaid
+        local playerNid = module.attendanceSelectedPlayer
+        if not (selectedRaid and playerNid) then
+            return
+        end
+
+        local removed = Actions:DeleteRaidAttendeeMany(selectedRaid, { playerNid })
+        if removed and removed > 0 then
+            module.attendanceSelectedPlayer = nil
+            markAttendanceListsDirty()
+        end
+    end
+
+    local function bindRaidAttendanceFrame()
+        if attendanceUi.Bound then
+            return getAttendanceFrame()
+        end
+
+        local frame = getAttendanceFrame()
+        if not frame then
+            return nil
+        end
+
+        attendanceUi.FrameName = Frames.BindModuleFrame(nil, frame, {
+            enableDrag = true,
+            hookOnShow = function()
+                if not module.attendanceSelectedRaid then
+                    module.attendanceSelectedRaid = Database.GetCurrentRaid()
+                end
+                refreshRaidAttendanceLayout()
+                markAttendanceListsDirty()
+            end,
+            hookOnHide = function()
+                module.attendanceSelectedRaid = Database.GetCurrentRaid()
+                module.attendanceSelectedPlayer = nil
+            end,
+        }) or ATTENDANCE_FRAME_NAME
+        attendanceUi.Loaded = true
+        Frames.SetFrameTitle(frame, L.StrRaidAttendance)
+
+        attendanceUi.refs = {
+            history = Frames.GetRef(frame, "History"),
+            raids = Frames.GetRef(frame, ATTENDANCE_RAIDS_FRAME),
+            raidAttendees = Frames.GetRef(frame, ATTENDANCE_PLAYERS_FRAME),
+            bosses = Frames.GetRef(frame, ATTENDANCE_BOSSES_FRAME),
+        }
+
+        attendanceRaidsController:OnLoad(attendanceUi.refs.raids)
+        attendancePlayersController:OnLoad(attendanceUi.refs.raidAttendees)
+        attendanceBossesController:OnLoad(attendanceUi.refs.bosses)
+
+        applyLoggerSkin()
+        refreshRaidAttendanceLayout()
+        attendanceUi.Bound = true
+        return frame
+    end
+
+    module._toggleRaidAttendanceView = function()
+        local frame = bindRaidAttendanceFrame()
+        if not frame then
+            return
+        end
+        if frame:IsShown() then
+            frame:Hide()
+            return
+        end
+        frame:Show()
+    end
+
+    Bus.RegisterCallback(InternalEvents.RaidCreate, function(_, raidId)
+        local frame = getAttendanceFrame()
+        if not (frame and frame.IsShown and frame:IsShown()) then
+            return
+        end
+        module.attendanceSelectedRaid = tonumber(raidId) or raidId
+        module.attendanceSelectedPlayer = nil
+        markAttendanceListsDirty()
+    end)
+end
+
+initializeRaidAttendanceFrame()
+
 local function ensurePopupRefs(box)
     if not box then
         return nil
@@ -3427,7 +3977,7 @@ do
     local raidData, bossData, tempDate = {}, {}, {}
     local editBossNid
 
-    -- Campi uniformi:
+    -- Uniform fields:
     --   bossData.time : timestamp
     --   bossData.mode : "h" | "n"
     fillBossBox = function()
@@ -3581,6 +4131,20 @@ do
         end
     end
 end
+
+module.ToggleLootHistory = function()
+    if module._toggleLootHistoryView then
+        return module._toggleLootHistoryView()
+    end
+end
+
+module.ToggleRaidAttendance = function()
+    if module._toggleRaidAttendanceView then
+        return module._toggleRaidAttendanceView()
+    end
+end
+
+module.Toggle = module.ToggleLootHistory
 
 local registry = addon.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then

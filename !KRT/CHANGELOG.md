@@ -8,6 +8,11 @@ Release-Version: 0.7.1-beta.3
 
 ### Fixes
 
+- **Logger attendance boss participation** - Stopped loot-source attribution
+  records such as `Shared: ...` from seeding or displaying boss attendance,
+  so Attendance shows player participation only for actual boss fights.
+- **Clear button localization** - Added the missing shared Clear button label
+  so Loot Master, Loot History, and Spammer controls no longer display `BtnClear`.
 - **MS Changes removal** - Removed the retired MS Changes window, minimap
   menu entry, slash commands, localization strings, controller, XML layout,
   and public Raid change-management APIs. Legacy `raid.changes` data remains
@@ -34,12 +39,22 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **LootFrame SoftRes hints** - Reserved loot items in the Blizzard loot
+  window now show a colored reserve border and append a `Reserved by` section
+  to the item tooltip with the reserving player names.
+- **Logger views** - Split the old combined logger minimap entry into
+  dedicated Loot History and Raid Attendance windows, so attendance can be
+  opened as its own frame instead of as a tab inside loot history.
+- **Loot Reserve empty import** - The Loot Reserve window now keeps its
+  left action button visible when the reserve list is empty and switches it
+  from Clear Loot Reserve to Import, matching the Loot Master shortcut.
 - **Minimap raid menu** - Reordered the minimap menu into grouped raid
-  workflow sections and added direct access to Raid Reserves.
+  workflow sections for Loot Master, Loot Reserve, Loot Counter, Loot History,
+  Raid Attendance, Raid Warning, LFM Spam, and Clear Raid Icons.
 - **Loot workflow hardening** - Loot ingestion now uses focused internal
   workflow, receipt, record, and reconciliation helpers so parsed loot events,
   canonical record creation, and passive/trade duplicate handling are easier
-  to audit without changing Master Looter award policy.
+  to audit without changing Loot Master award policy.
 - **SoftRes imports** - Reserve import now accepts encoded SoftRes JSON
   exports in addition to the existing CSV flow, preserving the same Multi
   and Plus aggregation rules after parsing.

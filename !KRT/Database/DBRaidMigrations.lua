@@ -9,6 +9,8 @@ local feature = addon.Database.GetFeatureShared()
 local Database = feature.Database
 local Strings = feature.Strings
 
+local strsub = string.sub
+
 -- Current-schema raid persistence helpers.
 do
     addon.DB.RaidMigrations = addon.DB.RaidMigrations or {}
@@ -70,6 +72,28 @@ do
             return nil
         end
         return num
+    end
+
+    local function isBossFightRecord(boss)
+        if type(boss) ~= "table" then
+            return false
+        end
+
+        local sourceKind = boss.sourceKind
+        if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
+            return false
+        end
+
+        if boss.source == "LootSources" then
+            return false
+        end
+
+        local name = boss.name or boss.boss
+        if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
+            return false
+        end
+
+        return true
     end
 
     local function compactChangesMap(changes)
@@ -236,13 +260,15 @@ do
 
                 local attendees = {}
                 local seen = {}
-                local rawPlayers = boss.players
-                if type(rawPlayers) == "table" then
-                    for j = 1, #rawPlayers do
-                        local playerNid = tonumber(rawPlayers[j])
-                        if playerNid and playerNid > 0 and not seen[playerNid] then
-                            seen[playerNid] = true
-                            attendees[#attendees + 1] = playerNid
+                if isBossFightRecord(boss) then
+                    local rawPlayers = boss.players
+                    if type(rawPlayers) == "table" then
+                        for j = 1, #rawPlayers do
+                            local playerNid = tonumber(rawPlayers[j])
+                            if playerNid and playerNid > 0 and not seen[playerNid] then
+                                seen[playerNid] = true
+                                attendees[#attendees + 1] = playerNid
+                            end
                         end
                     end
                 end

@@ -31,8 +31,6 @@ local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local InternalEvents = Events.Internal
 
-local _G = _G
-
 local rollTypes = feature.rollTypes
 local RAID_TARGET_MARKERS = feature.RAID_TARGET_MARKERS
 local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
@@ -122,6 +120,14 @@ do
         lootWhispers = false,
         ignoreStacks = false,
     })
+
+    local function getOption(namespace, key)
+        local cfg = Options and Options.Get and Options.Get(namespace)
+        if cfg and cfg.Get then
+            return cfg:Get(key)
+        end
+        return nil
+    end
 
     -- ----- Internal state ----- --
     local getFrame = makeModuleFrameGetter(module, "KRTMaster")
@@ -464,11 +470,11 @@ do
             end
         end
 
-        itemBtn:SetScript("OnClick", function()
+        Frames.SetScriptSafely(itemBtn, "OnClick", function()
             tryAcceptFromCursor()
         end)
 
-        itemBtn:SetScript("OnReceiveDrag", function()
+        Frames.SetScriptSafely(itemBtn, "OnReceiveDrag", function()
             tryAcceptFromCursor()
         end)
     end
@@ -943,7 +949,7 @@ do
 
     local function drawRollRow(row, data)
         if not row.krtHasOnClick then
-            row:SetScript("OnClick", function(self)
+            Frames.SetScriptSafely(row, "OnClick", function(self)
                 if selectRollWinnerRow(self.playerName) then
                     module:RequestRefresh()
                 end
@@ -1082,7 +1088,285 @@ do
         return tostring(suggestion.action or "") .. "|" .. tostring(suggestion.reason or "") .. "|" .. tostring(suggestion.targetKey or "")
     end
 
+    Private.BuildLootReserveUiState = function(itemLink)
+        local state = {
+            itemId = nil,
+            hasReserves = false,
+            playerLines = {},
+        }
+        local itemId = Item.GetItemIdFromLink(itemLink)
+        if not itemId then
+            return state
+        end
+
+        state.itemId = itemId
+
+        local reserves = Services.Reserves
+        if not reserves then
+            return state
+        end
+
+        if reserves.GetPlayersForItem then
+            local playerLines = reserves:GetPlayersForItem(itemId, true, true, true, false)
+            if type(playerLines) == "table" and #playerLines > 0 then
+                state.hasReserves = true
+                state.playerLines = playerLines
+                return state
+            end
+        end
+
+        if reserves.HasItemReserves and reserves:HasItemReserves(itemId) then
+            state.hasReserves = true
+        end
+
+        return state
+    end
+
+    Private.EnsureLootReserveBorder = function(frame)
+        if not frame then
+            return nil
+        end
+        if frame._krtLootReserveBorder ~= nil then
+            return frame._krtLootReserveBorder
+        end
+        if not frame.CreateTexture then
+            return nil
+        end
+
+        local border = frame:CreateTexture(nil, "OVERLAY")
+        border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        if border.SetBlendMode then
+            border:SetBlendMode("ADD")
+        end
+        if border.SetVertexColor then
+            border:SetVertexColor(1, 0.35, 0.85, 1)
+        end
+        if border.SetWidth then
+            border:SetWidth(42)
+        end
+        if border.SetHeight then
+            border:SetHeight(42)
+        end
+        border:Hide()
+        frame._krtLootReserveBorder = border
+        return border
+    end
+
+    Private.SetLootReserveBorder = function(frame, icon, shown)
+        if not frame then
+            return
+        end
+
+        frame._krtLootReserveMarked = shown == true
+        local border = Private.EnsureLootReserveBorder(frame)
+        if not border then
+            return
+        end
+
+        if border.ClearAllPoints then
+            border:ClearAllPoints()
+        end
+        if icon then
+            border:SetPoint("CENTER", icon, "CENTER", 0, 0)
+        else
+            border:SetPoint("CENTER", frame, "CENTER", 0, 0)
+        end
+
+        if shown then
+            border:Show()
+        else
+            border:Hide()
+        end
+    end
+
+    Private.ShowLootItemTooltip = function(frame)
+        if not (frame and frame._krtLootItemLink) then
+            return
+        end
+        if getOption("UI", "showTooltips") ~= true then
+            return
+        end
+
+        local playerLines = frame._krtLootReservePlayerLines
+        if type(playerLines) ~= "table" or #playerLines <= 0 then
+            return
+        end
+
+        local anchor = frame._krtLootTooltipAnchor or "ANCHOR_CURSOR"
+        GameTooltip:SetOwner(frame, anchor)
+        GameTooltip:SetHyperlink(frame._krtLootItemLink)
+
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L.StrLootReservedBy, 0.82, 0.58, 1, true)
+        for i = 1, #playerLines do
+            GameTooltip:AddLine(playerLines[i], 1, 1, 1, true)
+        end
+
+        GameTooltip:Show()
+    end
+
+    Private.BindLootItemTooltip = function(frame, itemLink, reserveState, anchor)
+        if not frame then
+            return
+        end
+
+        frame._krtLootItemLink = itemLink
+        frame._krtLootReservePlayerLines = reserveState and reserveState.playerLines or nil
+        frame._krtLootTooltipAnchor = anchor or "ANCHOR_CURSOR"
+
+        if itemLink and getOption("UI", "showTooltips") then
+            Frames.SetScriptSafely(frame, "OnEnter", Private.ShowLootItemTooltip)
+            Frames.SetScriptSafely(frame, "OnLeave", Frames.HideTooltip)
+        else
+            Frames.SetScriptSafely(frame, "OnEnter", nil)
+            Frames.SetScriptSafely(frame, "OnLeave", nil)
+        end
+    end
+
+    Private.ApplyLootReserveUi = function(frame, itemLink, icon, anchor)
+        local reserveState = Private.BuildLootReserveUiState(itemLink)
+        Private.SetLootReserveBorder(frame, icon, reserveState.hasReserves)
+        Private.BindLootItemTooltip(frame, itemLink, reserveState, anchor)
+        return reserveState
+    end
+
+    Private.GetLootFrameButton = function(index)
+        local button = _G["LootButton" .. tostring(index)]
+        if button then
+            return button
+        end
+        local lootFrame = _G.LootFrame
+        if lootFrame and type(lootFrame.buttons) == "table" then
+            return lootFrame.buttons[index]
+        end
+        return nil
+    end
+
+    Private.GetLootFrameButtonSlot = function(button, fallbackSlot)
+        local slot = tonumber(button and button.slot)
+        if slot and slot > 0 then
+            return slot
+        end
+        if button and button.GetID then
+            slot = tonumber(button:GetID())
+            if slot and slot > 0 then
+                return slot
+            end
+        end
+        return fallbackSlot
+    end
+
+    Private.GetLootFrameButtonIcon = function(button, index)
+        if not button then
+            return nil
+        end
+
+        local buttonName = button.GetName and button:GetName() or nil
+        if buttonName then
+            local icon = _G[buttonName .. "IconTexture"] or _G[buttonName .. "Icon"]
+            if icon then
+                return icon
+            end
+        end
+
+        local fallbackName = "LootButton" .. tostring(index)
+        return _G[fallbackName .. "IconTexture"] or _G[fallbackName .. "Icon"] or button.IconTexture or button.iconTexture or button.Icon or button.icon
+    end
+
+    Private.GetLootFrameButtonCount = function(activeCount)
+        local buttonCount = tonumber(_G.LOOTFRAME_NUMBUTTONS) or 0
+        if activeCount and activeCount > buttonCount then
+            buttonCount = activeCount
+        end
+        if buttonCount > 0 then
+            return buttonCount
+        end
+
+        buttonCount = 0
+        for i = 1, 32 do
+            if Private.GetLootFrameButton(i) then
+                buttonCount = i
+            elseif buttonCount > 0 then
+                return buttonCount
+            end
+        end
+        return buttonCount
+    end
+
+    Private.BindLootFrameButtonTooltip = function(button, itemLink, reserveState, anchor)
+        if not button then
+            return
+        end
+
+        button._krtLootItemLink = itemLink
+        button._krtLootReservePlayerLines = reserveState and reserveState.playerLines or nil
+        button._krtLootTooltipAnchor = anchor or "ANCHOR_RIGHT"
+
+        if button.HookScript then
+            if not button._krtLootReserveTooltipHooked then
+                button:HookScript("OnEnter", Private.ShowLootItemTooltip)
+                if Frames.HideTooltip then
+                    button:HookScript("OnLeave", Frames.HideTooltip)
+                end
+                button._krtLootReserveTooltipHooked = true
+            end
+        else
+            Private.BindLootItemTooltip(button, itemLink, reserveState, anchor)
+        end
+    end
+
+    Private.ApplyLootFrameReserveHints = function()
+        if not _G.LootFrame then
+            return
+        end
+
+        local activeCount = 0
+        if type(GetNumLootItems) == "function" then
+            activeCount = tonumber(GetNumLootItems()) or 0
+        end
+
+        local buttonCount = Private.GetLootFrameButtonCount(activeCount)
+        for i = 1, buttonCount do
+            local button = Private.GetLootFrameButton(i)
+            if button then
+                local slot = Private.GetLootFrameButtonSlot(button, i)
+                local itemLink = nil
+                if type(GetLootSlotLink) == "function" and slot and slot <= activeCount then
+                    itemLink = GetLootSlotLink(slot)
+                end
+
+                local reserveState = Private.BuildLootReserveUiState(itemLink)
+                Private.SetLootReserveBorder(button, Private.GetLootFrameButtonIcon(button, i), reserveState.hasReserves)
+                Private.BindLootFrameButtonTooltip(button, itemLink, reserveState, "ANCHOR_RIGHT")
+            end
+        end
+    end
+
+    Private.ClearLootFrameReserveHints = function()
+        local buttonCount = Private.GetLootFrameButtonCount(0)
+        for i = 1, buttonCount do
+            local button = Private.GetLootFrameButton(i)
+            if button then
+                button._krtLootItemLink = nil
+                button._krtLootReservePlayerLines = nil
+                Private.SetLootReserveBorder(button, nil, false)
+            end
+        end
+    end
+
+    Private.EnsureLootFrameHooks = function()
+        if Private._LootFrameHooksBound then
+            return
+        end
+        Private._LootFrameHooksBound = true
+
+        if type(hooksecurefunc) == "function" and type(_G.LootFrame_Update) == "function" then
+            hooksecurefunc("LootFrame_Update", Private.ApplyLootFrameReserveHints)
+        end
+    end
+
     module._Private = Private
+    Private.EnsureLootFrameHooks()
 
     Private.BuildMasterWorkflowState = function(opts)
         local currentFlowState = opts.currentFlowState
@@ -1560,8 +1844,8 @@ do
 
     local function startCountdown()
         stopCountdown()
-        local duration = addon.options.countdownDuration or 0
-        local blockAfterCountdown = addon.options.countdownRollsBlock == true
+        local duration = getOption("Rolls", "countdownDuration") or 0
+        local blockAfterCountdown = getOption("Rolls", "countdownRollsBlock") == true
 
         RollsApi.StartCountdown(Rolls, duration, nil, function()
             -- At zero: either block late rolls or keep intake open and tag late responses as OOT.
@@ -1856,21 +2140,22 @@ do
     -- ============================================================================
     local function buildAssignMessages(itemLink, playerName, rollType)
         local output, whisper
-        if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE and addon.options.announceOnWin then
+        local lootWhispers = getOption("Loot", "lootWhispers") == true
+        if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE and getOption("Master", "announceOnWin") then
             output = L.ChatAward:format(playerName, itemLink)
-        elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
+        elseif rollType == rollTypes.HOLD and getOption("Master", "announceOnHold") then
             output = L.ChatHold:format(playerName, itemLink)
-            if addon.options.lootWhispers then
+            if lootWhispers then
                 whisper = L.WhisperHoldAssign:format(itemLink)
             end
-        elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
+        elseif rollType == rollTypes.BANK and getOption("Master", "announceOnBank") then
             output = L.ChatBank:format(playerName, itemLink)
-            if addon.options.lootWhispers then
+            if lootWhispers then
                 whisper = L.WhisperBankAssign:format(itemLink)
             end
-        elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+        elseif rollType == rollTypes.DISENCHANT and getOption("Master", "announceOnDisenchant") then
             output = L.ChatDisenchant:format(itemLink, playerName)
-            if addon.options.lootWhispers then
+            if lootWhispers then
                 whisper = L.WhisperDisenchantAssign:format(itemLink)
             end
         end
@@ -2068,7 +2353,7 @@ do
             winners = winners,
             slotCandidates = candidateSlots,
             slotCandidateMap = candidateSlotMap,
-            announceOnWin = addon.options.announceOnWin,
+            announceOnWin = getOption("Master", "announceOnWin") == true,
         })
         lootState.multiAward = plan and plan.state or nil
         if addon.hasDebug then
@@ -2375,8 +2660,7 @@ do
         currentItemLink:SetText(addon.WrapTextInColorCode(itemName, Colors.NormalizeHexColor(itemColor)))
         currentItemBtn:SetNormalTexture(itemTexture)
 
-        local options = addon.options or KRT_Options or {}
-        if options.showTooltips then
+        if getOption("UI", "showTooltips") then
             currentItemBtn.tooltip_item = itemLink
             Frames.SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
         end
@@ -2578,11 +2862,11 @@ do
                 -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
                 local reserves = Services.Reserves
                 local srList = reserves and reserves.FormatReservedPlayersLine and reserves:FormatReservedPlayersLine(itemID, false, false, false, true) or ""
-                local suff = addon.options.sortAscending and "Low" or "High"
+                local suff = getOption("Master", "sortAscending") and "Low" or "High"
                 message = lootState.selectedItemCount > 1 and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.selectedItemCount)
                     or L[chatMsg]:format(srList, itemLink)
             else
-                local suff = addon.options.sortAscending and "Low" or "High"
+                local suff = getOption("Master", "sortAscending") and "Low" or "High"
                 message = lootState.selectedItemCount > 1 and L[chatMsg .. "Multiple" .. suff]:format(itemLink, lootState.selectedItemCount) or L[chatMsg]:format(itemLink)
             end
 
@@ -2655,7 +2939,7 @@ do
         elseif button == "RightButton" then
             finalizeRollSession()
         else
-            local duration = tonumber(addon.options.countdownDuration) or 0
+            local duration = tonumber(getOption("Rolls", "countdownDuration")) or 0
             if duration <= 0 then
                 finalizeRollSession()
                 return
@@ -2761,7 +3045,7 @@ do
         setPartText("RollsHeaderRoll", L.StrRolls)
         setPartText("ReserveListBtn", L.BtnInsertList)
         setPartText("LootCounterBtn", L.BtnLootCounter)
-        Frames.SetFrameTitle(frameName, MASTER_LOOTER)
+        Frames.SetFrameTitle(frameName, L.StrLootMaster)
 
         local function requestItemCountRefresh()
             announced = false
@@ -3108,9 +3392,6 @@ do
 
         refreshDropDowns(true)
     end
-
-    module.PrepareDropDowns = prepareDropDowns
-
     -- Dropdown field metadata: maps frame name suffixes to state keys (lazily bound at runtime).
     local function findDropDownField(frameNameFull)
         if not frameNameFull then
@@ -3443,6 +3724,7 @@ do
     function module:LOOT_OPENED()
         local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
         cancelLootClosedCleanup()
+        Private.ApplyLootFrameReserveHints()
         if canHandleLootWindow() then
             local debugEnabled = isDebugEnabled()
             local raidNum = Database.GetCurrentRaid()
@@ -3497,6 +3779,7 @@ do
 
     -- LOOT_CLOSED: Triggered when the loot window closes.
     function module:LOOT_CLOSED()
+        Private.ClearLootFrameReserveHints()
         if canHandleLootWindow() or lootState.opened == true then
             if Raid.ClearLootWindowBossContext then
                 Raid:ClearLootWindowBossContext()
@@ -3515,6 +3798,7 @@ do
     -- LOOT_SLOT_CLEARED: Triggered when an item is looted.
     function module:LOOT_SLOT_CLEARED(clearedSlot)
         local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
+        Private.ApplyLootFrameReserveHints()
         if canHandleLootWindow() then
             PendingCounter:Confirm(clearedSlot, "LOOT_SLOT_CLEARED")
             if canAutoManageLootFrame() then
@@ -3795,9 +4079,10 @@ do
             itemInfo.isStack = itemData.slotCount > 1
             itemInfo.count = itemData.totalCount
 
-            if itemInfo.isStack and not addon.options.ignoreStacks then
+            local ignoreStacks = getOption("Loot", "ignoreStacks") == true
+            if itemInfo.isStack and not ignoreStacks then
                 if addon.hasDebug then
-                    addon:debug(Diag.D.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks), tostring(itemLink)))
+                    addon:debug(Diag.D.LogTradeStackBlocked:format(tostring(ignoreStacks), tostring(itemLink)))
                 end
                 addon:warn(L.ErrItemStack:format(itemLink))
                 return false
@@ -3839,7 +4124,7 @@ do
                 if addon.hasDebug then
                     addon:debug(Diag.D.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
                 end
-                if addon.options.screenReminder and not screenshotWarn then
+                if getOption("Master", "screenReminder") and not screenshotWarn then
                     addon:warn(L.ErrScreenReminder)
                     screenshotWarn = true
                 end
@@ -3956,10 +4241,10 @@ do
                 fallbackRolls = fallbackRolls,
                 raidTargetMarkers = RAID_TARGET_MARKERS,
                 options = {
-                    announceOnWin = addon.options.announceOnWin,
-                    announceOnHold = addon.options.announceOnHold,
-                    announceOnBank = addon.options.announceOnBank,
-                    announceOnDisenchant = addon.options.announceOnDisenchant,
+                    announceOnWin = getOption("Master", "announceOnWin") == true,
+                    announceOnHold = getOption("Master", "announceOnHold") == true,
+                    announceOnBank = getOption("Master", "announceOnBank") == true,
+                    announceOnDisenchant = getOption("Master", "announceOnDisenchant") == true,
                 },
             })
 
@@ -4099,6 +4384,7 @@ do
 
     -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
     Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
+        Private.ApplyLootFrameReserveHints()
         module:RequestRefresh()
     end)
 

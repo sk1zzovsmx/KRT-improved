@@ -117,7 +117,7 @@ do
         local input = tostring(value or "")
         local out = Payload._EncodeText(input)
         if out == "" and input ~= "" and isDebugEnabled() then
-            addon:debug("Base64 encode failed for sync payload")
+            addon:debug(Diag.D.LogSyncBase64EncodeFailed)
         end
         return out
     end
@@ -129,7 +129,7 @@ do
         end
         local out = Payload._DecodeText(input)
         if out == nil and isDebugEnabled() then
-            addon:debug("Base64 decode failed for sync payload")
+            addon:debug(Diag.D.LogSyncBase64DecodeFailed)
         end
         return out
     end

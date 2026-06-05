@@ -4066,10 +4066,18 @@ test("logger view lists only bosses attended by selected raid player", function(
                 { bossNid = 10, name = "Anub'Rekhan", time = 1700004100, mode = "n", players = { 1, 2 } },
                 { bossNid = 11, name = "Grand Widow Faerlina", time = 1700004200, mode = "h", players = { 2 } },
                 { bossNid = 12, name = "Maexxna", time = 1700004300, mode = "n", players = { 1 } },
+                {
+                    bossNid = 13,
+                    name = "Shared: Gothik the Harvester / Four Horsemen",
+                    time = 1700004400,
+                    mode = "n",
+                    sourceKind = "shared",
+                    players = { 1 },
+                },
             },
             loot = {},
             nextPlayerNid = 3,
-            nextBossNid = 13,
+            nextBossNid = 14,
             nextLootNid = 1,
         },
     })
@@ -4087,6 +4095,7 @@ test("logger view lists only bosses attended by selected raid player", function(
     assertEqual(rows[1].mode, "N", "expected normal mode label")
     assertEqual(rows[2].id, 12, "expected second attended boss nid")
     assertEqual(rows[2].name, "Maexxna", "expected second attended boss name")
+    assertTextNotContains(rows[2].name, "Shared:", "expected shared loot source records to stay out of boss participation")
 end)
 
 test("logger updates duplicate item entries by lootNid only", function()
@@ -6352,7 +6361,7 @@ test("passive group loot need greed and disenchant skip loot counter count calls
     assertEqual(countCalls, 0, "expected uncounted passive group-loot roll types to avoid LootCounter count calls")
 end)
 
-local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, message, sourceData)
+local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, message, sourceData, unitNames)
     local h = newHarness()
     local link = h.registerItem(itemId, itemName)
 
@@ -6370,6 +6379,28 @@ local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, messa
     })
     h.addon.State.currentRaid = 1
     h.addon.State.lastBoss = nil
+    if type(unitNames) == "table" then
+        h.addon.UnitIterator = function()
+            local index = 0
+            return function()
+                index = index + 1
+                if unitNames[index] then
+                    return "raid" .. index
+                end
+                return nil
+            end
+        end
+        _G.UnitIsConnected = function()
+            return true
+        end
+        _G.UnitName = function(unit)
+            if unit == "player" then
+                return unitNames[1]
+            end
+            local index = tonumber(tostring(unit or ""):match("^raid(%d+)$"))
+            return index and unitNames[index] or nil
+        end
+    end
     _G.GetLootMethod = function()
         return "group", nil, nil
     end
@@ -6436,6 +6467,25 @@ test("group loot source resolver attributes passive boss item from static source
     assertEqual(raid.loot[1].lootSource.sourceName, "Grand Widow Faerlina", "expected passive loot source name")
     assertEqual(raid.loot[1].rollType, h.rollTypes.GREED, "expected passive loot row to keep roll type")
     assertEqual(raid.loot[1].rollValue, 88, "expected passive loot row to keep roll score")
+end)
+
+test("group loot source resolver does not create boss attendees from static loot attribution", function()
+    local h, Raid, Loot = newGroupLootSourceResolverHarness(91736, "Resolver Attendance Charm", 307, "resolver-attendance-win", {
+        {
+            npcId = 15953,
+            npcName = "Grand Widow Faerlina",
+            raid = "Naxxramas",
+            kind = "boss",
+        },
+    }, { "Alice", "Bob" })
+
+    Raid:AddPassiveLootRoll(307, 45000)
+    assertEqual(Loot:AddGroupLootMessage("resolver-attendance-win"), "winner", "expected winner message")
+    Raid:AddLoot("resolver-attendance-win")
+
+    local raid = h.Database.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to create the static source boss")
+    assertEqual(#(raid.bossKills[1].players or {}), 0, "expected static loot source records to avoid boss attendance snapshots")
 end)
 
 test("group loot source resolver prefers static source over recent boss context", function()
@@ -7534,6 +7584,171 @@ test("loot selection refreshes current item when async item cache resolves", fun
     assertEqual(views[2].itemName, "Async Master Blade", "expected refreshed current item name")
     assertEqual(views[2].itemTexture, "Icon1401", "expected refreshed current item icon")
     assertEqual(views[2].itemRarity, 4, "expected refreshed current item rarity")
+end)
+
+test("reserve list action button opens import when reserves are empty", function()
+    local h = newHarness()
+    local hasData = false
+    local clearCount = 0
+    local uiCalls = {}
+    local registeredApis = {}
+
+    h.addon.L.BtnImport = "Import"
+    h.addon.L.BtnClearReserves = "Clear Loot Reserve"
+    h.addon.L.BtnQueryItem = "Query Item"
+    h.addon.L.BtnClose = "Close"
+    h.addon.L.StrRaidReserves = "KRT : Loot Reserve"
+
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return hasData
+        end,
+        ClearSavedReserves = function()
+            clearCount = clearCount + 1
+            return true
+        end,
+        GetDisplayList = function()
+            return {}
+        end,
+        IsSourceCollapsed = function()
+            return false
+        end,
+        QueryMissingItems = function()
+            return false, 0
+        end,
+    }
+
+    h.addon.Frames.GetRef = function(frame, suffix)
+        local name = frame and frame.GetName and frame:GetName() or nil
+        return name and _G[name .. suffix] or nil
+    end
+
+    h.addon.UI.Register = function(_, name, api)
+        registeredApis[name] = api
+    end
+    h.addon.UI.Call = function(_, name, methodName, ...)
+        uiCalls[#uiCalls + 1] = {
+            name = name,
+            methodName = methodName,
+        }
+        local api = registeredApis[name]
+        if api and api[methodName] then
+            return api[methodName](...)
+        end
+        return nil
+    end
+
+    h.addon.UIScaffold.DefineModuleUi = function(cfg)
+        local module = cfg.module
+        module._ui = h.addon.UIScaffold.EnsureModuleUi(module)
+
+        function module:BindUI()
+            if self._ui.Bound then
+                return self.frame, self.refs
+            end
+
+            local frame = cfg.getFrame()
+            self._ui.FrameName = frame and frame:GetName() or self._ui.FrameName
+            self._ui.Loaded = self._ui.FrameName ~= nil
+            self.frame = frame
+            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, self._ui.FrameName) or {}
+
+            if cfg.bind then
+                cfg.bind(self._ui.FrameName, frame, self.refs)
+            end
+            if cfg.localize then
+                cfg.localize(self._ui.FrameName, frame, self.refs)
+                self._ui.Localized = true
+            end
+
+            self._ui.Bound = true
+            return self.frame, self.refs
+        end
+
+        function module:EnsureUI()
+            if not self._ui.Bound then
+                self:BindUI()
+            end
+            return self.frame
+        end
+
+        function module:RequestRefresh(reason)
+            self:EnsureUI()
+            self._ui.Dirty = true
+            self._ui.Reason = reason
+            if cfg.refresh then
+                return cfg.refresh(self._ui.FrameName, self.frame, self.refs, true, reason)
+            end
+            return nil
+        end
+
+        function module:Toggle()
+            local frame = self:EnsureUI()
+            if not frame then
+                return nil
+            end
+            if frame:IsShown() then
+                frame:Hide()
+            else
+                frame:Show()
+            end
+            return frame:IsShown()
+        end
+
+        function module:Hide()
+            local frame = self:EnsureUI()
+            if frame then
+                frame:Hide()
+            end
+        end
+    end
+
+    local frame = h.makeFrame(true, "KRTReserveListFrame")
+    local scrollFrame = h.makeFrame(true, "KRTReserveListFrameScrollFrame")
+    local scrollChild = h.makeFrame(true, "KRTReserveListFrameScrollChild")
+    local clearButton = h.makeFrame(true, "KRTReserveListFrameClearButton")
+    local queryButton = h.makeFrame(true, "KRTReserveListFrameQueryButton")
+    local closeButton = h.makeFrame(true, "KRTReserveListFrameCloseButton")
+
+    scrollFrame.ScrollChild = scrollChild
+    scrollFrame.SetVerticalScroll = function(self, value)
+        self._verticalScroll = value
+    end
+    frame.ScrollFrame = scrollFrame
+    _G.KRTReserveListFrame = frame
+    _G.KRTReserveListFrameScrollFrame = scrollFrame
+    _G.KRTReserveListFrameScrollChild = scrollChild
+    _G.KRTReserveListFrameClearButton = clearButton
+    _G.KRTReserveListFrameQueryButton = queryButton
+    _G.KRTReserveListFrameCloseButton = closeButton
+
+    h:load("!KRT/Widgets/ReservesUI.lua")
+    local module = h.addon.Widgets.ReservesUI
+
+    module:RequestRefresh("empty")
+
+    assertEqual(clearButton:GetText(), "Import", "expected empty reserves action to become Import")
+    assertTrue(clearButton:IsShown(), "expected empty reserves action button to stay visible")
+    assertTrue(clearButton:IsEnabled(), "expected empty reserves import action to stay enabled")
+
+    clearButton.OnClick(clearButton)
+
+    assertEqual(#uiCalls, 1, "expected empty reserves action to route through the import widget")
+    assertEqual(uiCalls[1].name, "Reserves", "expected reserves widget call")
+    assertEqual(uiCalls[1].methodName, "ToggleImport", "expected empty reserves action to open import")
+    assertEqual(clearCount, 0, "expected empty reserves action not to clear saved data")
+
+    hasData = true
+    uiCalls = {}
+    module:RequestRefresh("has_data")
+
+    assertEqual(clearButton:GetText(), "Clear Loot Reserve", "expected data reserves action to clear reserves")
+    assertTrue(clearButton:IsShown(), "expected clear reserves button to stay visible when data exists")
+
+    clearButton.OnClick(clearButton)
+
+    assertEqual(clearCount, 1, "expected data reserves action to clear saved data")
+    assertEqual(#uiCalls, 0, "expected data reserves action not to open import")
 end)
 
 test("ui primitives expose pixel-aligned sizing helpers", function()
@@ -10167,6 +10382,14 @@ test("harness raid capability service mirrors shared loot and leadership policy"
     assertTrue(raid:CanUseCapability("ready_check") == true, "expected leadership to re-enable ready checks")
 end)
 
+test("english localization defines the shared Clear button label", function()
+    local h = newHarness()
+
+    h:load("!KRT/Localization/localization.en.lua")
+
+    assertEqual(h.addon.L.BtnClear, "Clear", "expected shared Clear button label to be localized")
+end)
+
 test("master roll intake reopens after announcing rolls with service-owned session bootstrap", function()
     local h = newHarness()
     local link = h.registerItem(9321, "Countdownblade")
@@ -11106,6 +11329,126 @@ test("master item selection popup stays clickable", function()
     firstButton:OnClick("LeftButton")
 
     assertEqual(selectedIndex, 1, "expected clicking the selection popup button to pick the corresponding loot index")
+end)
+
+test("master loot reserve ui state exposes reserved players", function()
+    local h = newHarness()
+    local link = h.registerItem(9410, "Reserved Popup Blade")
+    local calls = {}
+
+    h.addon.Services.Reserves = {
+        HasItemReserves = function(itemId)
+            return itemId == 9410
+        end,
+        GetPlayersForItem = function(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers)
+            calls[#calls + 1] = {
+                itemId = itemId,
+                useColor = useColor,
+                showPlus = showPlus,
+                showMulti = showMulti,
+                onlyCurrentRaidPlayers = onlyCurrentRaidPlayers,
+            }
+            if itemId == 9410 then
+                return { "Gargull (x2)", "Emann" }
+            end
+            return {}
+        end,
+    }
+    h.feature.Services = h.addon.Services
+
+    loadMasterController(h)
+
+    local Master = h.addon.Controllers.Master
+    local state = Master._Private.BuildLootReserveUiState(link)
+
+    assertTrue(state.hasReserves == true, "expected reserved loot state to be marked")
+    assertEqual(state.itemId, 9410, "expected reserve state to expose item id")
+    assertEqual(#state.playerLines, 2, "expected tooltip lines for every reserver")
+    assertEqual(state.playerLines[1], "Gargull (x2)", "expected first reserver line")
+    assertEqual(state.playerLines[2], "Emann", "expected second reserver line")
+    assertEqual(calls[1].useColor, true, "expected tooltip reserver names to allow class color")
+    assertEqual(calls[1].showPlus, true, "expected tooltip reserver names to keep plus values")
+    assertEqual(calls[1].showMulti, true, "expected tooltip reserver names to keep multi counts")
+    assertEqual(calls[1].onlyCurrentRaidPlayers, false, "expected tooltip to show all reservers")
+end)
+
+test("blizzard loot frame buttons show softres reserve hints", function()
+    local h = newHarness()
+    local reservedLink = h.registerItem(9411, "Corpse Reserve Blade")
+    local otherLink = h.registerItem(9412, "Corpse Other Blade")
+    local tooltipLines = {}
+
+    h.addon.Options.AddNamespace("UI", {
+        showTooltips = true,
+    })
+    h.addon.Services.Reserves = {
+        HasItemReserves = function(itemId)
+            return itemId == 9411
+        end,
+        GetPlayersForItem = function(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers)
+            if itemId == 9411 and useColor == true and showPlus == true and showMulti == true and onlyCurrentRaidPlayers == false then
+                return { "Gargull (x2)", "Emann" }
+            end
+            return {}
+        end,
+    }
+    h.feature.Services = h.addon.Services
+
+    _G.LootFrame = h.makeFrame(true, "LootFrame")
+    _G.LootButton1 = h.makeFrame(true, "LootButton1")
+    _G.LootButton2 = h.makeFrame(true, "LootButton2")
+    _G.LootButton1IconTexture = h.makeFrame(true, "LootButton1IconTexture")
+    _G.LootButton2IconTexture = h.makeFrame(true, "LootButton2IconTexture")
+    _G.LOOTFRAME_NUMBUTTONS = 2
+    _G.GetNumLootItems = function()
+        return 2
+    end
+    _G.GetLootSlotLink = function(slot)
+        if slot == 1 then
+            return reservedLink
+        end
+        if slot == 2 then
+            return otherLink
+        end
+        return nil
+    end
+    _G.GameTooltip = {
+        lines = tooltipLines,
+        SetOwner = function(self, owner, anchor)
+            self.owner = owner
+            self.anchor = anchor
+        end,
+        SetHyperlink = function(self, itemLink)
+            self.itemLink = itemLink
+        end,
+        AddLine = function(self, text)
+            self.lines[#self.lines + 1] = text
+        end,
+        Show = function(self)
+            self.shown = true
+        end,
+        Hide = function(self)
+            self.hidden = true
+        end,
+    }
+
+    loadMasterController(h)
+
+    local Master = h.addon.Controllers.Master
+    Master:LOOT_OPENED()
+
+    assertTrue(_G.LootButton1._krtLootReserveMarked == true, "expected reserved LootFrame button to be marked")
+    assertEqual(#_G.LootButton1._krtLootReservePlayerLines, 2, "expected tooltip lines for each reserver")
+    assertEqual(_G.LootButton1._krtLootReservePlayerLines[1], "Gargull (x2)", "expected first reserver line")
+    assertTrue(type(_G.LootButton1.HookedOnEnter) == "function", "expected reserved LootFrame button to hook tooltip")
+    assertTrue(_G.LootButton2._krtLootReserveMarked == false, "expected unreserved LootFrame button to be unmarked")
+
+    _G.LootButton1:HookedOnEnter()
+
+    assertEqual(_G.GameTooltip.itemLink, reservedLink, "expected tooltip to keep the LootFrame item hyperlink")
+    assertEqual(tooltipLines[2], h.addon.L.StrLootReservedBy, "expected tooltip reserve heading")
+    assertEqual(tooltipLines[3], "Gargull (x2)", "expected tooltip first reserver line")
+    assertEqual(tooltipLines[4], "Emann", "expected tooltip second reserver line")
 end)
 
 test("master loot opened stays hidden while passively observing group loot", function()

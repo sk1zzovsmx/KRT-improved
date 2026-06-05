@@ -3,6 +3,9 @@
 -- exports: addon.Timer (mixin: ScheduleTimer/CancelTimer; static: RefreshStats/ShowStats)
 -- events: none (purely a timer mixin; does not emit Bus events)
 local addon = select(2, ...)
+local feature = addon.Database.GetFeatureShared()
+
+local L = feature.L
 
 local type, pairs, select, rawget, rawset, tostring, tonumber = type, pairs, select, rawget, rawset, tostring, tonumber
 local pcall, error = pcall, error
@@ -255,7 +258,7 @@ function Timer.ShowStats(sortBy)
         return (tonumber(av) or 0) > (tonumber(bv) or 0)
     end)
 
-    addon:info("Timers: active=%d (max=%d) created=%d cancelled=%d completed=%d", stats.active, stats.maxActive, stats.created, stats.cancelled, stats.completed)
+    addon:info(L.MsgTimerStatsSummary, stats.active, stats.maxActive, stats.created, stats.cancelled, stats.completed)
 
     local limit = 15
     if #rows < limit then
@@ -263,10 +266,10 @@ function Timer.ShowStats(sortBy)
     end
     for i = 1, limit do
         local r = rows[i]
-        addon:info("%2d) [%s] %s | age:%.1fs dur:%.2fs", i, r.target, r.kind, r.age, r.duration)
+        addon:info(L.MsgTimerStatsRow, i, r.target, r.kind, r.age, r.duration)
     end
 
-    addon:info("Tip: /krt debug timers reset  |  sort: age|dur|target")
+    addon:info(L.MsgTimerStatsTip)
 end
 
 do

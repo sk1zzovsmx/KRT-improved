@@ -748,8 +748,9 @@ local standardWidgetMethods = {
 
 local function assertModuleMethod(source, methodName, context)
     local pattern = "function%s+module%:" .. methodName .. "%s*%("
+    local assignedPattern = "module%." .. methodName .. "%s*=%s*function%s*%("
     local message = context .. " must expose function module:" .. methodName .. "("
-    assert(source:find(pattern), message)
+    assert(source:find(pattern) or source:find(assignedPattern), message)
 end
 
 local function assertWidgetMethod(source, methodName, context)
@@ -858,12 +859,19 @@ end
 local function assertMinimapRaidMenuContract()
     local source = read("!KRT/EntryPoints/Minimap.lua")
     local reservesDispatch = 'callWidgetMethod("Reserves", "Toggle")'
+    local lootHistoryDispatch = 'Database.RequestControllerMethod("Logger", "ToggleLootHistory")'
+    local raidAttendanceDispatch = 'Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")'
 
-    assertContains(source, reservesDispatch, "minimap menu must open Raid Reserves through UI facade")
-    assertBefore(source, "MASTER_LOOTER", "L.StrRaidReserves", "minimap menu must list Master before Raid Reserves")
-    assertBefore(source, "L.StrRaidReserves", "L.StrLootCounter", "minimap menu must list Raid Reserves before Loot Counter")
-    assertBefore(source, "L.StrLootCounter", "L.StrLootLogger", "minimap menu must list Loot Counter before Loot Logger")
-    assertBefore(source, "L.StrLootLogger", "RAID_WARNING", "minimap menu must list Loot Logger before Raid Warning")
+    assertContains(source, reservesDispatch, "minimap menu must open Loot Reserve through UI facade")
+    assertContains(source, lootHistoryDispatch, "minimap menu must open Loot History through Logger controller")
+    assertContains(source, raidAttendanceDispatch, "minimap menu must open Raid Attendance through Logger controller")
+    assertNotContains(source, "L.StrLootLogger", "minimap menu must no longer expose the combined logger entry")
+    assertNotContains(source, "text = MASTER_LOOTER", "minimap menu must use the Loot Master label")
+    assertBefore(source, "L.StrLootMaster", "L.StrLootReserve", "minimap menu must list Loot Master before Loot Reserve")
+    assertBefore(source, "L.StrLootReserve", "L.StrLootCounter", "minimap menu must list Loot Reserve before Loot Counter")
+    assertBefore(source, "L.StrLootCounter", "L.StrLootHistory", "minimap menu must list Loot Counter before Loot History")
+    assertBefore(source, "L.StrLootHistory", "L.StrRaidAttendance", "minimap menu must list Loot History before Raid Attendance")
+    assertBefore(source, "L.StrRaidAttendance", "RAID_WARNING", "minimap menu must list Raid Attendance before Raid Warning")
     assertBefore(source, "RAID_WARNING", "L.StrLFMSpam", "minimap menu must list Raid Warning before LFM Spam")
     assertBefore(source, "L.StrLFMSpam", "L.StrClearIcons", "minimap menu must list LFM Spam before Clear Icons")
 end

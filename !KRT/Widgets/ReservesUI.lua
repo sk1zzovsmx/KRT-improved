@@ -78,6 +78,10 @@ do
         return addon.hasDebug ~= nil
     end
 
+    local function hasReserveData()
+        return Reserves and Reserves.HasData and Reserves:HasData() or false
+    end
+
     function UI.AcquireRefs(frame)
         return {
             closeButton = Frames.GetRef(frame, "CloseButton"),
@@ -298,7 +302,7 @@ do
         end
         local clearButton = frameName and _G[frameName .. "ClearButton"]
         if clearButton then
-            clearButton:SetText(L.BtnClearReserves)
+            clearButton:SetText(hasReserveData() and L.BtnClearReserves or L.BtnImport)
         end
         local queryButton = frameName and _G[frameName .. "QueryButton"]
         if queryButton then
@@ -316,15 +320,12 @@ do
         if not frameName then
             return
         end
-        local hasData = Reserves and Reserves.HasData and Reserves:HasData() or false
+        local hasData = hasReserveData()
         local clearButton = _G[frameName .. "ClearButton"]
         if clearButton then
-            if hasData then
-                clearButton:Show()
-                UIPrimitives.EnableDisable(clearButton, true)
-            else
-                clearButton:Hide()
-            end
+            clearButton:SetText(hasData and L.BtnClearReserves or L.BtnImport)
+            clearButton:Show()
+            UIPrimitives.EnableDisable(clearButton, true)
         end
         local queryButton = _G[frameName .. "QueryButton"]
         if queryButton then
@@ -557,10 +558,14 @@ do
 
         if refs.clearButton then
             refs.clearButton:SetScript("OnClick", function()
-                clearSavedReservesFromUI()
+                if hasReserveData() then
+                    clearSavedReservesFromUI()
+                else
+                    UIFacade:Call("Reserves", "ToggleImport")
+                end
             end)
             if isDebugEnabled() then
-                addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ClearSavedReserves"))
+                addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ClearOrImport"))
             end
         end
 
