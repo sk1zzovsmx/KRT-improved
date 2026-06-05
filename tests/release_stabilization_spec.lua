@@ -183,6 +183,18 @@ local function makeFrame(shown, name)
         return self._frameLevel or 1
     end
 
+    function frame:SetFrameStrata(strata)
+        self._frameStrata = strata
+    end
+
+    function frame:GetFrameStrata()
+        return self._frameStrata
+    end
+
+    function frame:SetToplevel(value)
+        self._toplevel = value and true or false
+    end
+
     function frame:SetID(id)
         self.id = id
     end
@@ -1085,12 +1097,26 @@ local function newHarness()
         return active
     end
 
+    local widgetRegistry = {}
     addon.UI.Widgets = {
         IsEnabled = function()
             return true
         end,
-        Register = function() end,
-        Call = function() end,
+        IsRegistered = function(_, widgetId)
+            return widgetRegistry[widgetId] ~= nil
+        end,
+        Register = function(widgetId, api)
+            widgetRegistry[widgetId] = api
+            return true
+        end,
+        Call = function(widgetId, methodName, ...)
+            local api = widgetRegistry[widgetId]
+            local fn = api and api[methodName] or nil
+            if type(fn) == "function" then
+                return fn(...)
+            end
+            return nil
+        end,
     }
 
     addon.UI.Primitives.SetEnabled = function(frame, enabled)
@@ -2443,6 +2469,10 @@ local function loadMasterController(h)
     h:load("!KRT/Controllers/Master.lua")
 end
 
+local function loadMasterLootGridWidget(h)
+    h:load("!KRT/Widgets/MasterLootGrid.lua")
+end
+
 local function loadMasterFrameForTest(Master, frame)
     return Master._Private.LoadFrame(frame)
 end
@@ -2806,8 +2836,15 @@ local function setupMasterAwardHarness(cfg)
     local h = newHarness()
     local link = h.registerItem(cfg.itemId or 9313, cfg.itemName or "AwardHarnessBlade")
     local lootSlotLink = cfg.lootSlotLink or link
+    local selectedLootQuality = tonumber(cfg.selectedLootQuality) or 3
+    local selectedLootSlot = tonumber(cfg.selectedLootSlot) or 1
     local currentModel = cfg.model or {}
     local candidates = cfg.candidates or { "Alice", "Bob", "Cara" }
+    local raidRecord = cfg.raidRecord or {
+        holder = cfg.holder,
+        banker = cfg.banker,
+        disenchanter = cfg.disenchanter,
+    }
     local candidateCache = {
         itemLink = nil,
         indexByName = {},
@@ -2833,9 +2870,20 @@ local function setupMasterAwardHarness(cfg)
     _G.GetNumLootItems = function()
         return 1
     end
+    _G.LootFrame = h.makeFrame(true, "LootFrame")
+    _G.LootFrame.selectedSlot = selectedLootSlot
+    _G.LootFrame.selectedQuality = selectedLootQuality
+    _G.LootButton1 = h.makeFrame(true, "LootButton1")
+    _G.LootFrame.selectedLootButton = _G.LootButton1
     _G.GetLootSlotLink = function(index)
-        if index == 1 then
+        if index == selectedLootSlot then
             return lootSlotLink
+        end
+        return nil
+    end
+    _G.GetLootSlotInfo = function(index)
+        if index == selectedLootSlot then
+            return "test-icon", cfg.itemName or "AwardHarnessBlade", tonumber(cfg.lootQuantity) or 1, selectedLootQuality
         end
         return nil
     end
@@ -3082,6 +3130,16 @@ local function setupMasterAwardHarness(cfg)
         rank = 2,
         isMasterLooter = true,
     })
+    h.Database.GetRaidStoreOrNil = function()
+        return {
+            GetRaidByIndex = function(_, raidId)
+                if raidId == 1 then
+                    return raidRecord
+                end
+                return nil
+            end,
+        }
+    end
     h.feature.Services = h.addon.Services
     h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
 
@@ -3113,6 +3171,7 @@ local function setupMasterAwardHarness(cfg)
         givenLoot = givenLoot,
         addCounts = addCounts,
         validationCalls = validationCalls,
+        raid = raidRecord,
         getRefreshCount = function()
             return refreshCount
         end,
@@ -3129,6 +3188,15 @@ test("release stabilization tests use namespace option helpers", function()
     local source = readText("tests/release_stabilization_spec.lua")
     assertTextNotContains(source, "h.addon." .. "options", "tests must use namespace cfg:Get/cfg:Set instead of direct option table access")
     assertTextNotContains(source, "h.addon.Options." .. "Set(", "tests must use namespace cfg:Set instead of flat option writes")
+end)
+
+test("init forwards master loot list events through the KRT bus", function()
+    local source = readText("!KRT/Init.lua")
+
+    assertTextContains(source, "OPEN_MASTER_LOOT_LIST", "expected Init.lua to register the master loot list open event")
+    assertTextContains(source, "UPDATE_MASTER_LOOT_LIST", "expected Init.lua to register the master loot list update event")
+    assertTextContains(source, "WowEvents.OpenMasterLootList", "expected Init.lua to forward master loot list open events")
+    assertTextContains(source, "WowEvents.UpdateMasterLootList", "expected Init.lua to forward master loot list update events")
 end)
 
 test("runtime cache reuses runtime until invalidated", function()
@@ -9726,6 +9794,216 @@ test("raid service owns master loot candidate cache resolution", function()
     Raid:RequestMasterLootCandidateRefresh()
 
     assertEqual(Raid:FindMasterLootCandidateIndex(itemLink, "Cara"), 1, "expected raid candidate cache invalidation to force a rebuild")
+end)
+
+test("master native loot grid opens for master loot candidates", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice", "Bob", "Cara" },
+        selectedLootQuality = 3,
+    })
+    loadMasterLootGridWidget(ctx.h)
+
+    ctx.Master:OPEN_MASTER_LOOT_LIST()
+
+    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    assertTrue(grid:IsShown(), "expected native grid to show for master loot candidates")
+    assertEqual(grid:GetButtonCount(), 3, "expected one grid button per candidate")
+end)
+
+test("master debug loot grid opens with fake N-player roster without awarding", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = {},
+        selectedLootQuality = 3,
+    })
+    loadMasterLootGridWidget(ctx.h)
+
+    local shownCount = ctx.Master:ShowDebugMasterLootGrid(25)
+
+    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    assertEqual(shownCount, 25, "expected debug grid to clamp and return the shown fake player count")
+    assertTrue(grid:IsShown(), "expected debug grid to show fake players")
+    assertEqual(grid:GetMode(), "debug", "expected debug grid mode to avoid live award behavior")
+    assertEqual(grid:GetButtonCount(), 25, "expected one debug grid button per fake player")
+
+    assertEqual(grid:ClickButtonForTest(1), false, "expected debug grid clicks to stay display-only")
+    assertEqual(#ctx.givenLoot, 0, "expected debug grid not to call GiveMasterLoot")
+    assertEqual(#ctx.queuedAwards, 0, "expected debug grid not to queue KRT awards")
+end)
+
+test("slash debug mlgrid opens fake Master Loot grid", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = {},
+        selectedLootQuality = 3,
+    })
+    _G.SlashCmdList = {}
+    loadMasterLootGridWidget(ctx.h)
+    ctx.h:load("!KRT/Localization/localization.en.lua")
+    ctx.h.Database.RequestControllerMethod = function(name, methodName, ...)
+        local controller = ctx.h.addon.Controllers[name]
+        local method = controller and controller[methodName]
+        if type(method) == "function" then
+            return method(controller, ...)
+        end
+        return nil
+    end
+    ctx.h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("debug mlgrid 12")
+
+    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    assertTrue(grid:IsShown(), "expected slash command to show debug grid")
+    assertEqual(grid:GetMode(), "debug", "expected slash command to open debug grid mode")
+    assertEqual(grid:GetButtonCount(), 12, "expected slash command count to drive fake player count")
+    assertContains(ctx.h.logs.info, "Master Loot grid debug shown with %d fake players.", "expected slash command to report the debug grid flow")
+end)
+
+test("master item popup debug fallback uses real roster before fake players", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = {},
+        selectedLootQuality = 3,
+    })
+    local rosterNames = { "Alice", "Bob" }
+    ctx.h.feature.coreState.debug = {
+        masterLootGridTargetCount = 5,
+    }
+    ctx.h.addon.UnitIterator = function()
+        local index = 0
+        return function()
+            index = index + 1
+            if rosterNames[index] then
+                return "raid" .. index
+            end
+            return nil
+        end
+    end
+    _G.UnitName = function(unit)
+        local index = tonumber(string.match(tostring(unit or ""), "^raid(%d+)$"))
+        return index and rosterNames[index] or nil
+    end
+    loadMasterLootGridWidget(ctx.h)
+
+    ctx.Master:OPEN_MASTER_LOOT_LIST()
+
+    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    assertTrue(grid:IsShown(), "expected item popup to show the debug fallback grid")
+    assertEqual(grid:GetMode(), "debug", "expected no-candidate item popup fallback to stay display-only")
+    assertEqual(grid:GetButtonCount(), 5, "expected debug fallback to fill real roster up to the target count")
+    assertEqual(grid:GetEntryNameForTest(1), "Alice", "expected real roster players first")
+    assertEqual(grid:GetEntryNameForTest(2), "Bob", "expected real roster players before fake rows")
+    assertEqual(grid:GetEntryNameForTest(3), "Player1", "expected fake players to fill only after real roster")
+    assertEqual(grid:ClickButtonForTest(1), false, "expected debug fallback clicks not to award")
+    assertEqual(#ctx.givenLoot, 0, "expected debug fallback not to call GiveMasterLoot")
+    assertEqual(#ctx.queuedAwards, 0, "expected debug fallback not to queue KRT awards")
+end)
+
+test("master native loot grid hides Blizzard dropdown lists", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice", "Bob" },
+        selectedLootQuality = 3,
+    })
+    local list1 = ctx.h.makeFrame(true, "DropDownList1")
+    local list2 = ctx.h.makeFrame(true, "DropDownList2")
+    _G.DropDownList1 = list1
+    _G.DropDownList2 = list2
+    loadMasterLootGridWidget(ctx.h)
+
+    ctx.Master:OPEN_MASTER_LOOT_LIST()
+    ctx.h:flushTimers()
+
+    assertTrue(not list1:IsShown(), "expected native grid to hide DropDownList1")
+    assertTrue(not list2:IsShown(), "expected native grid to hide DropDownList2")
+end)
+
+test("master native loot grid is layered above loot selection frames", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice", "Bob" },
+        selectedLootQuality = 3,
+    })
+    _G.LootButton1:SetFrameLevel(42)
+    loadMasterLootGridWidget(ctx.h)
+
+    ctx.Master:OPEN_MASTER_LOOT_LIST()
+
+    local gridFrame = _G.KRTMasterLootGridFrame
+    assertTrue(gridFrame ~= nil, "expected native grid frame to exist")
+    assertEqual(gridFrame:GetFrameStrata(), "FULLSCREEN_DIALOG", "expected native grid to use a strata above loot selection frames")
+    assertTrue(gridFrame._toplevel == true, "expected native grid to be a top-level frame")
+    assertTrue(gridFrame:GetFrameLevel() > _G.LootButton1:GetFrameLevel(), "expected native grid level to sit above the selected loot button")
+end)
+
+test("master native loot grid opens centered on screen", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice", "Bob" },
+        selectedLootQuality = 3,
+    })
+    loadMasterLootGridWidget(ctx.h)
+
+    ctx.Master:OPEN_MASTER_LOOT_LIST()
+
+    local gridFrame = _G.KRTMasterLootGridFrame
+    local point = gridFrame and gridFrame._points and gridFrame._points[1] or nil
+    assertTrue(point ~= nil, "expected native grid to be positioned")
+    assertEqual(point.point, "CENTER", "expected native grid to anchor from its center")
+    assertEqual(point.relativeTo, _G.UIParent, "expected native grid to anchor to UIParent")
+    assertEqual(point.relativePoint, "CENTER", "expected native grid to anchor to screen center")
+    assertEqual(point.x, 0, "expected native grid horizontal offset to be zero")
+    assertEqual(point.y, 0, "expected native grid vertical offset to be zero")
+end)
+
+test("master native loot grid confirms above-threshold manual awards", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice", "Bob" },
+        selectedLootQuality = 4,
+    })
+    loadMasterLootGridWidget(ctx.h)
+
+    ctx.Master:OPEN_MASTER_LOOT_LIST()
+    ctx.h.addon.Widgets.MasterLootGrid:ClickButtonForTest(2)
+
+    assertEqual(#ctx.givenLoot, 0, "expected above-threshold click to wait for confirmation")
+    local popup = _G.StaticPopupDialogs.KRT_MASTER_LOOT_GRID_CONFIRM
+    assertTrue(popup ~= nil, "expected KRT-owned grid confirmation popup to be defined")
+    popup.OnAccept(nil, popup._krtData)
+
+    assertEqual(#ctx.givenLoot, 1, "expected confirmation to award through KRT")
+    assertEqual(ctx.givenLoot[1].candidateIndex, 2, "expected confirmation award to resolve the clicked candidate")
+    assertEqual(ctx.queuedAwards[1].rollType, ctx.h.rollTypes.MANUAL, "expected manual grid award to use Manual roll type")
+end)
+
+test("master target grid updates Hold target without awarding", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice", "Bob" },
+        selectedLootQuality = 3,
+    })
+    local rosterNames = { "Alice", "Bob", "Cara" }
+    ctx.h.addon.UnitIterator = function()
+        local index = 0
+        return function()
+            index = index + 1
+            if rosterNames[index] then
+                return "raid" .. index
+            end
+            return nil
+        end
+    end
+    _G.UnitName = function(unit)
+        local index = tonumber(string.match(tostring(unit or ""), "^raid(%d+)$"))
+        return index and rosterNames[index] or nil
+    end
+    _G.GetRaidRosterInfo = function(index)
+        if rosterNames[index] then
+            return rosterNames[index], nil, 1
+        end
+        return nil
+    end
+    loadMasterLootGridWidget(ctx.h)
+
+    ctx.Master._Private.OpenAssignmentTargetGrid("holder")
+    ctx.h.addon.Widgets.MasterLootGrid:ClickButtonForTest(3)
+
+    assertEqual(ctx.raid.holder, "Cara", "expected target grid to persist holder")
+    assertEqual(ctx.h.feature.lootState.holder, "Cara", "expected target grid to update holder state")
+    assertEqual(#ctx.givenLoot, 0, "expected target selection not to award loot")
 end)
 
 test("master award matches loot slots by itemId when hyperlinks differ", function()

@@ -54,6 +54,16 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **Master Loot assignment grid** - Replaced the manual Master Loot candidate
+  dropdown flow with a native Blizzard-style KRT grid that expands to the
+  current candidate count without scrolling, confirms above-threshold awards
+  through a standard StaticPopup, and uses the same grid for Hold, Bank, and
+  DE target selection without awarding loot.
+- **Master Loot grid debug view** - Added `/krt debug mlgrid [1-40]` to open
+  the native grid with a configurable fake player count for layout testing,
+  and to let the item-click popup use real roster names plus fake fillers when
+  no live Blizzard Master Loot candidates are available. Debug rows never award
+  loot.
 - **Loot method automation** - Added opt-in Master Loot options to switch
   to Master Loot when a raid leader targets a recognized raid boss and to
   show a configurable RollFor-style KRT screen notice when it fires, then ask

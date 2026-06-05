@@ -2024,7 +2024,7 @@ do
         dirtyFlags.dropdowns = false
     end
 
-    local function hookDropDownOpen(frame)
+    local function hookDropDownOpen(frame, targetKey)
         if not frame then
             return
         end
@@ -2032,6 +2032,9 @@ do
         if button and not button._krtHooked then
             button:HookScript("OnClick", function()
                 refreshDropDowns(true)
+                if targetKey and Private.OpenAssignmentTargetGrid then
+                    Private.OpenAssignmentTargetGrid(targetKey)
+                end
             end)
             button._krtHooked = true
         end
@@ -3185,9 +3188,9 @@ do
         configureAssignDropDown(dropDownFrameBanker)
         configureAssignDropDown(dropDownFrameDisenchanter)
         dropDownsInitialized = true
-        hookDropDownOpen(dropDownFrameHolder)
-        hookDropDownOpen(dropDownFrameBanker)
-        hookDropDownOpen(dropDownFrameDisenchanter)
+        hookDropDownOpen(dropDownFrameHolder, "holder")
+        hookDropDownOpen(dropDownFrameBanker, "banker")
+        hookDropDownOpen(dropDownFrameDisenchanter, "disenchanter")
         refreshDropDowns(true)
         uiState.Localized = true
     end
@@ -3485,6 +3488,343 @@ do
 
         refreshDropDowns(true)
     end
+
+    Private.GetMasterLootGridFrameAnchor = function()
+        local selectedButton = LootFrame and LootFrame.selectedLootButton or nil
+        if selectedButton and (not selectedButton.IsShown or selectedButton:IsShown()) then
+            return selectedButton
+        end
+        if LootFrame and (not LootFrame.IsShown or LootFrame:IsShown()) then
+            return LootFrame
+        end
+        return getFrame()
+    end
+
+    Private.GetSelectedMasterLootSlot = function()
+        if LootFrame and LootFrame.selectedSlot then
+            return LootFrame.selectedSlot
+        end
+        if LootFrame and LootFrame.selectedLootButton and LootFrame.selectedLootButton.GetID then
+            local slot = LootFrame.selectedLootButton:GetID()
+            if slot and slot > 0 then
+                return slot
+            end
+        end
+        return nil
+    end
+
+    Private.GetSelectedMasterLootLink = function()
+        local slot = Private.GetSelectedMasterLootSlot()
+        if slot and GetLootSlotLink then
+            local link = GetLootSlotLink(slot)
+            if link then
+                return link
+            end
+        end
+        if Loot and Loot.GetItemLink then
+            return Loot.GetItemLink()
+        end
+        return nil
+    end
+
+    Private.GetSelectedMasterLootQuality = function()
+        if LootFrame and LootFrame.selectedQuality then
+            return tonumber(LootFrame.selectedQuality) or 0
+        end
+        local slot = Private.GetSelectedMasterLootSlot()
+        if slot and GetLootSlotInfo then
+            local _, _, _, quality = GetLootSlotInfo(slot)
+            return tonumber(quality) or 0
+        end
+        return 0
+    end
+
+    Private.GetSelectedMasterLootTexture = function()
+        local slot = Private.GetSelectedMasterLootSlot()
+        if slot and GetLootSlotInfo then
+            local texture = GetLootSlotInfo(slot)
+            return texture
+        end
+        return nil
+    end
+
+    Private.GetSelectedMasterLootCount = function()
+        local slot = Private.GetSelectedMasterLootSlot()
+        if slot and GetLootSlotInfo then
+            local _, _, quantity = GetLootSlotInfo(slot)
+            return tonumber(quantity) or nil
+        end
+        return nil
+    end
+
+    Private.CollectMasterLootGridEntries = function()
+        local result = {}
+        if type(GetMasterLootCandidate) ~= "function" then
+            return result
+        end
+
+        for i = 1, 40 do
+            local name = GetMasterLootCandidate(i)
+            if name and name ~= "" then
+                local className = Raid and Raid.GetPlayerClass and Raid:GetPlayerClass(name) or nil
+                tinsert(result, {
+                    name = name,
+                    displayName = name,
+                    index = i,
+                    class = className,
+                })
+            end
+        end
+        return result
+    end
+
+    Private.BuildDebugMasterLootGridEntries = function(count, includeRoster)
+        local classes = {
+            "WARRIOR",
+            "PALADIN",
+            "HUNTER",
+            "ROGUE",
+            "PRIEST",
+            "DEATHKNIGHT",
+            "SHAMAN",
+            "MAGE",
+            "WARLOCK",
+            "DRUID",
+        }
+        local result = {}
+        local total = tonumber(count) or 25
+        total = math.floor(total)
+        if total < 1 then
+            total = 1
+        elseif total > 40 then
+            total = 40
+        end
+
+        local seen = {}
+        if includeRoster ~= false and addon.UnitIterator then
+            for unit in addon.UnitIterator(true) do
+                local name = UnitName(unit)
+                if name and name ~= "" and not seen[name] then
+                    local className = Raid and Raid.GetPlayerClass and Raid:GetPlayerClass(name) or nil
+                    if not className and UnitClass then
+                        local _, classFileName = UnitClass(unit)
+                        className = classFileName
+                    end
+                    tinsert(result, {
+                        name = name,
+                        displayName = name,
+                        index = #result + 1,
+                        class = className or classes[(#result % #classes) + 1],
+                        debugOnly = true,
+                        realRoster = true,
+                    })
+                    seen[name] = true
+                end
+            end
+        end
+
+        if #result > total then
+            total = #result
+        end
+
+        local fakeIndex = 1
+        while #result < total do
+            local name = "Player" .. tostring(fakeIndex)
+            fakeIndex = fakeIndex + 1
+            if not seen[name] then
+                tinsert(result, {
+                    name = name,
+                    displayName = name,
+                    index = #result + 1,
+                    class = classes[(#result % #classes) + 1],
+                    debugOnly = true,
+                })
+                seen[name] = true
+            end
+        end
+
+        return result, total
+    end
+
+    Private.GetDebugMasterLootGridTargetCount = function()
+        local debugState = feature.coreState and feature.coreState.debug or nil
+        return debugState and debugState.masterLootGridTargetCount or 25
+    end
+
+    Private.IsMasterLootGridDebugFallbackEnabled = function()
+        local debugState = feature.coreState and feature.coreState.debug or nil
+        if debugState and debugState.masterLootGridTargetCount then
+            return true
+        end
+        return Options and Options.IsDebugEnabled and Options.IsDebugEnabled() == true
+    end
+
+    Private.HideBlizzardDropDownLists = function()
+        if type(CloseDropDownMenus) == "function" then
+            CloseDropDownMenus()
+        end
+        for i = 1, 2 do
+            local list = _G["DropDownList" .. i]
+            if list and list.Hide then
+                list:Hide()
+            end
+        end
+        UIDROPDOWNMENU_OPEN_MENU = nil
+    end
+
+    Private.QueueHideBlizzardDropDownLists = function()
+        Private.HideBlizzardDropDownLists()
+        if module.ScheduleTimer then
+            module:ScheduleTimer(Private.HideBlizzardDropDownLists, 0)
+        end
+    end
+
+    Private.AcceptManualGridAward = function(data)
+        if type(data) ~= "table" or not data.playerName then
+            return false
+        end
+
+        local itemLink = data.itemLink or Private.GetSelectedMasterLootLink()
+        if not itemLink then
+            return false
+        end
+
+        lootState.currentRollType = rollTypes.MANUAL
+        local ok = assignItem(itemLink, data.playerName, rollTypes.MANUAL, 0)
+        if ok then
+            UI.Widgets.Call("MasterLootGrid", "Hide")
+        end
+        return ok
+    end
+
+    Private.EnsureMasterLootGridConfirmPopup = function()
+        if type(StaticPopupDialogs) ~= "table" then
+            return nil
+        end
+
+        if not StaticPopupDialogs.KRT_MASTER_LOOT_GRID_CONFIRM then
+            local dialog = {
+                text = L.PopupMasterLootGridConfirm or "Give %s to %s?",
+                button1 = YES or OKAY,
+                button2 = NO or CANCEL,
+                timeout = 0,
+                whileDead = 1,
+                hideOnEscape = 1,
+                OnAccept = function(_, data)
+                    Private.AcceptManualGridAward(data)
+                end,
+            }
+            if Popups and Popups.Define then
+                Popups.Define("KRT_MASTER_LOOT_GRID_CONFIRM", dialog)
+            else
+                StaticPopupDialogs.KRT_MASTER_LOOT_GRID_CONFIRM = dialog
+            end
+        end
+        return StaticPopupDialogs.KRT_MASTER_LOOT_GRID_CONFIRM
+    end
+
+    Private.ShowManualGridAwardConfirm = function(itemLink, playerName)
+        local popup = Private.EnsureMasterLootGridConfirmPopup()
+        if not popup then
+            return false
+        end
+
+        local data = {
+            itemLink = itemLink,
+            itemText = itemLink or L.StrMasterLootGridTitle,
+            playerName = playerName,
+        }
+        popup._krtData = data
+        if type(StaticPopup_Show) == "function" then
+            local dialog = StaticPopup_Show("KRT_MASTER_LOOT_GRID_CONFIRM", data.itemText, playerName, data)
+            if dialog then
+                dialog.data = data
+            end
+        end
+        return true
+    end
+
+    Private.HandleManualGridEntry = function(entry)
+        if type(entry) ~= "table" or not entry.name then
+            return false
+        end
+
+        local itemLink = Private.GetSelectedMasterLootLink()
+        if not itemLink then
+            return false
+        end
+
+        local threshold = MASTER_LOOT_THREHOLD or MASTER_LOOT_THRESHOLD or 4
+        if Private.GetSelectedMasterLootQuality() >= threshold then
+            return Private.ShowManualGridAwardConfirm(itemLink, entry.name)
+        end
+        return Private.AcceptManualGridAward({
+            itemLink = itemLink,
+            playerName = entry.name,
+        })
+    end
+
+    Private.OpenManualAwardGrid = function()
+        if Raid and Raid.IsMasterLooter and not Raid:IsMasterLooter() then
+            return false
+        end
+        Private.QueueHideBlizzardDropDownLists()
+
+        local itemLink = Private.GetSelectedMasterLootLink()
+        local title = itemLink or L.StrMasterLootGridTitle
+        local entries = Private.CollectMasterLootGridEntries()
+        local debugFallback = false
+        if #entries <= 0 and Private.IsMasterLootGridDebugFallbackEnabled() then
+            entries = Private.BuildDebugMasterLootGridEntries(Private.GetDebugMasterLootGridTargetCount(), true)
+            title = title .. " (" .. (L.StrMasterLootGridDebugTitle or "Debug") .. ")"
+            debugFallback = true
+        end
+        UI.Widgets.Call("MasterLootGrid", "ShowPicker", {
+            mode = debugFallback and "debug" or "award",
+            title = title,
+            texture = Private.GetSelectedMasterLootTexture(),
+            count = Private.GetSelectedMasterLootCount(),
+            emptyText = L.StrMasterLootGridEmpty,
+            entries = entries,
+            anchor = Private.GetMasterLootGridFrameAnchor(),
+            closeOnSelect = not debugFallback,
+            onSelect = debugFallback and function()
+                return false
+            end or Private.HandleManualGridEntry,
+        })
+        return true
+    end
+
+    Private.OpenDebugMasterLootGrid = function(count)
+        local debugState = feature.coreState and feature.coreState.debug or nil
+        if not debugState then
+            feature.coreState.debug = {}
+            debugState = feature.coreState.debug
+        end
+        debugState.masterLootGridTargetCount = count or 25
+
+        local entries, total = Private.BuildDebugMasterLootGridEntries(count)
+        UI.Widgets.Call("MasterLootGrid", "ShowPicker", {
+            mode = "debug",
+            title = (L.StrMasterLootGridDebugTitle or "Master Loot Grid Debug") .. " (" .. tostring(total) .. ")",
+            emptyText = L.StrMasterLootGridEmpty,
+            entries = entries,
+            anchor = Private.GetMasterLootGridFrameAnchor(),
+            closeOnSelect = false,
+            onSelect = function()
+                return false
+            end,
+        })
+        return total
+    end
+
+    Private.RefreshManualAwardGrid = function()
+        if UI.Widgets.Call("MasterLootGrid", "IsShown") and UI.Widgets.Call("MasterLootGrid", "GetMode") == "award" then
+            return Private.OpenManualAwardGrid()
+        end
+        return false
+    end
+
     -- Dropdown field metadata: maps frame name suffixes to state keys (lazily bound at runtime).
     local function findDropDownField(frameNameFull)
         if not frameNameFull then
@@ -3492,14 +3832,115 @@ do
         end
 
         -- Match dropdown frame name to find the field type
-        if frameNameFull == dropDownFrameHolder:GetName() then
+        local holderName = dropDownFrameHolder and dropDownFrameHolder.GetName and dropDownFrameHolder:GetName() or nil
+        local bankerName = dropDownFrameBanker and dropDownFrameBanker.GetName and dropDownFrameBanker:GetName() or nil
+        local disenchanterName = dropDownFrameDisenchanter and dropDownFrameDisenchanter.GetName and dropDownFrameDisenchanter:GetName() or nil
+        if frameNameFull == holderName then
             return { stateKey = "holder", raidKey = "holder", frame = dropDownFrameHolder }
-        elseif frameNameFull == dropDownFrameBanker:GetName() then
+        elseif frameNameFull == bankerName then
             return { stateKey = "banker", raidKey = "banker", frame = dropDownFrameBanker }
-        elseif frameNameFull == dropDownFrameDisenchanter:GetName() then
+        elseif frameNameFull == disenchanterName then
             return { stateKey = "disenchanter", raidKey = "disenchanter", frame = dropDownFrameDisenchanter }
         end
         return nil
+    end
+
+    Private.GetAssignmentFieldByKey = function(targetKey)
+        if targetKey == "holder" then
+            return { stateKey = "holder", raidKey = "holder", frame = dropDownFrameHolder, label = L.BtnHold }
+        elseif targetKey == "banker" then
+            return { stateKey = "banker", raidKey = "banker", frame = dropDownFrameBanker, label = L.BtnBank }
+        elseif targetKey == "disenchanter" then
+            return { stateKey = "disenchanter", raidKey = "disenchanter", frame = dropDownFrameDisenchanter, label = L.BtnDisenchant }
+        end
+        return nil
+    end
+
+    Private.SetAssignmentTarget = function(targetKey, playerName)
+        if not playerName or playerName == "" then
+            return false
+        end
+
+        local field = Private.GetAssignmentFieldByKey(targetKey)
+        if not field then
+            return false
+        end
+
+        local raidStore = Database.GetRaidStoreOrNil("Master.SetAssignmentTarget", { "GetRaidByIndex" })
+        local raidId = Database.GetCurrentRaid()
+        local raid = raidStore and raidId and raidStore:GetRaidByIndex(raidId) or nil
+        if raid then
+            raid[field.raidKey] = playerName
+        end
+        lootState[field.stateKey] = playerName
+
+        if field.frame then
+            UIDropDownMenu_SetText(field.frame, playerName)
+            UIDropDownMenu_SetSelectedValue(field.frame, playerName)
+        end
+
+        dropDownDirty = true
+        dirtyFlags.dropdowns = true
+        dirtyFlags.buttons = true
+        Private.HideBlizzardDropDownLists()
+        UI.Widgets.Call("MasterLootGrid", "Hide")
+        module:RequestRefresh()
+        return true
+    end
+
+    Private.CollectAssignmentTargetEntries = function()
+        if prepareDropDowns then
+            prepareDropDowns()
+        end
+
+        local result = {}
+        for group = 1, 8 do
+            local names = dropDownData[group]
+            if type(names) == "table" then
+                for name in pairs(names) do
+                    local className = Raid and Raid.GetPlayerClass and Raid:GetPlayerClass(name) or nil
+                    tinsert(result, {
+                        name = name,
+                        displayName = name,
+                        group = group,
+                        class = className,
+                    })
+                end
+            end
+        end
+        table.sort(result, function(a, b)
+            if a.group == b.group then
+                return tostring(a.name or "") < tostring(b.name or "")
+            end
+            return (tonumber(a.group) or 0) < (tonumber(b.group) or 0)
+        end)
+        return result
+    end
+
+    Private.OpenAssignmentTargetGrid = function(targetKey)
+        local field = Private.GetAssignmentFieldByKey(targetKey)
+        if not field then
+            return false
+        end
+
+        Private.QueueHideBlizzardDropDownLists()
+
+        local title = L.StrMasterLootGridTargetTitle
+        if field.label then
+            title = title .. ": " .. field.label
+        end
+
+        UI.Widgets.Call("MasterLootGrid", "ShowPicker", {
+            mode = "target",
+            title = title,
+            emptyText = L.StrMasterLootGridEmpty,
+            entries = Private.CollectAssignmentTargetEntries(),
+            anchor = field.frame or getFrame(),
+            onSelect = function(entry)
+                return Private.SetAssignmentTarget(targetKey, entry and entry.name)
+            end,
+        })
+        return true
     end
 
     -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
@@ -3507,19 +3948,15 @@ do
         if not owner or not value or not Database.GetCurrentRaid() then
             return
         end
-        UIDropDownMenu_SetText(owner, value)
-        UIDropDownMenu_SetSelectedValue(owner, value)
 
         local field = findDropDownField(owner:GetName())
         if field then
-            local raidStore = Database.GetRaidStoreOrNil("Master.OnClickDropDown", { "GetRaidByIndex" })
-            local raid = raidStore and raidStore:GetRaidByIndex(Database.GetCurrentRaid()) or nil
-            if raid then
-                raid[field.raidKey] = value
-                lootState[field.stateKey] = value
-            end
+            Private.SetAssignmentTarget(field.stateKey, value)
+            return
         end
 
+        UIDropDownMenu_SetText(owner, value)
+        UIDropDownMenu_SetSelectedValue(owner, value)
         dropDownDirty = true
         dirtyFlags.dropdowns = true
         dirtyFlags.buttons = true
@@ -3878,6 +4315,7 @@ do
 
     -- LOOT_CLOSED: Triggered when the loot window closes.
     function module:LOOT_CLOSED()
+        UI.Widgets.Call("MasterLootGrid", "Hide")
         Private.ClearLootFrameReserveHints()
         if canHandleLootWindow() or lootState.opened == true then
             if Raid.ClearLootWindowBossContext then
@@ -3892,6 +4330,18 @@ do
             clearMultiAwardState(false)
             scheduleLootClosedCleanup()
         end
+    end
+
+    function module:OPEN_MASTER_LOOT_LIST()
+        Private.OpenManualAwardGrid()
+    end
+
+    function module:UPDATE_MASTER_LOOT_LIST()
+        Private.RefreshManualAwardGrid()
+    end
+
+    function module:ShowDebugMasterLootGrid(count)
+        return Private.OpenDebugMasterLootGrid(count)
     end
 
     -- LOOT_SLOT_CLEARED: Triggered when an item is looted.
@@ -4440,6 +4890,8 @@ do
         registerWowForwarded("LOOT_OPENED")
         registerWowForwarded("LOOT_CLOSED")
         registerWowForwarded("LOOT_SLOT_CLEARED")
+        registerWowForwarded("OPEN_MASTER_LOOT_LIST")
+        registerWowForwarded("UPDATE_MASTER_LOOT_LIST")
         registerWowForwarded("PLAYER_TARGET_CHANGED")
         registerWowForwarded("UI_ERROR_MESSAGE")
         registerWowForwarded("TRADE_ACCEPT_UPDATE")

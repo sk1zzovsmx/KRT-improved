@@ -22,6 +22,9 @@ local Wow = Events.Wow
 
 Database.EnsureBootstrapEvents()
 
+Wow.OpenMasterLootList = Wow.OpenMasterLootList or "wow.OPEN_MASTER_LOOT_LIST"
+Wow.UpdateMasterLootList = Wow.UpdateMasterLootList or "wow.UPDATE_MASTER_LOOT_LIST"
+
 Internal.AddRoll = "AddRoll"
 Internal.LoggerLootLogRequest = "LoggerLootLogRequest"
 Internal.LoggerSelectRaid = "LoggerSelectRaid"

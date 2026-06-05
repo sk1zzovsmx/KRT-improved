@@ -82,6 +82,8 @@ local function seedBootstrapEvents()
     Wow.LootOpened = Wow.LootOpened or "wow.LOOT_OPENED"
     Wow.LootClosed = Wow.LootClosed or "wow.LOOT_CLOSED"
     Wow.LootSlotCleared = Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
+    Wow.OpenMasterLootList = Wow.OpenMasterLootList or "wow.OPEN_MASTER_LOOT_LIST"
+    Wow.UpdateMasterLootList = Wow.UpdateMasterLootList or "wow.UPDATE_MASTER_LOOT_LIST"
     Wow.PlayerTargetChanged = Wow.PlayerTargetChanged or "wow.PLAYER_TARGET_CHANGED"
     Wow.UiErrorMessage = Wow.UiErrorMessage or "wow.UI_ERROR_MESSAGE"
     Wow.ChatMsgWhisper = Wow.ChatMsgWhisper or "wow.CHAT_MSG_WHISPER"
@@ -812,6 +814,8 @@ do
         LOOT_CLOSED = "LOOT_CLOSED",
         LOOT_OPENED = "LOOT_OPENED",
         LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+        OPEN_MASTER_LOOT_LIST = "OPEN_MASTER_LOOT_LIST",
+        UPDATE_MASTER_LOOT_LIST = "UPDATE_MASTER_LOOT_LIST",
         PLAYER_TARGET_CHANGED = "PLAYER_TARGET_CHANGED",
         UI_ERROR_MESSAGE = "UI_ERROR_MESSAGE",
         TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
@@ -825,6 +829,8 @@ do
             LOOT_OPENED = WowEvents.LootOpened,
             LOOT_CLOSED = WowEvents.LootClosed,
             LOOT_SLOT_CLEARED = WowEvents.LootSlotCleared,
+            OPEN_MASTER_LOOT_LIST = WowEvents.OpenMasterLootList,
+            UPDATE_MASTER_LOOT_LIST = WowEvents.UpdateMasterLootList,
             PLAYER_TARGET_CHANGED = WowEvents.PlayerTargetChanged,
             UI_ERROR_MESSAGE = WowEvents.UiErrorMessage,
             CHAT_MSG_WHISPER = WowEvents.ChatMsgWhisper,

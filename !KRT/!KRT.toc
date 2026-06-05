@@ -106,6 +106,7 @@ Services\Rolls\Display.lua
 Services\Rolls\Service.lua
 Services\Loot\Service.lua
 Services\Debug.lua
+Widgets\MasterLootGrid.lua
 Controllers\Master.lua
 Widgets\LootCounter.lua
 Services\Reserves\Import.lua

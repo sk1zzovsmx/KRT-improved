@@ -152,6 +152,7 @@
 |   |-- Widgets
 |   |   |-- Config.lua
 |   |   |-- LootCounter.lua
+|   |   |-- MasterLootGrid.lua
 |   |   |-- README.md
 |   |   \\-- ReservesUI.lua
 |   |-- !KRT.toc
@@ -200,9 +201,11 @@
 |-- docs
 |   |-- superpowers
 |   |   |-- plans
-|   |   |   \\-- 2026-06-04-atlasloot-raid-dataset.md
+|   |   |   |-- 2026-06-04-atlasloot-raid-dataset.md
+|   |   |   \\-- 2026-06-05-master-loot-grid.md
 |   |   \\-- specs
-|   |       \\-- 2026-06-04-atlasloot-raid-dataset-design.md
+|   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
+|   |       \\-- 2026-06-05-master-loot-grid-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY.csv

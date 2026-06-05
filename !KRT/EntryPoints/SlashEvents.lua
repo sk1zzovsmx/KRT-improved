@@ -489,6 +489,34 @@ local function showBugReport()
     addon:info(L.MsgBugReportRole:format(yesNo(role.inRaid), yesNo(role.isLeader), yesNo(role.isAssistant), yesNo(role.isMasterLooter)))
 end
 
+local function handleDebugMasterLootGridCommand(arg)
+    local countArg, extra = Strings.SplitArgs(arg)
+    local count
+
+    if countArg == "" then
+        countArg = nil
+    end
+    if extra and extra ~= "" then
+        addon:warn(L.MsgDebugMasterLootGridInvalidCount)
+        return
+    end
+
+    if countArg then
+        count = tonumber(countArg)
+        if not count or count < 1 or count > 40 or count ~= floor(count) then
+            addon:warn(L.MsgDebugMasterLootGridInvalidCount)
+            return
+        end
+    end
+
+    local shown = Database.RequestControllerMethod("Master", "ShowDebugMasterLootGrid", count or 25)
+    if not shown then
+        addon:warn(L.MsgFeatureUnavailable, "Master", "debug mlgrid")
+        return
+    end
+    addon:info(L.MsgDebugMasterLootGridShown, shown)
+end
+
 local function handleDebugCommand(rest)
     local subCmd, arg = Strings.SplitArgs(rest)
     if isBlank(subCmd) then
@@ -539,6 +567,11 @@ local function handleDebugCommand(rest)
 
     if subCmd == "raid" or subCmd == "players" then
         handleDebugRaidCommand(arg)
+        return
+    end
+
+    if subCmd == "mlgrid" or subCmd == "lootgrid" then
+        handleDebugMasterLootGridCommand(arg)
         return
     end
 
@@ -1068,6 +1101,7 @@ local function handleHelpCommand(rest)
         printHelp("off", L.StrCmdToggle)
         printHelp("level <name|num>", L.StrCmdDebugLevel)
         printHelp("raid", L.StrCmdDebugRaid)
+        printHelp("mlgrid [1-40]", L.StrCmdDebugMasterLootGrid)
     elseif topic == "perf" or topic == "performance" then
         handlePerfCommand("help")
     elseif topic == "rw" or topic == "warn" or topic == "warning" or topic == "warnings" then
