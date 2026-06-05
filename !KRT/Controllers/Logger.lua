@@ -2752,6 +2752,8 @@ do
     local Actions = module.Actions
     local sortLoot
     local showLootTooltip
+    local showSourceTooltip
+    local buildSourceTooltipModel
     local confirmDeleteSelectedLootItems
 
     local function updateSourceHeaderState(frameName)
@@ -2881,6 +2883,27 @@ do
                         GameTooltip:Hide()
                     end)
                 end
+                local sourceHitBox = row.GetName and _G[row:GetName() .. "SourceHitBox"] or nil
+                if sourceHitBox and sourceHitBox.EnableMouse then
+                    sourceHitBox:EnableMouse(true)
+                end
+                if sourceHitBox then
+                    sourceHitBox._krtRow = row
+                    if UI.Tooltips and UI.Tooltips.BindModel then
+                        UI.Tooltips.BindModel(sourceHitBox, function(self)
+                            return buildSourceTooltipModel(self and self._krtRow)
+                        end, "ANCHOR_CURSOR")
+                    else
+                        UI.Frames.SetScriptSafely(sourceHitBox, "OnEnter", function(self)
+                            showSourceTooltip(self)
+                        end)
+                        UI.Frames.SetScriptSafely(sourceHitBox, "OnLeave", function()
+                            if UI.Tooltips and UI.Tooltips.Hide then
+                                UI.Tooltips.Hide()
+                            end
+                        end)
+                    end
+                end
 
                 -- Size the slot background to the button and the icon inset to reveal it.
                 if ui.ItemNormalTexture and ui.ItemNormalTexture.SetSize then
@@ -2899,6 +2922,10 @@ do
                     itemButton:EnableMouse(true)
                 end
             end
+            local sourceHitBox = row.GetName and _G[row:GetName() .. "SourceHitBox"] or nil
+            if sourceHitBox then
+                sourceHitBox._krtRow = row
+            end
 
             -- Preserve a tooltip-ready hyperlink on the pooled row.
             row._itemLink = it.itemLink
@@ -2914,9 +2941,14 @@ do
             local selectedBoss = module.selectedBoss
             if selectedBoss and tonumber(it.bossNid) == tonumber(selectedBoss) then
                 ui.Source:SetText("")
+                row._sourceCandidates = nil
             else
                 ui.Source:SetText(it.sourceName or "")
+                row._sourceCandidates = it.sourceCandidates
             end
+            row._sourceKind = it.sourceKind
+            row._sourceName = it.sourceName
+            row._sourceKey = it.sourceKey
             ui.Source:SetVertexColor(0.86, 0.82, 0.72)
 
             local winnerClass = it.looterClass or Services.Raid:GetPlayerClass(it.looter)
@@ -3039,6 +3071,53 @@ do
 
         GameTooltip:SetOwner(widget, "ANCHOR_CURSOR")
         GameTooltip:SetHyperlink(link)
+    end
+
+    buildSourceTooltipModel = function(row)
+        if not row then
+            return nil
+        end
+
+        local candidates = row._sourceCandidates
+        if type(candidates) ~= "table" or #candidates == 0 then
+            return nil
+        end
+
+        local lines = {}
+        for i = 1, #candidates do
+            local candidate = candidates[i]
+            local name = candidate and (candidate.name or candidate.npcName)
+            if name and name ~= "" then
+                lines[#lines + 1] = name
+            end
+        end
+        if #lines == 0 then
+            return nil
+        end
+
+        return {
+            title = L.StrLoggerSharedSource or "Shared",
+            titleColor = { 1, 0.82, 0 },
+            heading = L.StrLoggerSharedSourceTooltipSources or "Possible sources:",
+            headingColor = { 0.86, 0.82, 0.72 },
+            lineColor = { 1, 1, 1 },
+            lines = lines,
+            anchor = "ANCHOR_CURSOR",
+        }
+    end
+
+    showSourceTooltip = function(widget)
+        if not widget then
+            return
+        end
+        if not UI.Tooltips or not UI.Tooltips.ShowLines then
+            return
+        end
+
+        local model = buildSourceTooltipModel(widget._krtRow)
+        if model then
+            UI.Tooltips.ShowLines(widget, model)
+        end
     end
 
     do

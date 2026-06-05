@@ -460,17 +460,23 @@ do
 
         local schemaVersion = getSchemaVersion()
         local storedSchemaVersion = tonumber(raid.schemaVersion)
-        if not storedSchemaVersion or storedSchemaVersion < schemaVersion then
-            raid.schemaVersion = schemaVersion
-        else
-            raid.schemaVersion = storedSchemaVersion
-        end
 
         raid.players = (type(raid.players) == "table") and raid.players or {}
         raid.bossKills = (type(raid.bossKills) == "table") and raid.bossKills or {}
         raid.loot = (type(raid.loot) == "table") and raid.loot or {}
         raid.changes = (type(raid.changes) == "table") and raid.changes or {}
         raid.attendance = (type(raid.attendance) == "table") and raid.attendance or {}
+
+        local migrations = getMigrations()
+        if migrations and migrations.MigrateRaidToCurrentSchema then
+            migrations:MigrateRaidToCurrentSchema(raid, storedSchemaVersion, schemaVersion)
+        end
+
+        if not storedSchemaVersion or storedSchemaVersion < schemaVersion then
+            raid.schemaVersion = schemaVersion
+        else
+            raid.schemaVersion = storedSchemaVersion
+        end
 
         local allocatePlayerNid, getNextPlayerNid = createNidAllocator(raid.nextPlayerNid)
         local assignedByRef = {}

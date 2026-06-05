@@ -39,7 +39,7 @@ UI.Popups = Popups
 
 local Tooltips = UI.Tooltips or {}
 UI.Tooltips = Tooltips
-local tooltipColor = HIGHLIGHT_FONT_COLOR
+local tooltipColor = HIGHLIGHT_FONT_COLOR or { r = 1, g = 1, b = 1 }
 
 -- ----- Internal state ----- --
 local stateByModule = setmetatable({}, { __mode = "k" })
@@ -411,8 +411,85 @@ local function showTooltip(frame)
     GameTooltip:Show()
 end
 
+local function addTooltipLine(text, color, wrap)
+    if not text or not GameTooltip or not GameTooltip.AddLine then
+        return false
+    end
+
+    local r = color and color[1] or tooltipColor.r
+    local g = color and color[2] or tooltipColor.g
+    local b = color and color[3] or tooltipColor.b
+    GameTooltip:AddLine(text, r, g, b, wrap ~= false)
+    return true
+end
+
 function Tooltips.Hide()
     GameTooltip:Hide()
+end
+
+function Tooltips.ShowLines(owner, model)
+    if not owner or type(model) ~= "table" or not GameTooltip then
+        return false
+    end
+
+    local hasContent = false
+    if model.title and model.title ~= "" then
+        hasContent = true
+    end
+    if model.heading and model.heading ~= "" then
+        hasContent = true
+    end
+    if type(model.lines) == "table" and #model.lines > 0 then
+        hasContent = true
+    end
+    if not hasContent then
+        return false
+    end
+
+    local anchor = model.anchor or "ANCHOR_CURSOR"
+    GameTooltip:SetOwner(owner, anchor)
+    if model.title and model.title ~= "" then
+        addTooltipLine(model.title, model.titleColor, model.wrap)
+    end
+    if model.heading and model.heading ~= "" then
+        addTooltipLine(model.heading, model.headingColor, model.wrap)
+    end
+    if type(model.lines) == "table" then
+        for i = 1, #model.lines do
+            local line = model.lines[i]
+            if type(line) == "table" then
+                addTooltipLine(line.text, line.color, line.wrap)
+            elseif line and line ~= "" then
+                addTooltipLine(line, model.lineColor, model.wrap)
+            end
+        end
+    end
+
+    if GameTooltip.Show then
+        GameTooltip:Show()
+    end
+    return true
+end
+
+function Tooltips.BindModel(frame, modelProvider, anchor)
+    if not frame or type(modelProvider) ~= "function" then
+        return false
+    end
+
+    frame._krtTooltipModelProvider = modelProvider
+    frame._krtTooltipAnchor = anchor
+    frame:SetScript("OnEnter", function(self)
+        local model = self._krtTooltipModelProvider and self._krtTooltipModelProvider(self) or nil
+        if type(model) ~= "table" then
+            return
+        end
+        if model.anchor == nil and self._krtTooltipAnchor then
+            model.anchor = self._krtTooltipAnchor
+        end
+        Tooltips.ShowLines(self, model)
+    end)
+    frame:SetScript("OnLeave", Tooltips.Hide)
+    return true
 end
 
 function Tooltips.Bind(frame, text, anchor, title)

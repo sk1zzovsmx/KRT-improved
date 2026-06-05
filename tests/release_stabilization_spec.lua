@@ -3164,6 +3164,142 @@ test("runtime cache reuses runtime until invalidated", function()
     assertEqual(runtime3.lootIdxByNid[2], 2, "expected rebuilt loot index to include new loot")
 end)
 
+test("raid schema version includes shared loot source candidate migration", function()
+    local h = newHarness()
+    h:load("!KRT/Database/DBSchema.lua")
+
+    assertEqual(h.Database.GetRaidSchemaVersion(), 6, "expected shared source candidate migration to bump raid schema")
+end)
+
+test("raid store migrates legacy shared source labels to compact loot candidates", function()
+    local h = newHarness()
+    _G.KRT_Raids = {
+        {
+            schemaVersion = 5,
+            raidNid = 100,
+            players = {},
+            bossKills = {
+                {
+                    bossNid = 7,
+                    name = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                    sourceKind = "shared",
+                    source = "LootSources",
+                },
+            },
+            loot = {
+                {
+                    lootNid = 1,
+                    bossNid = 7,
+                    itemId = 91732,
+                    itemName = "Resolver Ambiguous Charm",
+                    lootSource = {
+                        kind = "shared",
+                        bossNid = 7,
+                        sourceNpcId = 0,
+                        sourceName = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                    },
+                },
+            },
+            changes = {},
+            attendance = {},
+            nextPlayerNid = 1,
+            nextBossNid = 8,
+            nextLootNid = 2,
+        },
+    }
+    h.Database.GetRaidSchemaVersion = function()
+        return 6
+    end
+    h:load("!KRT/Database/DBRaidMigrations.lua")
+    h.Database.GetRaidMigrations = function()
+        return h.addon.DB.RaidMigrations
+    end
+    h:load("!KRT/Database/DBRaidStore.lua")
+
+    local store = h.addon.DB.RaidStore
+    store:NormalizeAllRaids()
+    local raid = _G.KRT_Raids[1]
+
+    assertEqual(raid.schemaVersion, 6, "expected migrated raid to move to current schema")
+    assertEqual(raid.bossKills[1].name, "Shared", "expected legacy shared boss label to be compacted")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Shared", "expected legacy loot source label to be compacted")
+    assertTrue(type(raid.loot[1].lootSource.candidates) == "table", "expected migration to create shared candidates")
+    assertEqual(#raid.loot[1].lootSource.candidates, 2, "expected both legacy shared bosses to become candidates")
+    assertEqual(raid.loot[1].lootSource.candidates[1].name, "Grand Widow Faerlina", "expected first shared candidate name")
+    assertEqual(raid.loot[1].lootSource.candidates[2].name, "Noth the Plaguebringer", "expected second shared candidate name")
+end)
+
+test("raid store migrates compact shared rows through item id source resolver", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+    h.addon.LootSources._SetDataForTests({
+        [91732] = {
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
+        },
+    })
+    _G.KRT_Raids = {
+        {
+            schemaVersion = 5,
+            raidNid = 101,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {},
+            bossKills = {
+                {
+                    bossNid = 7,
+                    name = "Shared",
+                    sourceKind = "shared",
+                    source = "LootSources",
+                },
+            },
+            loot = {
+                {
+                    lootNid = 1,
+                    bossNid = 7,
+                    itemId = 91732,
+                    itemName = "Resolver Ambiguous Charm",
+                    lootSource = {
+                        kind = "shared",
+                        bossNid = 7,
+                        sourceNpcId = 0,
+                        sourceName = "Shared",
+                    },
+                },
+            },
+            changes = {},
+            attendance = {},
+            nextPlayerNid = 1,
+            nextBossNid = 8,
+            nextLootNid = 2,
+        },
+    }
+    h.Database.GetRaidSchemaVersion = function()
+        return 6
+    end
+    h:load("!KRT/Database/DBRaidMigrations.lua")
+    h.Database.GetRaidMigrations = function()
+        return h.addon.DB.RaidMigrations
+    end
+    h:load("!KRT/Database/DBRaidStore.lua")
+
+    local store = h.addon.DB.RaidStore
+    store:NormalizeAllRaids()
+    local raid = _G.KRT_Raids[1]
+    local lootSource = raid.loot[1].lootSource
+
+    assertEqual(raid.schemaVersion, 6, "expected migrated raid to move to current schema")
+    assertEqual(lootSource.sourceName, "Shared", "expected compact shared source label to remain compact")
+    assertTextContains(lootSource.sourceKey, "shared|", "expected item-id migration to keep the shared source key")
+    assertTrue(type(lootSource.candidates) == "table", "expected item-id migration to create shared candidates")
+    assertEqual(#lootSource.candidates, 2, "expected both resolver candidates to be migrated")
+    assertEqual(lootSource.candidates[1].name, "Grand Widow Faerlina", "expected first resolver candidate")
+    assertEqual(lootSource.candidates[1].sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected first resolver candidate source key")
+    assertEqual(lootSource.candidates[2].name, "Noth the Plaguebringer", "expected second resolver candidate")
+    assertEqual(lootSource.candidates[2].sourceKey, "naxxramas|boss|15954|noth the plaguebringer|any", "expected second resolver candidate source key")
+end)
+
 test("runtime cache indexes appended loot without rebuilding runtime", function()
     local h = newHarness()
     h:load("!KRT/Database/DBRaidStore.lua")
@@ -4369,6 +4505,129 @@ test("logger export returns header-only CSV when no rows match", function()
     )
 end)
 
+test("logger export writes shared loot sources as compact labels", function()
+    local _, raid, Export = setupLoggerExportHarness({
+        {
+            schemaVersion = 6,
+            raidNid = 47,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            startTime = 1700005000,
+            players = {},
+            bossKills = {
+                {
+                    bossNid = 13,
+                    name = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                    sourceKind = "shared",
+                    source = "LootSources",
+                    time = 1700005100,
+                },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    bossNid = 13,
+                    itemId = 91732,
+                    itemName = "Resolver Ambiguous Charm",
+                    time = 1700005110,
+                    lootSource = {
+                        kind = "shared",
+                        bossNid = 13,
+                        sourceNpcId = 0,
+                        sourceName = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                        sourceKey = "shared|naxxramas|boss|15953|grand widow faerlina|any;naxxramas|boss|15954|noth the plaguebringer|any",
+                        candidates = {
+                            { npcId = 15953, name = "Grand Widow Faerlina", kind = "boss", sourceKey = "naxxramas|boss|15953|grand widow faerlina|any" },
+                            { npcId = 15954, name = "Noth the Plaguebringer", kind = "boss", sourceKey = "naxxramas|boss|15954|noth the plaguebringer|any" },
+                        },
+                    },
+                },
+            },
+            nextPlayerNid = 1,
+            nextBossNid = 14,
+            nextLootNid = 102,
+        },
+    })
+
+    local csv = Export:GetLootCSV(raid, {})
+
+    assertTextContains(csv, ",13,Shared,", "expected shared export source to use the compact label")
+    assertTextNotContains(csv, "Grand Widow Faerlina", "expected shared export to omit tooltip-only candidates")
+    assertTextNotContains(csv, "Noth the Plaguebringer", "expected shared export to omit tooltip-only candidates")
+end)
+
+test("logger loot view exposes compact shared source label and candidates", function()
+    local h = newHarness()
+    h.feature.Sort.GetLootSortName = function(itemName, itemLink, itemId)
+        return tostring(itemName or itemLink or itemId or "")
+    end
+    h:installRaidStore({
+        {
+            schemaVersion = 6,
+            raidNid = 48,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {},
+            bossKills = {
+                {
+                    bossNid = 13,
+                    name = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                    sourceKind = "shared",
+                    source = "LootSources",
+                },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    bossNid = 13,
+                    itemId = 91732,
+                    itemName = "Resolver Ambiguous Charm",
+                    lootSource = {
+                        kind = "shared",
+                        bossNid = 13,
+                        sourceNpcId = 0,
+                        sourceName = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                        sourceKey = "shared|naxxramas|boss|15953|grand widow faerlina|any;naxxramas|boss|15954|noth the plaguebringer|any",
+                        candidates = {
+                            { npcId = 15953, name = "Grand Widow Faerlina", kind = "boss", sourceKey = "naxxramas|boss|15953|grand widow faerlina|any" },
+                            { npcId = 15954, name = "Noth the Plaguebringer", kind = "boss", sourceKey = "naxxramas|boss|15954|noth the plaguebringer|any" },
+                        },
+                    },
+                },
+            },
+            nextPlayerNid = 1,
+            nextBossNid = 14,
+            nextLootNid = 102,
+        },
+    })
+    h:load("!KRT/Database/DBRaidQueries.lua")
+
+    local raid = h.Database.EnsureRaidById(1)
+    local rows = h.addon.DB.RaidQueries:GetLoot(raid)
+
+    assertEqual(#rows, 1, "expected one loot row")
+    assertEqual(rows[1].sourceName, "Shared", "expected logger row to display compact shared source label")
+    assertEqual(rows[1].sourceKind, "shared", "expected logger row to expose shared source kind")
+    assertTrue(type(rows[1].sourceCandidates) == "table", "expected logger row to expose shared source candidates")
+    assertEqual(#rows[1].sourceCandidates, 2, "expected logger row to expose both possible source bosses")
+    assertEqual(rows[1].sourceCandidates[1].name, "Grand Widow Faerlina", "expected first tooltip candidate")
+    assertEqual(rows[1].sourceCandidates[1].sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected first tooltip candidate source key")
+    assertEqual(rows[1].sourceCandidates[2].name, "Noth the Plaguebringer", "expected second tooltip candidate")
+    assertEqual(rows[1].sourceCandidates[2].sourceKey, "naxxramas|boss|15954|noth the plaguebringer|any", "expected second tooltip candidate source key")
+    assertTextContains(rows[1].sourceKey, "shared|", "expected logger row to expose source key for future tooltips")
+end)
+
+test("logger loot XML exposes layout-only source column hitbox", function()
+    local xml = readText("!KRT/UI/Logger.xml")
+
+    assertTextContains(xml, 'name="$parentSourceHitBox"', "expected loot row XML to expose a source-column hitbox")
+    assertTextNotContains(xml, "<Scripts>", "Logger XML must stay layout-only")
+    assertTextNotContains(xml, "<OnEnter", "Logger XML must not bind tooltip handlers inline")
+    assertTextNotContains(xml, "<OnLeave", "Logger XML must not bind tooltip handlers inline")
+end)
+
 test("logger view lists only bosses attended by selected raid player", function()
     local h = newHarness()
     h:installRaidStore({
@@ -4828,6 +5087,8 @@ test("logger maintenance rebuilds missing loot sources from static source data",
     assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected missing loot source to bind to the rebuilt boss")
     assertEqual(raid.loot[1].lootSource.kind, "boss", "expected rebuilt loot row to store provenance kind")
     assertEqual(raid.loot[1].lootSource.sourceName, "Grand Widow Faerlina", "expected rebuilt loot row to store provenance name")
+    assertEqual(raid.loot[1].lootSource.sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected rebuilt loot row to store provenance source key")
+    assertEqual(raid.bossKills[1].sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected rebuilt static source boss to store source key")
 end)
 
 test("logger maintenance scans history report metrics", function()
@@ -5366,6 +5627,7 @@ test("loot source resolver filters candidates by raid and mode", function()
     assertEqual(resolved.npcName, "Grand Widow Faerlina", "expected resolved boss name")
     assertEqual(resolved.kind, "boss", "expected boss source kind")
     assertEqual(resolved.confidence, "exact", "expected exact source confidence")
+    assertEqual(resolved.sourceKey, "naxxramas|boss|15953|grand widow faerlina|normal10", "expected source key to include raid, source, and mode")
 end)
 
 test("loot source resolver returns shared candidates without context", function()
@@ -5383,9 +5645,14 @@ test("loot source resolver returns shared candidates without context", function(
 
     assertEqual(resolved.reason, "shared", "expected shared boss item to return structured shared context")
     assertEqual(resolved.kind, "shared", "expected shared boss item kind")
-    assertEqual(resolved.npcName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected shared display label")
+    assertEqual(resolved.npcName, "Shared", "expected shared display label")
     assertTrue(resolved.shared == true, "expected shared marker")
+    assertTextContains(resolved.sourceKey, "shared|", "expected shared result to expose a compact shared source key")
     assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")
+    assertEqual(resolved.candidates[1].npcName, "Grand Widow Faerlina", "expected first shared source candidate")
+    assertEqual(resolved.candidates[1].sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected first shared candidate source key")
+    assertEqual(resolved.candidates[2].npcName, "Noth the Plaguebringer", "expected second shared source candidate")
+    assertEqual(resolved.candidates[2].sourceKey, "naxxramas|boss|15954|noth the plaguebringer|any", "expected second shared candidate source key")
 end)
 
 test("loot source resolver uses recent context for shared boss items", function()
@@ -5537,6 +5804,82 @@ test("real loot source dataset includes AtlasLoot Naxxramas 25 Anub'Rekhan drops
     end
 end)
 
+test("real loot source dataset includes representative AtlasLoot Vanilla raid drops", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local resolved = h.addon.LootSources.FindSource(18832, {
+        raid = "Molten Core",
+        difficulty = 1,
+        raidSize = 40,
+    })
+
+    assertEqual(resolved.reason, nil, "expected Brutality Blade to resolve from Molten Core")
+    assertEqual(resolved.npcId, 12057, "expected Brutality Blade to resolve to Garr")
+    assertEqual(resolved.npcName, "Garr", "expected Vanilla source name")
+    assertTrue(resolved.modes.normal40 == true, "expected Vanilla raid mode")
+end)
+
+test("real loot source dataset includes representative AtlasLoot TBC raid drops", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local resolved = h.addon.LootSources.FindSource(32351, {
+        raid = "Black Temple",
+        difficulty = 2,
+        raidSize = 25,
+        recentSourceNpcId = 23420,
+    })
+
+    assertEqual(resolved.reason, nil, "expected Elunite Empowered Bracers to resolve from Black Temple")
+    assertEqual(resolved.npcId, 23420, "expected Elunite Empowered Bracers to resolve to Essence of Anger")
+    assertEqual(resolved.npcName, "Essence of Anger", "expected TBC source name")
+    assertTrue(resolved.modes.normal25 == true, "expected TBC raid mode")
+end)
+
+test("real loot source dataset includes representative AtlasLoot Wrath raid quest drops", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local resolved = h.addon.LootSources.FindSource(44650, {
+        raid = "The Eye of Eternity",
+        difficulty = 3,
+        raidSize = 10,
+    })
+
+    assertEqual(resolved.reason, nil, "expected Heart of Magic to resolve from The Eye of Eternity")
+    assertEqual(resolved.npcId, 28859, "expected Heart of Magic to resolve to Malygos")
+    assertEqual(resolved.npcName, "Malygos", "expected Wrath source name")
+    assertTrue(resolved.modes.normal10 == true, "expected Wrath 10-player raid mode")
+end)
+
+test("real loot source dataset includes representative AtlasLoot world boss drops", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local classic = h.addon.LootSources.FindSource(17070, {
+        raid = "Azshara",
+        difficulty = 1,
+        raidSize = 40,
+    })
+
+    assertEqual(classic.reason, nil, "expected Fang of the Mystics to resolve from Azshara")
+    assertEqual(classic.npcId, 6109, "expected Fang of the Mystics to resolve to Azuregos")
+    assertEqual(classic.npcName, "Azuregos", "expected Classic world boss source name")
+    assertTrue(classic.modes.normal40 == true, "expected Classic world boss mode")
+
+    local burningCrusade = h.addon.LootSources.FindSource(30733, {
+        raid = "Hellfire Peninsula",
+        difficulty = 1,
+        raidSize = 40,
+    })
+
+    assertEqual(burningCrusade.reason, nil, "expected Hope Ender to resolve from Hellfire Peninsula")
+    assertEqual(burningCrusade.npcId, 18728, "expected Hope Ender to resolve to Doom Lord Kazzak")
+    assertEqual(burningCrusade.npcName, "Doom Lord Kazzak", "expected TBC world boss source name")
+    assertTrue(burningCrusade.modes.normal40 == true, "expected TBC world boss mode")
+end)
+
 test("real loot source dataset preserves AtlasLoot Naxxramas 25 shared drops", function()
     local h = newHarness()
     loadRealLootSourceDataset(h)
@@ -5550,6 +5893,29 @@ test("real loot source dataset preserves AtlasLoot Naxxramas 25 shared drops", f
     assertEqual(resolved.reason, "shared", "expected Lost Jewel to remain shared without recent context")
     assertEqual(resolved.kind, "shared", "expected Lost Jewel to resolve as shared loot")
     assertTrue(#resolved.candidates >= 3, "expected Lost Jewel to keep multiple Naxxramas 25 source candidates")
+
+    local ring = h.addon.LootSources.FindSource(40108, {
+        raid = "Naxxramas",
+        difficulty = 4,
+        raidSize = 25,
+    })
+    local ringSources = {}
+    for i = 1, #(ring.candidates or {}) do
+        ringSources[ring.candidates[i].npcName] = true
+    end
+
+    assertEqual(ring.reason, "shared", "expected Seized Beauty to remain shared without recent context")
+    assertEqual(ring.kind, "shared", "expected Seized Beauty to resolve as shared loot")
+    assertTextContains(ring.sourceKey, "shared|", "expected Seized Beauty to expose a shared source key")
+    assertTrue(ringSources["Anub'Rekhan"] == true, "expected Seized Beauty to include Anub'Rekhan")
+    assertTrue(ringSources["Grand Widow Faerlina"] == true, "expected Seized Beauty to include Grand Widow Faerlina")
+    assertTrue(ringSources["Instructor Razuvious"] == true, "expected Seized Beauty to include Instructor Razuvious")
+    assertTrue(ringSources["Noth the Plaguebringer"] == true, "expected Seized Beauty to include Noth the Plaguebringer")
+    assertTrue(ringSources["Patchwerk"] == true, "expected Seized Beauty to include Patchwerk")
+    for i = 1, #(ring.candidates or {}) do
+        assertTextContains(ring.candidates[i].sourceKey, "naxxramas|boss|", "expected Seized Beauty candidates to expose source keys")
+        assertTextContains(ring.candidates[i].sourceKey, "normal25", "expected Seized Beauty candidate keys to keep Wrath 25 mode")
+    end
 end)
 
 test("real loot source dataset keeps Onyxia classic and level 80 modes separate", function()
@@ -5589,6 +5955,32 @@ test("real loot source dataset keeps Onyxia classic and level 80 modes separate"
     assertEqual(level80TwentyFive.npcId, 10184, "expected level 80 25-player Onyxia source to match")
     assertTrue(level80TwentyFive.modes.normal25 == true, "expected level 80 Onyxia 25-player loot to use normal25 mode")
     assertTrue(level80TwentyFive.modes.normal40 == nil, "expected level 80 Onyxia 25-player loot not to use classic mode")
+end)
+
+test("real loot source dataset keeps Classic and Wrath Naxxramas modes separate", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local classic = h.addon.LootSources.FindSource(23054, {
+        raid = "Naxxramas",
+        difficulty = 1,
+        raidSize = 40,
+    })
+
+    assertEqual(classic.reason, nil, "expected classic Naxxramas loot to resolve")
+    assertTrue(classic.modes.normal40 == true, "expected classic Naxxramas normal40 mode")
+    assertTrue(classic.modes.normal10 == nil, "expected classic Naxxramas not to inherit Wrath 10-player mode")
+    assertTrue(classic.modes.normal25 == nil, "expected classic Naxxramas not to inherit Wrath 25-player mode")
+
+    local wrath = h.addon.LootSources.FindSource(39719, {
+        raid = "Naxxramas",
+        difficulty = 4,
+        raidSize = 25,
+    })
+
+    assertEqual(wrath.reason, nil, "expected Wrath Naxxramas loot to resolve")
+    assertTrue(wrath.modes.normal25 == true, "expected Wrath Naxxramas 25-player mode")
+    assertTrue(wrath.modes.normal40 == nil, "expected Wrath Naxxramas not to inherit classic mode")
 end)
 
 test("group loot need selections log passive NE history on loot receipt", function()
@@ -7469,6 +7861,7 @@ test("group loot source resolver attributes passive boss item from static source
     assertTrue(type(raid.loot[1].lootSource) == "table", "expected passive loot row to persist static source provenance")
     assertEqual(raid.loot[1].lootSource.kind, "boss", "expected passive loot source kind")
     assertEqual(raid.loot[1].lootSource.sourceName, "Grand Widow Faerlina", "expected passive loot source name")
+    assertEqual(raid.loot[1].lootSource.sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected passive loot source key")
     assertEqual(raid.loot[1].rollType, h.rollTypes.GREED, "expected passive loot row to keep roll type")
     assertEqual(raid.loot[1].rollValue, 88, "expected passive loot row to keep roll score")
 end)
@@ -7514,12 +7907,14 @@ test("group loot source resolver prefers static source over recent boss context"
         { bossNid = 10, name = "Sapphiron", time = 990 },
     }
     raid.nextBossNid = 11
-    h.feature.raidState.bossEventContext = {
-        raidNum = 1,
-        bossNid = 10,
-        name = "Sapphiron",
-        source = "UNIT_DIED",
-        seenAt = currentTime,
+    h.feature.raidState.lootContext = {
+        eventBoss = {
+            raidNum = 1,
+            bossNid = 10,
+            name = "Sapphiron",
+            source = "UNIT_DIED",
+            seenAt = currentTime,
+        },
     }
     h.Database.SetLastBoss(nil)
 
@@ -7628,10 +8023,18 @@ test("group loot source resolver records shared static source for passive item",
     assertEqual(#resolverCalls, 2, "expected passive group loot to resolve both static source items")
     assertEqual(#raid.bossKills, 2, "expected passive group loot to create static source records")
     assertEqual(#raid.loot, 2, "expected seed and ambiguous item sources to create loot rows")
+    assertEqual(raid.bossKills[2].name, "Shared", "expected passive shared source boss record to use the compact label")
     assertEqual(raid.loot[2].bossNid, raid.bossKills[2].bossNid, "expected passive shared loot row to bind the shared source")
     assertTrue(type(raid.loot[2].lootSource) == "table", "expected passive shared loot row to persist source provenance")
     assertEqual(raid.loot[2].lootSource.kind, "shared", "expected passive shared loot source kind")
-    assertEqual(raid.loot[2].lootSource.sourceName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected passive shared source label")
+    assertEqual(raid.loot[2].lootSource.sourceName, "Shared", "expected passive shared source label")
+    assertTextContains(raid.loot[2].lootSource.sourceKey, "shared|", "expected passive shared source key")
+    assertTrue(type(raid.loot[2].lootSource.candidates) == "table", "expected passive shared loot source candidates")
+    assertEqual(#raid.loot[2].lootSource.candidates, 2, "expected passive shared loot source to keep both candidates")
+    assertEqual(raid.loot[2].lootSource.candidates[1].name, "Grand Widow Faerlina", "expected first passive shared candidate")
+    assertEqual(raid.loot[2].lootSource.candidates[1].sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected first passive shared candidate source key")
+    assertEqual(raid.loot[2].lootSource.candidates[2].name, "Noth the Plaguebringer", "expected second passive shared candidate")
+    assertEqual(raid.loot[2].lootSource.candidates[2].sourceKey, "naxxramas|boss|15954|noth the plaguebringer|any", "expected second passive shared candidate source key")
 end)
 
 test("group loot source resolver records shared passive source despite recent context", function()
@@ -7679,10 +8082,85 @@ test("group loot source resolver records shared passive source despite recent co
     assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
     assertEqual(#raid.bossKills, 2, "expected passive group loot to add a shared static source record")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected recent context boss to stay intact")
+    assertEqual(raid.bossKills[2].name, "Shared", "expected passive shared source boss record to use the compact label")
     assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected passive shared loot row to avoid recent context binding")
     assertTrue(type(raid.loot[1].lootSource) == "table", "expected passive shared loot row to persist source provenance")
     assertEqual(raid.loot[1].lootSource.kind, "shared", "expected passive shared loot source kind")
-    assertEqual(raid.loot[1].lootSource.sourceName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected passive shared source label")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Shared", "expected passive shared source label")
+    assertTrue(type(raid.loot[1].lootSource.candidates) == "table", "expected passive shared loot source candidates")
+    assertEqual(#raid.loot[1].lootSource.candidates, 2, "expected passive shared loot source to keep both candidates")
+    assertEqual(raid.loot[1].lootSource.candidates[1].name, "Grand Widow Faerlina", "expected first passive shared candidate")
+    assertEqual(raid.loot[1].lootSource.candidates[2].name, "Noth the Plaguebringer", "expected second passive shared candidate")
+end)
+
+test("master loot with boss context keeps real source over shared dataset fallback", function()
+    local h = newHarness()
+    local link = h.registerItem(91737, "Master Shared Context Blade")
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 6,
+            raidNid = 1,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {},
+            bossKills = {
+                { bossNid = 10, name = "Sapphiron", time = 990 },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = 10
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 4
+    end
+    h.feature.raidState.lootContext = {
+        eventBoss = {
+            raidNum = 1,
+            bossNid = 10,
+            name = "Sapphiron",
+            source = "UNIT_DIED",
+            seenAt = currentTime,
+        },
+    }
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "master-shared-context-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    h.addon.LootSources._SetDataForTests({
+        [91737] = {
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
+        },
+    })
+
+    local Raid = h.addon.Services.Raid
+    Raid:AddLoot("master-shared-context-self")
+
+    local raid = h.Database.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected master loot to avoid creating a shared static source when boss context exists")
+    assertEqual(raid.loot[1].bossNid, 10, "expected master loot to stay attached to the real boss context")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected master loot provenance to keep the real boss source kind")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Sapphiron", "expected master loot provenance to keep the real boss source name")
 end)
 
 test("group loot trash rolls do not inherit previous boss death context", function()
@@ -8994,6 +9472,97 @@ test("ui primitives expose pixel-aligned sizing helpers", function()
     assertTrue(math.abs(frame:GetHeight() - 10.666666666667) < 0.0000001, "expected height to align to physical pixels")
     assertTrue(math.abs(frame._point[4] - 2.1333333333333) < 0.0000001, "expected x offset to align to physical pixels")
     assertTrue(math.abs(frame._point[5] + 2.1333333333333) < 0.0000001, "expected y offset to align to physical pixels")
+end)
+
+test("ui tooltips render reusable multiline models", function()
+    local h = newHarness()
+    local owner = h.makeFrame(true, "TooltipOwner")
+    local calls = {}
+    _G.GameTooltip = {
+        SetOwner = function(self, frame, anchor)
+            self.owner = frame
+            self.anchor = anchor
+            calls[#calls + 1] = { kind = "owner", frame = frame, anchor = anchor }
+        end,
+        AddLine = function(self, text, r, g, b, wrap)
+            calls[#calls + 1] = { kind = "line", text = text, r = r, g = g, b = b, wrap = wrap }
+        end,
+        Show = function(self)
+            self.shown = true
+            calls[#calls + 1] = { kind = "show" }
+        end,
+        Hide = function(self)
+            self.hidden = true
+            calls[#calls + 1] = { kind = "hide" }
+        end,
+    }
+
+    h:load("!KRT/Modules/UI/Frames.lua")
+
+    local shown = h.addon.UI.Tooltips.ShowLines(owner, {
+        title = "Shared",
+        titleColor = { 1, 0.82, 0 },
+        heading = "Possible sources:",
+        lines = { "Grand Widow Faerlina", "Noth the Plaguebringer" },
+        anchor = "ANCHOR_CURSOR",
+    })
+
+    assertTrue(shown == true, "expected UI tooltip helper to report that it rendered a tooltip")
+    assertEqual(_G.GameTooltip.owner, owner, "expected UI tooltip helper to bind the provided owner")
+    assertEqual(_G.GameTooltip.anchor, "ANCHOR_CURSOR", "expected UI tooltip helper to use the provided anchor")
+    assertEqual(calls[2].text, "Shared", "expected UI tooltip helper to render the title")
+    assertEqual(calls[3].text, "Possible sources:", "expected UI tooltip helper to render the heading")
+    assertEqual(calls[4].text, "Grand Widow Faerlina", "expected UI tooltip helper to render first detail line")
+    assertEqual(calls[5].text, "Noth the Plaguebringer", "expected UI tooltip helper to render second detail line")
+    assertTrue(_G.GameTooltip.shown == true, "expected UI tooltip helper to show the tooltip")
+end)
+
+test("ui tooltips bind reusable model providers", function()
+    local h = newHarness()
+    local owner = h.makeFrame(true, "TooltipProviderOwner")
+    local calls = {}
+    _G.GameTooltip = {
+        SetOwner = function(self, frame, anchor)
+            self.owner = frame
+            self.anchor = anchor
+            calls[#calls + 1] = { kind = "owner", frame = frame, anchor = anchor }
+        end,
+        AddLine = function(self, text, r, g, b, wrap)
+            calls[#calls + 1] = { kind = "line", text = text, r = r, g = g, b = b, wrap = wrap }
+        end,
+        Show = function(self)
+            self.shown = true
+            calls[#calls + 1] = { kind = "show" }
+        end,
+        Hide = function(self)
+            self.hidden = true
+            calls[#calls + 1] = { kind = "hide" }
+        end,
+    }
+
+    h:load("!KRT/Modules/UI/Frames.lua")
+
+    local providerCalls = 0
+    local bound = h.addon.UI.Tooltips.BindModel(owner, function(frame)
+        providerCalls = providerCalls + 1
+        assertEqual(frame, owner, "expected tooltip provider to receive the bound frame")
+        return {
+            title = "Shared",
+            lines = { "Grand Widow Faerlina" },
+        }
+    end, "ANCHOR_RIGHT")
+
+    assertTrue(bound == true, "expected UI tooltip helper to bind a model provider")
+    owner.OnEnter(owner)
+
+    assertEqual(providerCalls, 1, "expected OnEnter to call the tooltip model provider")
+    assertEqual(_G.GameTooltip.owner, owner, "expected provider tooltip to bind the frame")
+    assertEqual(_G.GameTooltip.anchor, "ANCHOR_RIGHT", "expected provider tooltip to use the bind anchor")
+    assertEqual(calls[2].text, "Shared", "expected provider tooltip to render title")
+    assertEqual(calls[3].text, "Grand Widow Faerlina", "expected provider tooltip to render model lines")
+
+    owner.OnLeave(owner)
+    assertTrue(_G.GameTooltip.hidden == true, "expected provider tooltip OnLeave to hide")
 end)
 
 test("auto loot rules suggest disenchant for enchanting materials", function()

@@ -572,6 +572,8 @@ L.StrEditItemLooterHelp = "Enter the name of the winner:"
 L.StrEditItemRollType = "Change roll type"
 L.StrEditItemRollValue = "Change roll value"
 L.StrEditItemRollValueHelp = "Enter the value of the roll:"
+L.StrLoggerSharedSource = "Shared"
+L.StrLoggerSharedSourceTooltipSources = "Possible sources:"
 
 -- Add/Edit Boss:
 L.StrAddBoss = "Add Boss"

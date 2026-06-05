@@ -198,6 +198,11 @@
 |   |-- mcp.json
 |   \\-- settings.json
 |-- docs
+|   |-- superpowers
+|   |   |-- plans
+|   |   |   \\-- 2026-06-04-atlasloot-raid-dataset.md
+|   |   \\-- specs
+|   |       \\-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY.csv
@@ -241,6 +246,8 @@
 |-- tools
 |   |-- agent-skills.manifest.json
 |   |-- api-contract-cleanup-wave.md
+|   |-- atlasloot_raid_sources.py
+|   |-- atlasloot_raid_source_map.py
 |   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1

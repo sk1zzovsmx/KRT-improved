@@ -11,9 +11,9 @@ local Strings = feature.Strings
 
 local type, tonumber, tostring = type, tonumber, tostring
 local pairs = pairs
+local tconcat = table.concat
 local strlower = string.lower
 local gsub = string.gsub
-local concat = table.concat
 
 local LootSourcesData = feature.LootSourcesData or {}
 addon.LootSourcesData = LootSourcesData
@@ -42,6 +42,14 @@ local VALID_MODE_KEYS = {
     normal40 = true,
     heroic10 = true,
     heroic25 = true,
+}
+local MODE_KEY_ORDER = {
+    "normal10",
+    "normal20",
+    "normal25",
+    "normal40",
+    "heroic10",
+    "heroic25",
 }
 
 -- ----- Private helpers ----- --
@@ -75,15 +83,47 @@ local function copyModes(modes)
     return copied
 end
 
+local function getModeSignature(modes)
+    if type(modes) ~= "table" then
+        return "any"
+    end
+
+    local out = {}
+    for i = 1, #MODE_KEY_ORDER do
+        local mode = MODE_KEY_ORDER[i]
+        if modes[mode] == true then
+            out[#out + 1] = mode
+        end
+    end
+
+    return (#out > 0) and tconcat(out, ",") or "any"
+end
+
+local function buildCandidateSourceKey(candidate)
+    local raidKey = normalizeText(candidate and candidate.raid) or "unknown"
+    local kind = normalizeText(candidate and candidate.kind) or "boss"
+    local npcId = tonumber(candidate and (candidate.npcId or candidate.sourceNpcId)) or 0
+    local sourceName = normalizeText(candidate and (candidate.npcName or candidate.name)) or "unknown"
+    return tconcat({ raidKey, kind, tostring(npcId), sourceName, getModeSignature(candidate and candidate.modes) }, "|")
+end
+
 local function copyCandidate(candidate)
+    local modes = copyModes(candidate.modes)
     return {
         npcId = tonumber(candidate.npcId),
         npcName = candidate.npcName,
         raid = candidate.raid,
         kind = candidate.kind,
-        modes = copyModes(candidate.modes),
+        modes = modes,
         shared = candidate.shared == true,
         note = candidate.note,
+        sourceKey = candidate.sourceKey or buildCandidateSourceKey({
+            npcId = candidate.npcId,
+            npcName = candidate.npcName,
+            raid = candidate.raid,
+            kind = candidate.kind,
+            modes = modes,
+        }),
     }
 end
 
@@ -378,33 +418,28 @@ local function withSharedContext(candidate, candidates)
     return resolved
 end
 
-local function buildSharedSourceName(candidates)
-    local names = {}
-    local seen = {}
+local function buildSharedSourceKey(candidates)
+    local keys = {}
     for i = 1, #candidates do
-        local name = trimText(candidates[i].npcName)
-        if name ~= "" and not seen[name] then
-            names[#names + 1] = name
-            seen[name] = true
+        local candidate = candidates[i]
+        if type(candidate) == "table" then
+            keys[#keys + 1] = candidate.sourceKey or buildCandidateSourceKey(candidate)
         end
     end
-
-    if #names == 0 then
-        return "Shared"
-    end
-    return "Shared: " .. concat(names, " / ")
+    return (#keys > 0) and ("shared|" .. tconcat(keys, ";")) or nil
 end
 
 local function buildSharedSource(candidates)
     return {
         reason = "shared",
         npcId = 0,
-        npcName = buildSharedSourceName(candidates),
+        npcName = "Shared",
         raid = candidates[1] and candidates[1].raid or nil,
         kind = "shared",
         confidence = "shared",
         shared = true,
         note = "Shared",
+        sourceKey = buildSharedSourceKey(candidates),
         candidates = copyCandidates(candidates),
     }
 end

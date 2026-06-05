@@ -521,6 +521,14 @@
 			</Layer>
 		</Layers>
 		<Frames>
+			<Frame name="$parentSourceHitBox" enableMouse="true">
+				<Size>
+					<AbsDimension x="123" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="CENTER" relativeTo="$parentSource" relativePoint="CENTER" />
+				</Anchors>
+			</Frame>
 			<Button name="$parentItem" inherits="KRTItemButtonTemplate">
 				<Size>
 					<AbsDimension x="26" y="26" />

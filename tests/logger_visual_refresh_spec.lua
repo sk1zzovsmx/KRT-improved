@@ -7,6 +7,7 @@ end
 
 local logger = read("!KRT/Controllers/Logger.lua")
 local loggerXml = read("!KRT/UI/Logger.xml")
+local frames = read("!KRT/Modules/UI/Frames.lua")
 local visuals = read("!KRT/Modules/UI/Visuals.lua")
 local listController = read("!KRT/Modules/UI/ListController.lua")
 
@@ -49,6 +50,9 @@ assert(logger:find("Rows.SetLoggerRowIndex(row, visibleIndex)", 1, true), "Logge
 assert(logger:find("Rows.ApplyLoggerSkin(loggerPanelNames)", 1, true), "Logger controller must apply shared Logger skin")
 assert(logger:find("rightInset = 0", 1, true), "Logger lists must keep the existing scrollbar inset policy")
 assert(logger:find("setPanelVisible%(refs%.bossAttendees, false%)", 1, false), "Logger refresh must keep the boss attendee panel hidden")
+assert(frames:find("function Tooltips.ShowLines", 1, true), "Reusable multiline tooltip rendering must live in shared UI tooltips")
+assert(logger:find("UI.Tooltips.ShowLines", 1, true), "Logger source-column tooltips must render through shared UI.Tooltips")
+assert(not logger:find("GameTooltip:AddLine%(L%.StrLoggerSharedSource", 1, false), "Logger must not render shared source tooltip lines directly")
 
 assert(loggerXml:find('Frame name="KRTRaidAttendance"', 1, true), "Logger XML must define a distinct Raid Attendance frame")
 assert(loggerXml:find('Frame name="KRTRaidAttendanceRaids"', 1, true), "Raid Attendance XML must define a separate raids list")

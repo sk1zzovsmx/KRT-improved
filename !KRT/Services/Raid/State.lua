@@ -65,6 +65,37 @@ do
         return tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
     end
 
+    local function copySourceCandidates(candidates)
+        if type(candidates) ~= "table" then
+            return nil
+        end
+
+        local copied = {}
+        for i = 1, #candidates do
+            local candidate = candidates[i]
+            if type(candidate) == "table" then
+                local name = trimText(candidate.name or candidate.npcName, true)
+                if name then
+                    local out = {
+                        name = name,
+                        kind = trimText(candidate.kind, true) or "boss",
+                    }
+                    local sourceKey = trimText(candidate.sourceKey, true)
+                    if sourceKey then
+                        out.sourceKey = sourceKey
+                    end
+                    local npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or 0
+                    if npcId > 0 then
+                        out.npcId = npcId
+                    end
+                    copied[#copied + 1] = out
+                end
+            end
+        end
+
+        return (#copied > 0) and copied or nil
+    end
+
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
     local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
@@ -201,6 +232,23 @@ do
         return nil
     end
 
+    local function findBossBySourceKey(raid, sourceKey)
+        local queryKey = trimText(sourceKey, true)
+        if not queryKey then
+            return nil
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = #bosses, 1, -1 do
+            local boss = bosses[i]
+            if boss and trimText(boss.sourceKey, true) == queryKey then
+                return boss
+            end
+        end
+
+        return nil
+    end
+
     local function classifyNpcLootSource(npcId)
         local resolvedNpcId = tonumber(npcId) or 0
         if resolvedNpcId <= 0 then
@@ -257,6 +305,7 @@ do
         activeLoot.sourceUnit = sourceMeta and sourceMeta.unit or nil
         activeLoot.sourceNpcId = tonumber(sourceMeta and sourceMeta.npcId) or 0
         activeLoot.sourceName = sourceMeta and sourceMeta.name or nil
+        activeLoot.sourceKey = nil
         activeLoot.snapshotId = nil
         activeLoot.openedAt = resolvedNow
         activeLoot.expiresAt = expiresAt
@@ -567,6 +616,8 @@ do
         activeLoot.bossNid = resolvedBossNid
         activeLoot.sourceNpcId = tonumber(sourceMeta and sourceMeta.npcId) or tonumber(sourceMeta and sourceMeta.sourceNpcId) or 0
         activeLoot.sourceName = sourceName
+        activeLoot.sourceKey = trimText(sourceMeta and sourceMeta.sourceKey, true)
+        activeLoot.candidates = (resolvedKind == "shared") and copySourceCandidates(sourceMeta and sourceMeta.candidates) or nil
         activeLoot.snapshotId = tonumber(snapshotId) or nil
         activeLoot.openedAt = resolvedNow
         activeLoot.expiresAt = expiresAt
@@ -594,6 +645,7 @@ do
         activeLoot.windowExpiresAt = expiresAt
         if updateLootSource ~= false then
             activeLoot.kind = IsTrashMobName(boss.name) and "trash" or "boss"
+            activeLoot.sourceKey = trimText(sourceMeta and sourceMeta.sourceKey, true)
             activeLoot.snapshotId = tonumber(snapshotId) or nil
             activeLoot.openedAt = tonumber(now) or Time.GetCurrentTime()
             activeLoot.expiresAt = expiresAt
@@ -972,6 +1024,20 @@ do
         return tonumber(bossNid) or 0
     end
 
+    local function setActiveLootSourceFromBossNid(raid, raidNum, bossNid, now, ttlSeconds)
+        local currentSource = getLootSourceState()
+        if type(currentSource) == "table" and tonumber(currentSource.bossNid) == (tonumber(bossNid) or 0) and currentSource.kind then
+            return currentSource
+        end
+
+        local boss = findBossByNid(raid, bossNid)
+        if not boss then
+            return nil
+        end
+        local sourceKind = IsTrashMobName(boss.name) and "trash" or "boss"
+        return setActiveLootSource(raid, raidNum, sourceKind, bossNid, nil, now, ttlSeconds, nil)
+    end
+
     local function findOrCreateLootSourceBossNid(raid, raidNum, source, now)
         if type(raid) ~= "table" or type(source) ~= "table" then
             return 0
@@ -986,8 +1052,12 @@ do
             return 0
         end
 
+        local sourceKey = trimText(source.sourceKey, true)
         local existingBoss
-        if sourceNpcId > 0 then
+        if source.kind ~= "shared" and sourceKey then
+            existingBoss = findBossBySourceKey(raid, sourceKey)
+        end
+        if not existingBoss and sourceNpcId > 0 then
             existingBoss = findBossBySourceNpcId(raid, sourceNpcId)
         end
         if not existingBoss and (source.kind == "boss" or source.kind == "shared") then
@@ -1023,6 +1093,7 @@ do
             name = sourceName,
             sourceNpcId = sourceNpcId,
             sourceKind = source.kind,
+            sourceKey = source.kind ~= "shared" and sourceKey or nil,
             source = "LootSources",
             difficulty = instanceDiff,
             mode = (instanceDiff == 3 or instanceDiff == 4) and "h" or "n",
@@ -1042,7 +1113,7 @@ do
         return bossNid
     end
 
-    local function findOrCreateBossNidFromLootSource(raid, raidNum, itemId, rollSessionId, now, ttlSeconds)
+    local function findOrCreateBossNidFromLootSource(raid, raidNum, itemId, rollSessionId, now, ttlSeconds, deferShared)
         local numericItemId = tonumber(itemId) or 0
         if type(LootSources) ~= "table" or type(LootSources.FindSource) ~= "function" or numericItemId <= 0 then
             return 0, "unavailable"
@@ -1068,11 +1139,17 @@ do
             return 0, "ambiguous"
         end
 
+        if deferShared == true and source.kind == "shared" then
+            return 0, "shared"
+        end
+
         local bossNid = findOrCreateLootSourceBossNid(raid, raidNum, source, currentTime)
         if bossNid > 0 then
             setActiveLootSource(raid, raidNum, source.kind, bossNid, {
                 npcId = tonumber(source.npcId) or 0,
                 name = source.npcName,
+                sourceKey = source.sourceKey,
+                candidates = source.candidates,
             }, currentTime, ttlSeconds, nil)
         end
         if bossNid > 0 and rollSessionId then
@@ -1230,9 +1307,21 @@ do
         local allowTrashFallback = options.allowTrashFallback == true
         local ttlSeconds = options.ttlSeconds
 
-        local bossNid, lootSourceReason = findOrCreateBossNidFromLootSource(raid, raidNum, options.itemId, rollSessionId, currentTime, ttlSeconds)
+        local preferContextForShared = allowContextFallback == true
+        local bossNid, lootSourceReason = findOrCreateBossNidFromLootSource(raid, raidNum, options.itemId, rollSessionId, currentTime, ttlSeconds, preferContextForShared)
+        if bossNid <= 0 and lootSourceReason == "shared" and allowContextFallback then
+            bossNid = findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, currentTime, ttlSeconds, allowLootWindowContext, allowContextRecovery, true)
+            if bossNid > 0 then
+                setActiveLootSourceFromBossNid(raid, raidNum, bossNid, currentTime, ttlSeconds)
+            else
+                bossNid, lootSourceReason = findOrCreateBossNidFromLootSource(raid, raidNum, options.itemId, rollSessionId, currentTime, ttlSeconds, false)
+            end
+        end
         if bossNid <= 0 and lootSourceReason ~= "ambiguous" and allowContextFallback then
             bossNid = findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, currentTime, ttlSeconds, allowLootWindowContext, allowContextRecovery, true)
+            if bossNid > 0 then
+                setActiveLootSourceFromBossNid(raid, raidNum, bossNid, currentTime, ttlSeconds)
+            end
         end
         if bossNid <= 0 and allowTrashFallback then
             bossNid = findOrCreateTrashBossNid(raidNum, raid)

@@ -11,6 +11,7 @@ local feature = addon.Database.GetFeatureShared()
 local pairs = pairs
 local tostring = tostring
 local tonumber = tonumber
+local tconcat = table.concat
 local strlower = string.lower
 local gsub = string.gsub
 
@@ -25,6 +26,14 @@ local ByInstance = LootSourcesData.ByInstance
 local BOSS_SOURCE_KIND = "boss"
 local UNKNOWN_MODE_SIZE = 0
 local UNKNOWN_MODE_DIFFICULTY = "any"
+local MODE_KEY_ORDER = {
+    "normal10",
+    "normal20",
+    "normal25",
+    "normal40",
+    "heroic10",
+    "heroic25",
+}
 
 -- ----- Private helpers ----- --
 local function isBossSource(source)
@@ -55,6 +64,30 @@ local function copyModes(modes)
         copied[mode] = enabled
     end
     return copied
+end
+
+local function getModeSignature(modes)
+    if type(modes) ~= "table" then
+        return "any"
+    end
+
+    local out = {}
+    for i = 1, #MODE_KEY_ORDER do
+        local mode = MODE_KEY_ORDER[i]
+        if modes[mode] == true then
+            out[#out + 1] = mode
+        end
+    end
+
+    return (#out > 0) and tconcat(out, ",") or "any"
+end
+
+local function buildSourceKey(raidName, source)
+    local raidKey = normalizeText(raidName) or "unknown"
+    local kind = normalizeText(source and source.kind) or BOSS_SOURCE_KIND
+    local npcId = tonumber(source and (source.npcId or source.sourceNpcId)) or 0
+    local sourceName = normalizeText(source and (source.npcName or source.name)) or "unknown"
+    return tconcat({ raidKey, kind, tostring(npcId), sourceName, getModeSignature(source and source.modes) }, "|")
 end
 
 local function parseMode(mode)
@@ -108,15 +141,19 @@ local function addItemSource(itemId, source, raidName)
         ByItemId[numericItemId] = itemSources
     end
 
-    itemSources[#itemSources + 1] = {
+    local modes = copyModes(source.modes)
+    local candidate = {
         npcId = npcId,
         npcName = tostring(source.name or ""),
         npcNameNormalized = normalizeText(source.name),
         raid = tostring(raidName or ""),
         raidNormalized = normalizeText(raidName),
         kind = source.kind or BOSS_SOURCE_KIND,
-        modes = copyModes(source.modes),
+        modes = modes,
     }
+    candidate.sourceKey = source.sourceKey or buildSourceKey(raidName, candidate)
+
+    itemSources[#itemSources + 1] = candidate
 end
 
 local function addSourceToInstanceIndex(candidate, itemId)

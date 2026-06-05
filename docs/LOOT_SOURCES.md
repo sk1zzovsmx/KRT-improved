@@ -1,7 +1,8 @@
 # Loot Sources
 
-KRT uses `!KRT/Modules/LootSourcesData.lua` as a static raid-only item source table.
-The resolver targets stock WoW 3.3.5a raid data from Vanilla through WotLK.
+KRT uses `!KRT/Modules/LootSourcesData.lua` and the sharded static tables under
+`!KRT/Modules/Dataset/LootSources/` as its raid and world-boss item source table. The
+resolver targets stock WoW 3.3.5a raid data from Vanilla through WotLK.
 
 Loot source data is used for passive Group Loot and Need Before Greed attribution before
 timing-based fallbacks are considered. AtlasLoot and DataStore are not required at runtime.
@@ -13,74 +14,87 @@ timing-based fallbacks are considered. AtlasLoot and DataStore are not required 
 - AtlasLoot and DataStore are not runtime dependencies for source resolution.
 - Classic-era raid sizes use `normal20` and `normal40`; Wrath raids use `normal10`, `normal25`,
   `heroic10`, and `heroic25` when mode-specific data differs.
+- Classic and Wrath raid records with the same display name, such as Naxxramas and Onyxia's Lair,
+  remain separate records through mode metadata.
+
+## Build-Time Import
+
+`tools/atlasloot_raid_sources.py` regenerates the KRT shards from the existing KRT data plus
+reviewed AtlasLoot v5.11.04 raid and world-boss tables. `tools/atlasloot_raid_source_map.py`
+is the allow-list that maps AtlasLoot table keys to KRT raid names, source NPC IDs, and mode
+metadata.
+
+```powershell
+py -3 tools/atlasloot_raid_sources.py --atlasloot-root "<AtlasLoot Package path>"
+```
+
+If `--atlasloot-root` is omitted, the generator downloads the three raw AtlasLoot module files
+from the Plan414 addon repository. Pass `--no-download` when the import must use only local files.
 
 ## Data Rules
 
 - Prefer item IDs and NPC IDs over names.
-- Use `kind = "trash"` for trash sources.
-- Use `kind = "boss"` for boss and encounter sources backed by raid boss NPC IDs.
+- Use `kind = "trash"` for reviewed trash sources with specific NPC attribution.
+- Use `kind = "boss"` for boss, encounter, and world-boss sources backed by NPC IDs.
 - Add mode metadata when raid size, normal/heroic, or classic-era raid availability differs.
-- Exclude non-raid, vendor, crafted, PvP-only, reputation, and quest-only reward sources.
+- Keep positive item IDs from reviewed boss or encounter tables, including tokens, recipes,
+  quest starters, legendary components, mounts, emblems, and badges when AtlasLoot lists them
+  under that reviewed source.
+- Include reviewed outdoor world-boss tables as zone-backed records so the resolver can match
+  the outdoor raid zone.
+- Exclude standalone dungeon, key, set, vendor, crafted, PvP, faction, reputation, emblem,
+  badge, and quest-reward tables.
 - Do not bulk-map generic trash tables that do not identify a specific NPC source.
 
 ## Current Coverage
 
 Current generated coverage includes: Vanilla, The Burning Crusade, Wrath of the Lich King.
 
-The table is intentionally conservative for trash. Boss and encounter loot is generated from
-static guide tables, while generic trash sections without a unique NPC are omitted unless a
-specific NPC mapping has been reviewed. This avoids replacing timing ambiguity with false NPC
-attribution.
+The table is intentionally conservative for trash. Boss, encounter, and world-boss loot is
+generated from the reviewed AtlasLoot map, while generic trash sections without a unique NPC are
+omitted unless a specific NPC mapping has been reviewed. This avoids replacing timing ambiguity
+with false NPC attribution.
 
-- Molten Core: 138 item IDs, 220 source edges, 11 NPC/encounter sources
-- Onyxia's Lair: 86 item IDs, 86 source edges, 1 NPC/encounter sources
-- Blackwing Lair: 78 item IDs, 92 source edges, 8 NPC/encounter sources
-- Zul'Gurub: 105 item IDs, 107 source edges, 13 NPC/encounter sources
-- Ruins of Ahn'Qiraj: 64 item IDs, 66 source edges, 7 NPC/encounter sources
-- Temple of Ahn'Qiraj: 121 item IDs, 123 source edges, 12 NPC/encounter sources
-- Naxxramas: 492 item IDs, 630 source edges, 18 NPC/encounter sources
-- Karazhan: 146 item IDs, 200 source edges, 16 NPC/encounter sources
-- Gruul's Lair: 25 item IDs, 25 source edges, 2 NPC/encounter sources
-- Magtheridon's Lair: 18 item IDs, 18 source edges, 1 NPC/encounter sources
-- Serpentshrine Cavern: 70 item IDs, 71 source edges, 6 NPC/encounter sources
-- The Eye: 54 item IDs, 54 source edges, 4 NPC/encounter sources
-- Hyjal Summit: 69 item IDs, 101 source edges, 5 NPC/encounter sources
-- Black Temple: 110 item IDs, 128 source edges, 11 NPC/encounter sources
-- Zul'Aman: 56 item IDs, 61 source edges, 6 NPC/encounter sources
-- Sunwell Plateau: 92 item IDs, 131 source edges, 7 NPC/encounter sources
-- The Obsidian Sanctum: 44 item IDs, 44 source edges, 1 NPC/encounter sources
-- The Eye of Eternity: 32 item IDs, 32 source edges, 1 NPC/encounter sources
-- Vault of Archavon: 701 item IDs, 797 source edges, 4 NPC/encounter sources
-- Ulduar: 421 item IDs, 545 source edges, 16 NPC/encounter sources
-- Trial of the Crusader: 561 item IDs, 3676 source edges, 36 NPC/encounter sources
-- Icecrown Citadel: 501 item IDs, 609 source edges, 14 NPC/encounter sources
+Classic and Wrath records with the same displayed raid name are intentionally separate records.
+In the list below, the first Naxxramas and Onyxia's Lair entries are Classic records and the
+later entries are Wrath records.
+
+- Molten Core: 176 item IDs, 420 source edges, 11 NPC/encounter sources
+- Onyxia's Lair: 16 item IDs, 16 source edges, 1 NPC/encounter sources
+- Blackwing Lair: 147 item IDs, 183 source edges, 8 NPC/encounter sources
+- Zul'Gurub: 122 item IDs, 345 source edges, 13 NPC/encounter sources
+- Ruins of Ahn'Qiraj: 74 item IDs, 105 source edges, 7 NPC/encounter sources
+- Temple of Ahn'Qiraj: 138 item IDs, 269 source edges, 12 NPC/encounter sources
+- Naxxramas: 136 item IDs, 166 source edges, 14 NPC/encounter sources
+- Azshara: 12 item IDs, 12 source edges, 1 NPC/encounter sources
+- Ashenvale: 33 item IDs, 66 source edges, 4 NPC/encounter sources
+- Duskwood: 33 item IDs, 66 source edges, 4 NPC/encounter sources
+- Feralas: 33 item IDs, 66 source edges, 4 NPC/encounter sources
+- The Hinterlands: 33 item IDs, 66 source edges, 4 NPC/encounter sources
+- Karazhan: 147 item IDs, 232 source edges, 17 NPC/encounter sources
+- Gruul's Lair: 27 item IDs, 28 source edges, 2 NPC/encounter sources
+- Magtheridon's Lair: 23 item IDs, 23 source edges, 1 NPC/encounter sources
+- Serpentshrine Cavern: 75 item IDs, 81 source edges, 6 NPC/encounter sources
+- The Eye: 59 item IDs, 62 source edges, 4 NPC/encounter sources
+- Hyjal Summit: 70 item IDs, 106 source edges, 5 NPC/encounter sources
+- Black Temple: 115 item IDs, 151 source edges, 11 NPC/encounter sources
+- Zul'Aman: 57 item IDs, 67 source edges, 6 NPC/encounter sources
+- Sunwell Plateau: 118 item IDs, 168 source edges, 7 NPC/encounter sources
+- Hellfire Peninsula: 10 item IDs, 10 source edges, 1 NPC/encounter sources
+- Shadowmoon Valley: 10 item IDs, 10 source edges, 1 NPC/encounter sources
+- Naxxramas: 369 item IDs, 568 source edges, 18 NPC/encounter sources
+- Onyxia's Lair: 77 item IDs, 77 source edges, 1 NPC/encounter sources
+- The Obsidian Sanctum: 45 item IDs, 45 source edges, 1 NPC/encounter sources
+- The Eye of Eternity: 43 item IDs, 43 source edges, 1 NPC/encounter sources
+- Vault of Archavon: 807 item IDs, 1008 source edges, 4 NPC/encounter sources
+- Ulduar: 437 item IDs, 546 source edges, 16 NPC/encounter sources
+- Trial of the Crusader: 585 item IDs, 3756 source edges, 36 NPC/encounter sources
+- Icecrown Citadel: 513 item IDs, 669 source edges, 14 NPC/encounter sources
 - The Ruby Sanctum: 56 item IDs, 56 source edges, 1 NPC/encounter sources
 
 ## Reference Sources
 
-- https://www.wowhead.com/classic/guide/blackwing-lair-loot-classic-wow
-- https://www.wowhead.com/classic/guide/molten-core-loot-wow-classic
-- https://www.wowhead.com/classic/guide/onyxia-onyxias-lair-strategy-wow-classic
-- https://www.wowhead.com/classic/guide/ruins-ahnqiraj-aq20-loot-classic-wow
-- https://www.wowhead.com/classic/guide/temple-ahnqiraj-aq40-loot-classic-wow
-- https://www.wowhead.com/classic/guide/wow-classic-naxxramas-raid-loot-bosses-atiesh-frozen-runes
-- https://www.wowhead.com/classic/guide/wow-classic-zulgurub-loot-guide
-- https://www.wowhead.com/tbc/guide/black-temple-loot-gear-guide-burning-crusade-classic
-- https://www.wowhead.com/tbc/guide/gruuls-lair-and-magtheridons-lair-loot-guide-for-world-of-warcraft-burning-13462
-- https://www.wowhead.com/tbc/guide/hyjal-summit-loot-gear-guide-burning-crusade-classic
-- https://www.wowhead.com/tbc/guide/karazhan-raid-loot-gear-tier-tokens-burning-crusade-classic
-- https://www.wowhead.com/tbc/guide/serpentshrine-cavern-ssc-loot-gear-guide-burning-crusade-classic
-- https://www.wowhead.com/tbc/guide/sunwell-plateau-raid-gear-loot-burning-crusade-classic
-- https://www.wowhead.com/tbc/guide/the-eye-raid-gear-loot-burning-crusade-classic-wow
-- https://www.wowhead.com/tbc/guide/zulaman-za-loot-gear-guide-burning-crusade-classic
-- https://www.wowhead.com/wotlk/guide/raids/eye-of-eternity-loot
-- https://www.wowhead.com/wotlk/guide/raids/icecrown-citadel/loot
-- https://www.wowhead.com/wotlk/guide/raids/naxxramas/loot
-- https://www.wowhead.com/wotlk/guide/raids/obsidian-sanctum/loot
-- https://www.wowhead.com/wotlk/guide/raids/onyxias-lair-80/loot
-- https://www.wowhead.com/wotlk/guide/raids/ruby-sanctum/loot
-- https://www.wowhead.com/wotlk/guide/raids/trial-of-the-crusader/loot
-- https://www.wowhead.com/wotlk/guide/raids/trial-of-the-grand-crusader/loot
-- https://www.wowhead.com/wotlk/guide/raids/ulduar/loot
-- https://www.wowhead.com/wotlk/guide/raids/vault-of-archavon/loot
-- https://www.wowhead.com/wotlk/npc=38433/toravon-the-ice-watcher
+- Plan414 `AtlasLoot_OriginalWoW/originalwow.lua`.
+- Plan414 `AtlasLoot_BurningCrusade/burningcrusade.lua`.
+- Plan414 `AtlasLoot_WrathoftheLichKing/wrathofthelichking.lua`.
+- Existing KRT static shards are preserved as the curated base before import additions.

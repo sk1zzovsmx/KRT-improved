@@ -8,6 +8,21 @@ Release-Version: 0.7.1-beta.3
 
 ### Fixes
 
+- **Shared Loot History sources** - Bumped the raid SavedVariables schema to
+  migrate legacy `Shared: Boss A / Boss B` loot-source labels into compact
+  `Shared` rows with tooltip-only boss candidates, recover compact shared
+  candidate metadata from item IDs when the static loot-source resolver is
+  available during migration, kept CSV export on the compact label, and made
+  Master Loot prefer the real boss context over shared static dataset fallback
+  when the boss source is known.
+- **AtlasLoot raid dataset coverage** - Added a build-time AtlasLoot raid
+  source generator and regenerated the Vanilla, The Burning Crusade, and
+  Wrath loot-source shards from reviewed raid boss, world-boss, and encounter
+  tables, keeping non-raid AtlasLoot sections out of runtime data and preserving
+  separate Classic/Wrath records for raids such as Naxxramas and Onyxia's Lair.
+- **Naxxramas 25 loot-source data** - Corrected Seized Beauty (`40108`) so it
+  is treated as a shared Naxxramas 25 drop across Anub'Rekhan, Grand Widow
+  Faerlina, Instructor Razuvious, Noth the Plaguebringer, and Patchwerk.
 - **Logger attendance boss participation** - Stopped loot-source attribution
   records such as `Shared: ...` from seeding or displaying boss attendance,
   so Attendance shows player participation only for actual boss fights.

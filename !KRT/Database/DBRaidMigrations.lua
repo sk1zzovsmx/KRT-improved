@@ -19,6 +19,8 @@ do
 
     -- ----- Internal state ----- --
     local EMPTY_MIGRATIONS = {}
+    local SHARED_SOURCE_LABEL = "Shared"
+    local SHARED_SOURCE_PREFIX = "Shared:"
 
     -- ----- Private helpers ----- --
     local normalizeNameLower = function(value)
@@ -73,6 +75,185 @@ do
             return nil
         end
         return num
+    end
+
+    local function isLegacySharedText(value)
+        return type(value) == "string" and string.sub(value, 1, string.len(SHARED_SOURCE_PREFIX)) == SHARED_SOURCE_PREFIX
+    end
+
+    local function isSharedSourceName(value)
+        local text = normalizeTextOrNil(value)
+        return text == SHARED_SOURCE_LABEL or isLegacySharedText(text)
+    end
+
+    local function appendSharedCandidate(out, seen, rawName, rawNpcId, rawKind, rawSourceKey)
+        local name = normalizeTextOrNil(rawName)
+        if not name then
+            return
+        end
+
+        local key = normalizeNameLower(name) or name
+        if seen[key] then
+            return
+        end
+        seen[key] = true
+
+        local candidate = {
+            name = name,
+            kind = normalizeTextOrNil(rawKind) or "boss",
+        }
+        local sourceKey = normalizeTextOrNil(rawSourceKey)
+        if sourceKey then
+            candidate.sourceKey = sourceKey
+        end
+
+        local npcId = tonumber(rawNpcId)
+        if npcId and npcId > 0 then
+            candidate.npcId = npcId
+        end
+
+        out[#out + 1] = candidate
+    end
+
+    local function parseSharedCandidatesFromText(value)
+        local text = normalizeTextOrNil(value)
+        if not text then
+            return nil
+        end
+
+        if isLegacySharedText(text) then
+            text = normalizeTextOrNil(string.sub(text, string.len(SHARED_SOURCE_PREFIX) + 1))
+        end
+        if not text or text == SHARED_SOURCE_LABEL then
+            return nil
+        end
+
+        local out = {}
+        local seen = {}
+        for name in string.gmatch(text, "[^/]+") do
+            appendSharedCandidate(out, seen, name, nil, "boss")
+        end
+
+        return (#out > 0) and out or nil
+    end
+
+    local function compactSharedCandidates(candidates, fallbackText)
+        local out = {}
+        local seen = {}
+        if type(candidates) == "table" then
+            for i = 1, #candidates do
+                local candidate = candidates[i]
+                if type(candidate) == "table" then
+                    appendSharedCandidate(out, seen, candidate.name or candidate.npcName, candidate.npcId or candidate.sourceNpcId, candidate.kind, candidate.sourceKey)
+                end
+            end
+        end
+
+        if #out == 0 then
+            local parsed = parseSharedCandidatesFromText(fallbackText)
+            if type(parsed) == "table" then
+                for i = 1, #parsed do
+                    appendSharedCandidate(out, seen, parsed[i].name, parsed[i].npcId, parsed[i].kind, parsed[i].sourceKey)
+                end
+            end
+        end
+
+        return (#out > 0) and out or nil
+    end
+
+    local function getLootSourceResolver()
+        local resolver = feature.LootSources
+        if type(resolver) == "table" and type(resolver.FindSource) == "function" then
+            return resolver
+        end
+        return nil
+    end
+
+    local function buildLootSourceContext(raid)
+        local zone = raid and raid.zone or nil
+        return {
+            raid = zone,
+            zoneName = zone,
+            instanceName = zone,
+            raidSize = tonumber(raid and raid.size) or 0,
+            difficulty = tonumber(raid and raid.difficulty) or 0,
+        }
+    end
+
+    local function resolveSharedCandidatesFromItem(raid, loot)
+        local resolver = getLootSourceResolver()
+        local itemId = tonumber(loot and loot.itemId)
+        if not resolver or not itemId or itemId <= 0 then
+            return nil, nil
+        end
+
+        local source = resolver.FindSource(itemId, buildLootSourceContext(raid))
+        if type(source) ~= "table" or source.kind ~= "shared" then
+            return nil, nil
+        end
+
+        local candidates = compactSharedCandidates(source.candidates, nil)
+        if not candidates then
+            return nil, nil
+        end
+
+        return candidates, normalizeTextOrNil(source.sourceKey)
+    end
+
+    local function migrateSharedLootSources(raid)
+        if type(raid) ~= "table" then
+            return raid
+        end
+
+        local sharedCandidatesByBossNid = {}
+        local bosses = raid.bossKills or EMPTY_MIGRATIONS
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            if type(boss) == "table" then
+                local sourceKind = boss.sourceKind
+                local bossName = boss.name or boss.boss
+                if sourceKind == "shared" or isSharedSourceName(bossName) then
+                    local candidates = compactSharedCandidates(boss.candidates, bossName)
+                    boss.name = SHARED_SOURCE_LABEL
+                    boss.boss = nil
+                    boss.sourceKind = "shared"
+                    boss.source = boss.source or "LootSources"
+                    boss.sourceNpcId = nil
+                    boss.candidates = nil
+
+                    local bossNid = tonumber(boss.bossNid) or 0
+                    if bossNid > 0 and candidates then
+                        sharedCandidatesByBossNid[bossNid] = candidates
+                    end
+                end
+            end
+        end
+
+        local lootRows = raid.loot or EMPTY_MIGRATIONS
+        for i = 1, #lootRows do
+            local loot = lootRows[i]
+            if type(loot) == "table" then
+                local lootSource = type(loot.lootSource) == "table" and loot.lootSource or nil
+                local bossNid = tonumber(loot.bossNid) or 0
+                local sourceName = lootSource and lootSource.sourceName or nil
+                local sourceKind = lootSource and lootSource.kind or nil
+                local bossCandidates = sharedCandidatesByBossNid[bossNid]
+
+                if sourceKind == "shared" or bossCandidates or isSharedSourceName(sourceName) then
+                    local resolvedCandidates, resolvedSourceKey = resolveSharedCandidatesFromItem(raid, loot)
+                    lootSource = lootSource or {}
+                    lootSource.kind = "shared"
+                    lootSource.bossNid = bossNid
+                    lootSource.sourceNpcId = 0
+                    lootSource.sourceName = SHARED_SOURCE_LABEL
+                    lootSource.sourceKey = resolvedSourceKey or normalizeTextOrNil(lootSource.sourceKey)
+                    lootSource.candidates = resolvedCandidates or compactSharedCandidates(lootSource.candidates, sourceName) or bossCandidates
+                    loot.lootSource = lootSource
+                end
+            end
+        end
+
+        return raid
     end
 
     local function compactChangesMap(changes)
@@ -235,6 +416,7 @@ do
 
                 boss.time = normalizePositiveNumberOrNil(boss.time)
                 boss.hash = normalizeTextOrNil(boss.hash)
+                boss.sourceKey = normalizeTextOrNil(boss.sourceKey)
                 boss.attendanceMask = nil
 
                 local attendees = {}
@@ -294,6 +476,28 @@ do
                 loot.bossNid = (bossNid > 0) and bossNid or nil
 
                 loot.time = normalizePositiveNumberOrNil(loot.time)
+
+                local lootSource = type(loot.lootSource) == "table" and loot.lootSource or nil
+                if lootSource then
+                    local sourceKind = normalizeTextOrNil(lootSource.kind)
+                    lootSource.kind = sourceKind
+                    local sourceBossNid = tonumber(lootSource.bossNid) or tonumber(loot.bossNid) or 0
+                    lootSource.bossNid = (sourceBossNid > 0) and sourceBossNid or nil
+                    local sourceNpcId = tonumber(lootSource.sourceNpcId) or 0
+                    lootSource.sourceNpcId = (sourceNpcId > 0 or sourceKind == "shared") and sourceNpcId or nil
+                    lootSource.sourceName = normalizeTextOrNil(lootSource.sourceName)
+                    lootSource.sourceKey = normalizeTextOrNil(lootSource.sourceKey)
+                    lootSource.openedAt = normalizePositiveNumberOrNil(lootSource.openedAt)
+                    lootSource.snapshotId = normalizePositiveNumberOrNil(lootSource.snapshotId)
+
+                    if sourceKind == "shared" then
+                        lootSource.sourceName = SHARED_SOURCE_LABEL
+                        lootSource.sourceNpcId = 0
+                        lootSource.candidates = compactSharedCandidates(lootSource.candidates, nil)
+                    else
+                        lootSource.candidates = nil
+                    end
+                end
             end
         end
 
@@ -312,7 +516,17 @@ do
         return version
     end
 
+    function module:MigrateRaidToCurrentSchema(raid, fromVersion, toVersion)
+        local currentVersion = tonumber(toVersion) or self:GetCurrentVersion()
+        local storedVersion = tonumber(fromVersion) or 1
+        if currentVersion >= 6 and storedVersion < 6 then
+            migrateSharedLootSources(raid)
+        end
+        return raid
+    end
+
     function module:CompactRaidForPersistence(raid)
+        migrateSharedLootSources(raid)
         return compactRaidForPersistence(raid)
     end
 end

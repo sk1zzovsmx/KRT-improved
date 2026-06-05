@@ -19,6 +19,48 @@ module._Context = module._Context or {}
 local LootContext = module._Context
 
 -- ----- Private helpers ----- --
+local function normalizeTextOrNil(value)
+    if value == nil then
+        return nil
+    end
+    local text = tostring(value)
+    if text == "" then
+        return nil
+    end
+    return text
+end
+
+local function copySourceCandidates(candidates)
+    if type(candidates) ~= "table" then
+        return nil
+    end
+
+    local copied = {}
+    for i = 1, #candidates do
+        local candidate = candidates[i]
+        if type(candidate) == "table" then
+            local name = normalizeTextOrNil(candidate.name or candidate.npcName)
+            if name then
+                local out = {
+                    name = name,
+                    kind = normalizeTextOrNil(candidate.kind) or "boss",
+                }
+                local sourceKey = normalizeTextOrNil(candidate.sourceKey)
+                if sourceKey then
+                    out.sourceKey = sourceKey
+                end
+                local npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or 0
+                if npcId > 0 then
+                    out.npcId = npcId
+                end
+                copied[#copied + 1] = out
+            end
+        end
+    end
+
+    return (#copied > 0) and copied or nil
+end
+
 local function isValidLootSourceKind(kind)
     return kind == "boss" or kind == "trash" or kind == "shared" or kind == "object"
 end
@@ -117,9 +159,11 @@ function LootContext.NormalizeLootSourceState(state)
     state.bossNid = tonumber(state.bossNid) or 0
     state.sourceNpcId = tonumber(state.sourceNpcId) or 0
     state.sourceName = state.sourceName or nil
+    state.sourceKey = normalizeTextOrNil(state.sourceKey)
     state.openedAt = tonumber(state.openedAt) or 0
     state.snapshotId = tonumber(state.snapshotId) or nil
     state.expiresAt = tonumber(state.expiresAt) or 0
+    state.candidates = (state.kind == "shared") and copySourceCandidates(state.candidates) or nil
     if state.raidNum <= 0 or not state.kind then
         return nil
     end
@@ -138,10 +182,12 @@ function LootContext.NormalizeActiveLootContext(context)
     context.sourceUnit = context.sourceUnit or nil
     context.sourceNpcId = tonumber(context.sourceNpcId) or 0
     context.sourceName = context.sourceName or nil
+    context.sourceKey = normalizeTextOrNil(context.sourceKey)
     context.snapshotId = tonumber(context.snapshotId) or nil
     context.openedAt = tonumber(context.openedAt) or 0
     context.expiresAt = tonumber(context.expiresAt) or 0
     context.windowExpiresAt = tonumber(context.windowExpiresAt) or 0
+    context.candidates = (context.kind == "shared") and copySourceCandidates(context.candidates) or nil
     if context.raidNum <= 0 then
         return nil
     end
@@ -189,10 +235,12 @@ function LootContext.BuildActiveLootContext(activeLoot, lootWindowBossContext, l
         sourceUnit = activeWindow and activeWindow.sourceUnit or nil,
         sourceNpcId = tonumber(activeWindow and activeWindow.sourceNpcId) or tonumber(activeSource and activeSource.sourceNpcId) or 0,
         sourceName = (activeWindow and activeWindow.sourceName) or (activeSource and activeSource.sourceName) or nil,
+        sourceKey = activeSource and activeSource.sourceKey or nil,
         snapshotId = tonumber(activeSource and activeSource.snapshotId) or nil,
         openedAt = tonumber(activeSource and activeSource.openedAt) or 0,
         expiresAt = tonumber(activeSource and activeSource.expiresAt) or 0,
         windowExpiresAt = tonumber(activeWindow and activeWindow.expiresAt) or 0,
+        candidates = activeSource and activeSource.candidates or nil,
     })
 end
 
@@ -231,9 +279,11 @@ function LootContext.ProjectLootSourceState(context)
         bossNid = bossNid,
         sourceNpcId = tonumber(context.sourceNpcId) or 0,
         sourceName = context.sourceName or nil,
+        sourceKey = context.sourceKey or nil,
         openedAt = tonumber(context.openedAt) or 0,
         snapshotId = tonumber(context.snapshotId) or nil,
         expiresAt = tonumber(context.expiresAt) or 0,
+        candidates = context.candidates,
     })
 end
 
@@ -266,14 +316,19 @@ function LootContext.CopyLootSource(context, bossNidOverride)
         bossNid = overrideBossNid
     end
 
-    return {
+    local copied = {
         kind = source.kind,
         bossNid = bossNid,
         sourceNpcId = tonumber(source.sourceNpcId) or 0,
         sourceName = source.sourceName,
+        sourceKey = source.sourceKey,
         openedAt = tonumber(source.openedAt) or 0,
         snapshotId = tonumber(source.snapshotId) or nil,
     }
+    if source.kind == "shared" then
+        copied.candidates = copySourceCandidates(source.candidates)
+    end
+    return copied
 end
 
 local registry = feature.ModuleRegistry

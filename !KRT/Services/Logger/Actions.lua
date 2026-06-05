@@ -72,6 +72,40 @@ trimText = function(value)
     return Strings.NormalizeName(value) or ""
 end
 
+local function copySourceCandidates(candidates)
+    if type(candidates) ~= "table" then
+        return nil
+    end
+
+    local copied = {}
+    for i = 1, #candidates do
+        local candidate = candidates[i]
+        if type(candidate) == "table" then
+            local name = trimText(candidate.name or candidate.npcName)
+            if name ~= "" then
+                local out = {
+                    name = name,
+                    kind = trimText(candidate.kind),
+                }
+                if out.kind == "" then
+                    out.kind = "boss"
+                end
+                local sourceKey = trimText(candidate.sourceKey)
+                if sourceKey ~= "" then
+                    out.sourceKey = sourceKey
+                end
+                local npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or 0
+                if npcId > 0 then
+                    out.npcId = npcId
+                end
+                copied[#copied + 1] = out
+            end
+        end
+    end
+
+    return (#copied > 0) and copied or nil
+end
+
 local function removeFromList(list, value)
     if not (list and value) then
         return
@@ -264,6 +298,21 @@ findBossBySourceNpcId = function(raid, sourceNpcId)
     return nil
 end
 
+local function findBossBySourceKey(raid, sourceKey)
+    local queryKey = trimText(sourceKey)
+    if queryKey == "" then
+        return nil
+    end
+    local bosses = raid and raid.bossKills or {}
+    for i = 1, #bosses do
+        local boss = bosses[i]
+        if boss and trimText(boss.sourceKey) == queryKey then
+            return boss
+        end
+    end
+    return nil
+end
+
 shouldRebuildLootSource = function(raid, loot)
     if type(loot) ~= "table" then
         return false
@@ -314,7 +363,8 @@ findOrCreateStaticSourceBoss = function(raid, raidIndex, source, sourceTime)
         return 0, false
     end
 
-    local existingBoss = findBossBySourceNpcId(raid, sourceNpcId) or findBossByName(raid, sourceName)
+    local sourceKey = trimText(source.sourceKey)
+    local existingBoss = (sourceKind ~= "shared" and findBossBySourceKey(raid, sourceKey)) or findBossBySourceNpcId(raid, sourceNpcId) or findBossByName(raid, sourceName)
     local existingBossNid = tonumber(existingBoss and existingBoss.bossNid) or 0
     if existingBossNid > 0 then
         return existingBossNid, false
@@ -335,6 +385,7 @@ findOrCreateStaticSourceBoss = function(raid, raidIndex, source, sourceTime)
         name = sourceName,
         sourceNpcId = sourceNpcId,
         sourceKind = sourceKind,
+        sourceKey = sourceKind ~= "shared" and sourceKey ~= "" and sourceKey or nil,
         source = "LootSources",
         difficulty = difficulty,
         mode = (difficulty == 3 or difficulty == 4) and "h" or "n",
@@ -346,13 +397,19 @@ findOrCreateStaticSourceBoss = function(raid, raidIndex, source, sourceTime)
 end
 
 applyStaticLootSource = function(loot, source, bossNid)
+    local sourceName = trimText(source.npcName)
     loot.bossNid = bossNid
     loot.lootSource = {
         kind = source.kind,
         bossNid = bossNid,
         sourceNpcId = tonumber(source.npcId) or 0,
-        sourceName = trimText(source.npcName),
+        sourceName = sourceName,
+        sourceKey = trimText(source.sourceKey) ~= "" and trimText(source.sourceKey) or nil,
     }
+    if source.kind == "shared" then
+        loot.lootSource.sourceName = "Shared"
+        loot.lootSource.candidates = copySourceCandidates(source.candidates)
+    end
 end
 
 local function scanRaidPlayers(raid, result)

@@ -71,6 +71,10 @@ Strict mode status: current-schema reads are enabled; retired payload keys are s
 | `players` | table(array) | no | `{}` | `playerNid` values present for that kill. |
 | `time` | number | no | `nil` | Kill timestamp. |
 | `hash` | string | no | `nil` | Sync hash for the kill row. |
+| `source` | string | no | `nil` | Static provenance marker, for example `LootSources`, on synthetic source rows. |
+| `sourceKind` | string | no | `nil` | Static source kind (`boss`, `trash`, `shared`, or `object`) when the row is not a real boss kill. |
+| `sourceNpcId` | number | no | `nil` | NPC ID used by static source rows when available. |
+| `sourceKey` | string | no | `nil` | Stable static dataset source key used to distinguish same-name raid/source records. |
 
 ## LootRecord (`raid.loot[i]`)
 
@@ -91,6 +95,29 @@ Strict mode status: current-schema reads are enabled; retired payload keys are s
 | `bossNid` | number | no | `nil` | Source boss id (`0` omitted in v3 compaction). |
 | `time` | number | no | `nil` | Loot timestamp. |
 | `source` | string | no | `nil` | Optional loot origin marker (for example `TRADE_ONLY`). |
+| `lootSource` | table | no | `nil` | Optional structured source provenance copied from the live boss context or static loot-source resolver. |
+
+## LootSourceRecord (`raid.loot[i].lootSource`)
+
+| Field | Type | Req | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `kind` | string | no | `nil` | Source kind (`boss`, `trash`, `shared`, or `object`). |
+| `bossNid` | number | no | `nil` | Boss/source row associated with this loot record. |
+| `sourceNpcId` | number | no | `nil` | Source NPC ID when known; shared static rows store `0`. |
+| `sourceName` | string | no | `nil` | Display source label. Shared static rows use `Shared`. |
+| `sourceKey` | string | no | `nil` | Stable static dataset source key, including shared candidate keys for shared loot. |
+| `candidates` | table(array) | no | `nil` | Shared-only compact candidate list for tooltip display. |
+| `openedAt` | number | no | `nil` | LOOT_OPENED timestamp when captured from a loot-window source. |
+| `snapshotId` | number | no | `nil` | Loot-window snapshot identifier when available. |
+
+## LootSourceCandidate (`raid.loot[i].lootSource.candidates[j]`)
+
+| Field | Type | Req | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `name` | string | yes | n/a | Candidate boss/source display name. |
+| `kind` | string | no | `boss` | Candidate source kind. |
+| `npcId` | number | no | `nil` | Candidate NPC ID when known. |
+| `sourceKey` | string | no | `nil` | Stable candidate source key used by runtime/UI metadata. |
 
 ### v5 Persistence Compaction
 

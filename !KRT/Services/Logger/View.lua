@@ -22,6 +22,8 @@ local Logger = Services.Logger
 local View = Logger.View
 local Store = Logger.Store
 local buildRows
+local SHARED_SOURCE_LABEL = "Shared"
+local SHARED_SOURCE_PREFIX = "Shared:"
 
 -- ----- Private helpers ----- --
 local function isBossFightRecord(boss)
@@ -55,6 +57,97 @@ local function getRaidQueries()
         return Database.GetRaidQueries()
     end
     return nil
+end
+
+local function trimText(value)
+    if value == nil then
+        return ""
+    end
+    return tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function isLegacySharedText(value)
+    return type(value) == "string" and string.sub(value, 1, string.len(SHARED_SOURCE_PREFIX)) == SHARED_SOURCE_PREFIX
+end
+
+local function appendSourceCandidate(out, seen, rawName, rawNpcId, rawKind, rawSourceKey)
+    local name = trimText(rawName)
+    if name == "" or seen[name] then
+        return
+    end
+    seen[name] = true
+
+    local candidate = {
+        name = name,
+        kind = trimText(rawKind),
+    }
+    if candidate.kind == "" then
+        candidate.kind = "boss"
+    end
+    local sourceKey = trimText(rawSourceKey)
+    if sourceKey ~= "" then
+        candidate.sourceKey = sourceKey
+    end
+
+    local npcId = tonumber(rawNpcId) or 0
+    if npcId > 0 then
+        candidate.npcId = npcId
+    end
+    out[#out + 1] = candidate
+end
+
+local function parseSharedCandidatesFromText(value)
+    local text = trimText(value)
+    if not isLegacySharedText(text) then
+        return nil
+    end
+
+    text = trimText(string.sub(text, string.len(SHARED_SOURCE_PREFIX) + 1))
+    local out = {}
+    local seen = {}
+    for name in string.gmatch(text, "[^/]+") do
+        appendSourceCandidate(out, seen, name, nil, "boss")
+    end
+    return (#out > 0) and out or nil
+end
+
+local function copySourceCandidates(candidates, fallbackText)
+    local copied = {}
+    local seen = {}
+    if type(candidates) == "table" then
+        for i = 1, #candidates do
+            local candidate = candidates[i]
+            if type(candidate) == "table" then
+                appendSourceCandidate(copied, seen, candidate.name or candidate.npcName, candidate.npcId or candidate.sourceNpcId, candidate.kind, candidate.sourceKey)
+            end
+        end
+    end
+
+    if #copied == 0 then
+        local parsed = parseSharedCandidatesFromText(fallbackText)
+        if type(parsed) == "table" then
+            for i = 1, #parsed do
+                appendSourceCandidate(copied, seen, parsed[i].name, parsed[i].npcId, parsed[i].kind, parsed[i].sourceKey)
+            end
+        end
+    end
+
+    return (#copied > 0) and copied or nil
+end
+
+local function getLootSourceModel(loot, boss)
+    local lootSource = type(loot and loot.lootSource) == "table" and loot.lootSource or nil
+    local sourceKind = (lootSource and lootSource.kind) or (boss and boss.sourceKind) or nil
+    local bossName = boss and boss.name or ""
+    local lootSourceName = lootSource and lootSource.sourceName or nil
+    local sourceName = lootSourceName or bossName or ""
+    local sourceKey = lootSource and lootSource.sourceKey or boss and boss.sourceKey or nil
+
+    if sourceKind == "shared" or isLegacySharedText(sourceName) or isLegacySharedText(bossName) then
+        return SHARED_SOURCE_LABEL, "shared", copySourceCandidates(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
+    end
+
+    return sourceName, sourceKind, nil, sourceKey
 end
 
 -- ----- Public methods ----- --
@@ -243,7 +336,11 @@ function View:FillLootList(out, raid, bossNid, playerName)
         it.bossNid = v.bossNid
         it.sortName = GetLootSortName(v.itemName, v.itemLink, v.itemId)
         local boss = Store:GetBoss(raid, v.bossNid)
-        it.sourceName = (boss and boss.name) or ""
+        local sourceName, sourceKind, sourceCandidates, sourceKey = getLootSourceModel(v, boss)
+        it.sourceName = sourceName or ""
+        it.sourceKind = sourceKind
+        it.sourceCandidates = sourceCandidates
+        it.sourceKey = sourceKey
         it.looterNid = tonumber(v.looterNid)
         it.looter = Store._ResolveLootLooterName(raid, v) or ""
         it.looterClass = Store._ResolveLootLooterClass(raid, v)
