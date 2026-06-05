@@ -133,7 +133,7 @@ Common infra under `!KRT/Modules/`:
 - `Modules/LootSourcesData.lua` - static raid item-source data
 - `Modules/LootSources.lua` - itemId -> raid source resolver
 - `Modules/Dataset/IgnoredMobs.lua` - raid add/phase-ignore lookup plus canonical trash-mob name helpers
-- UI infra: `Frames`, `UIScaffold`, `ListController`, `MultiSelect`, `UI` facade, `UIEffects`
+- UI infra: `Frames`, `UI.Scaffold`, `ListController`, `Selection`, `UI` facade, `UI.Effects`
 - Messaging: `Bus`
 - Feature toggles: `Features`
 

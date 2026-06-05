@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: publish module APIs on addon.*
+-- exports: addon.UI.Primitives, addon.UI.Rows
 -- events: none
 
 local addon = select(2, ...)
@@ -11,13 +11,14 @@ local floor = math.floor
 local strmatch = string.match
 local tonumber, type = tonumber, type
 
-local UIEffects = feature.UIEffects
+local UI = feature.UI or {}
+local Effects = UI.Effects
 
-local UIPrimitives = feature.UIPrimitives or {}
-addon.UIPrimitives = UIPrimitives
+local Primitives = UI.Primitives or {}
+UI.Primitives = Primitives
 
-local UIRowVisuals = feature.UIRowVisuals or {}
-addon.UIRowVisuals = UIRowVisuals
+local Rows = UI.Rows or {}
+UI.Rows = Rows
 
 -- ----- Internal state ----- --
 
@@ -66,7 +67,7 @@ end
 local function setTextNamedPart(frameName, suffix, str1, str2, cond)
     local frame = getNamedFramePart(frameName, suffix)
     if frame then
-        UIPrimitives.SetText(frame, str1, str2, cond)
+        Primitives.SetText(frame, str1, str2, cond)
     end
     return frame
 end
@@ -92,7 +93,7 @@ local function alignToPixel(value, pixelScale)
 end
 
 -- ----- Public methods ----- --
-function UIPrimitives.SetPixelSize(frame, width, height, scaleX, scaleY)
+function Primitives.SetPixelSize(frame, width, height, scaleX, scaleY)
     if not frame then
         return false
     end
@@ -113,7 +114,7 @@ function UIPrimitives.SetPixelSize(frame, width, height, scaleX, scaleY)
     return true
 end
 
-function UIPrimitives.SetPixelPoint(frame, point, relativeTo, relativePoint, x, y, scaleX, scaleY)
+function Primitives.SetPixelPoint(frame, point, relativeTo, relativePoint, x, y, scaleX, scaleY)
     if not (frame and frame.SetPoint) then
         return false
     end
@@ -123,7 +124,7 @@ function UIPrimitives.SetPixelPoint(frame, point, relativeTo, relativePoint, x, 
     return true
 end
 
-function UIPrimitives.EnableDisable(frame, cond)
+function Primitives.SetEnabled(frame, cond)
     if not frame then
         return
     end
@@ -134,7 +135,7 @@ function UIPrimitives.EnableDisable(frame, cond)
     end
 end
 
-function UIPrimitives.Toggle(frame)
+function Primitives.Toggle(frame)
     if not frame then
         return
     end
@@ -145,7 +146,7 @@ function UIPrimitives.Toggle(frame)
     end
 end
 
-function UIPrimitives.ShowHide(frame, cond)
+function Primitives.SetShown(frame, cond)
     if not frame then
         return
     end
@@ -156,7 +157,7 @@ function UIPrimitives.ShowHide(frame, cond)
     end
 end
 
-function UIPrimitives.ToggleHighlight(frame, cond)
+function Primitives.SetHighlighted(frame, cond)
     if not frame then
         return
     end
@@ -167,7 +168,7 @@ function UIPrimitives.ToggleHighlight(frame, cond)
     end
 end
 
-function UIPrimitives.SetButtonCount(btn, baseText, n)
+function Primitives.SetButtonCount(btn, baseText, n)
     if not btn then
         return
     end
@@ -182,13 +183,13 @@ function UIPrimitives.SetButtonCount(btn, baseText, n)
     end
 end
 
-function UIPrimitives.SetButtonGlow(button, enabled, r, g, b, style, options)
-    if UIEffects and UIEffects.SetButtonGlow then
-        UIEffects.SetButtonGlow(button, enabled, r, g, b, style, options)
+function Primitives.SetButtonGlow(button, enabled, r, g, b, style, options)
+    if Effects and Effects.SetButtonGlow then
+        Effects.SetButtonGlow(button, enabled, r, g, b, style, options)
     end
 end
 
-function UIPrimitives.SetText(frame, str1, str2, cond)
+function Primitives.SetText(frame, str1, str2, cond)
     if not frame then
         return
     end
@@ -199,23 +200,23 @@ function UIPrimitives.SetText(frame, str1, str2, cond)
     end
 end
 
-function UIPrimitives.EnableDisableNamedPart(frameName, suffix, cond)
+function Primitives.SetNamedPartEnabled(frameName, suffix, cond)
     local frame = getNamedFramePart(frameName, suffix)
     if frame then
-        UIPrimitives.EnableDisable(frame, cond)
+        Primitives.SetEnabled(frame, cond)
     end
     return frame
 end
 
-function UIPrimitives.ShowHideNamedPart(frameName, suffix, cond)
+function Primitives.SetNamedPartShown(frameName, suffix, cond)
     local frame = getNamedFramePart(frameName, suffix)
     if frame then
-        UIPrimitives.ShowHide(frame, cond)
+        Primitives.SetShown(frame, cond)
     end
     return frame
 end
 
-function UIPrimitives.UpdateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
+function Primitives.UpdateNamedPartModeText(frameName, suffix, str1, str2, mode, lastMode)
     if mode ~= lastMode then
         setTextNamedPart(frameName, suffix, str1, str2, mode)
         return mode
@@ -223,11 +224,11 @@ function UIPrimitives.UpdateModeTextNamedPart(frameName, suffix, str1, str2, mod
     return lastMode
 end
 
-function UIRowVisuals.EnsureRowVisuals(row)
+function Rows.EnsureVisuals(row)
     ensureRowTextures(row)
 end
 
-function UIRowVisuals.SetRowSelected(row, cond)
+function Rows.SetSelected(row, cond)
     ensureRowTextures(row)
     if not row or not row._krtSelTex then
         return
@@ -244,7 +245,7 @@ function UIRowVisuals.SetRowSelected(row, cond)
     end
 end
 
-function UIRowVisuals.SetRowFocused(row, cond)
+function Rows.SetFocused(row, cond)
     ensureRowTextures(row)
     local texture = row and row._krtFocusTex
     if not texture then

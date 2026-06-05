@@ -9,13 +9,13 @@ local feature = addon.Database.GetFeatureShared()
 local L = feature.L
 
 local Options = feature.Options
-local Frames = feature.Frames
+local UI = feature.UI
+local UIWidgets = UI.Widgets
+local Frames = UI.Frames
 local Colors = feature.Colors
 local Database = feature.Database
 local Services = feature.Services
 local K_COLOR = feature.K_COLOR
-
-local UIFacade = feature.UI
 
 -- =========== Minimap Button Module  =========== --
 feature.Minimap = feature.Minimap or {}
@@ -33,14 +33,14 @@ local function getRaidService()
 end
 
 local function isWidgetAvailable(widgetId)
-    return UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId)
+    return UIWidgets.IsEnabled(widgetId) and UIWidgets.IsRegistered(widgetId)
 end
 
 local function callWidgetMethod(widgetId, methodName, ...)
-    if not (UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId)) then
+    if not (UIWidgets.IsEnabled(widgetId) and UIWidgets.IsRegistered(widgetId)) then
         return nil
     end
-    return UIFacade:Call(widgetId, methodName, ...)
+    return UIWidgets.Call(widgetId, methodName, ...)
 end
 
 local function toggleLootCounterWidget()
@@ -51,7 +51,7 @@ end
 local addonMenu
 local dragMode
 local dragActive = false
-local UI = {
+local uiState = {
     Bound = false,
 }
 
@@ -63,7 +63,7 @@ local MINIMAP_RING_RADIUS = 80
 local MIN_DRAG_DISTANCE = 0.001
 
 -- ----- Private helpers ----- --
-function UI.AcquireRefs(frame)
+function uiState.AcquireRefs(frame)
     return {
         button = frame,
     }
@@ -318,7 +318,7 @@ local function loadMinimapFrame(frame)
 end
 
 function module:BindUI()
-    if UI.Bound and self.frame and self.refs then
+    if uiState.Bound and self.frame and self.refs then
         return self.frame, self.refs
     end
 
@@ -327,17 +327,17 @@ function module:BindUI()
         return nil
     end
 
-    local refs = UI.AcquireRefs(frame)
+    local refs = uiState.AcquireRefs(frame)
     self.refs = refs
 
     loadMinimapFrame(frame)
 
-    UI.Bound = true
+    uiState.Bound = true
     return frame, refs
 end
 
 function module:EnsureUI()
-    if UI.Bound and self.frame and self.refs then
+    if uiState.Bound and self.frame and self.refs then
         return self.frame
     end
     return self:BindUI()

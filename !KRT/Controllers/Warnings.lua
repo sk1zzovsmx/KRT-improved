@@ -11,12 +11,14 @@ local Controllers = feature.Controllers
 local coreState = feature.coreState
 local Database = feature.Database
 
-local ListController = feature.ListController
-local Frames = feature.Frames
+local UI = feature.UI
+local Lists = UI.Lists
+local Frames = UI.Frames
+local Scaffold = UI.Scaffold
+local Primitives = UI.Primitives
+local EditBoxes = UI.EditBoxes
 local Strings = feature.Strings
 local Services = feature.Services
-local UIScaffold = feature.UIScaffold
-local UIPrimitives = feature.UIPrimitives
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -38,8 +40,7 @@ local ChatApi = {
 do
     Controllers.Warnings = Controllers.Warnings or {}
     local module = Controllers.Warnings
-    module._ui = UIScaffold.EnsureModuleUi(module)
-    local UI = module._ui
+    local uiState = Scaffold.EnsureModuleState(module)
 
     local getFrame = makeModuleFrameGetter(module, "KRTWarnings")
     -- ----- Internal state ----- --
@@ -193,7 +194,7 @@ do
         return stock
     end
 
-    function UI.AcquireRefs(frame)
+    function uiState.AcquireRefs(frame)
         return {
             name = Frames.GetRef(frame, "Name"),
             content = Frames.GetRef(frame, "Content"),
@@ -204,12 +205,12 @@ do
     end
 
     local function cancelWarning()
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
-        Frames.ResetEditBox(_G[frameName .. "Name"])
-        Frames.ResetEditBox(_G[frameName .. "Content"])
+        EditBoxes.Reset(_G[frameName .. "Name"])
+        EditBoxes.Reset(_G[frameName .. "Content"])
         selectedID = nil
         tempSelectedID = nil
         isEdit = false
@@ -250,7 +251,7 @@ do
 
     -- ----- Public methods ----- --
 
-    local controller = ListController.MakeListController({
+    local controller = Lists.CreateController({
         keyName = "WarningsList",
         poolTag = "warnings",
         _rowParts = { "ID", "Name" },
@@ -268,7 +269,7 @@ do
         end,
         rowTmpl = "KRTWarningButtonTemplate",
 
-        drawRow = ListController.CreateRowDrawer(function(row, it)
+        drawRow = Lists.CreateRowRenderer(function(row, it)
             bindWarningRow(row)
             local ui = row._p
             ui.ID:SetText(it.id)
@@ -280,7 +281,7 @@ do
         end,
     })
 
-    local panelScaffold = UIScaffold.CreateListPanelScaffold({
+    local panelScaffold = Scaffold.CreateListPanel({
         module = module,
         getFrame = getFrame,
         controller = controller,
@@ -289,10 +290,10 @@ do
             lastSelectedID = false
         end,
         localize = function()
-            UI.Localize()
+            uiState.Localize()
         end,
         update = function()
-            UI.Refresh()
+            uiState.Refresh()
         end,
     })
 
@@ -348,18 +349,18 @@ do
     end
 
     local function OnLoadFrame(frame)
-        UI.FrameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or UI.FrameName)
-        UI.Loaded = UI.FrameName ~= nil
-        return UI.FrameName
+        uiState.FrameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or uiState.FrameName)
+        uiState.Loaded = uiState.FrameName ~= nil
+        return uiState.FrameName
     end
 
-    UIScaffold.DefineModuleUi({
+    Scaffold.DefineModule({
         module = module,
         getFrame = getFrame,
-        acquireRefs = UI.AcquireRefs,
+        acquireRefs = uiState.AcquireRefs,
         bind = BindHandlers,
         localize = function()
-            UI.Localize()
+            uiState.Localize()
         end,
         onLoad = OnLoadFrame,
         refresh = function()
@@ -370,7 +371,7 @@ do
     -- Edit/Save warning:
     function editWarning()
         local wName, wContent
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -501,11 +502,11 @@ do
     end
 
     -- Localizing UI frame:
-    function UI.Localize()
-        if UI.Localized then
+    function uiState.Localize()
+        if uiState.Localized then
             return
         end
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -516,17 +517,17 @@ do
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
         Frames.SetFrameTitle(frameName, RAID_WARNING)
-        Frames.BindEditBoxHandlers(frameName, {
+        EditBoxes.BindHandlers(frameName, {
             { suffix = "Name", onEscape = cancelWarning, onEnter = editWarning },
             { suffix = "Content", onEscape = cancelWarning, onEnter = editWarning },
         }, function()
             module:RequestRefresh()
         end)
-        UI.Localized = true
+        uiState.Localized = true
     end
 
     local function updateSelectionUI()
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -544,8 +545,8 @@ do
     end
 
     -- UI refresh.
-    function UI.Refresh()
-        local frameName = UI.FrameName
+    function uiState.Refresh()
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -560,16 +561,16 @@ do
         end
         tempName = _G[frameName .. "Name"]:GetText()
         tempContent = _G[frameName .. "Content"]:GetText()
-        UIPrimitives.EnableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
-        UIPrimitives.EnableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
-        UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
+        Primitives.SetNamedPartEnabled(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
+        Primitives.SetNamedPartEnabled(frameName, "DeleteBtn", selectedID ~= nil)
+        Primitives.SetNamedPartEnabled(frameName, "AnnounceBtn", selectedID ~= nil)
         local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "EditBtn", L.BtnSave, L.BtnEdit, editBtnMode, lastEditBtnMode)
+        lastEditBtnMode = Primitives.UpdateNamedPartModeText(frameName, "EditBtn", L.BtnSave, L.BtnEdit, editBtnMode, lastEditBtnMode)
     end
 
     -- Saving a Warning:
     function saveWarning(wContent, wName, wID)
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -595,8 +596,8 @@ do
             savedID = #warnings
         end
 
-        Frames.ResetEditBox(_G[frameName .. "Name"])
-        Frames.ResetEditBox(_G[frameName .. "Content"])
+        EditBoxes.Reset(_G[frameName .. "Name"])
+        EditBoxes.Reset(_G[frameName .. "Content"])
         selectedID = savedID
         tempSelectedID = nil
         isEdit = false

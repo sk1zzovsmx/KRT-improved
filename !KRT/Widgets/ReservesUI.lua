@@ -10,9 +10,13 @@ local L = feature.L
 local Diag = feature.Diag
 
 local Widgets = feature.Widgets
-local Frames = feature.Frames
-local UIScaffold = feature.UIScaffold
-local UIPrimitives = feature.UIPrimitives
+local UI = feature.UI
+local UIWidgets = UI.Widgets
+local Frames = UI.Frames
+local Scaffold = UI.Scaffold
+local Primitives = UI.Primitives
+local EditBoxes = UI.EditBoxes
+local Tooltips = UI.Tooltips
 local Events = feature.Events
 local C = feature.C
 local Options = feature.Options
@@ -28,8 +32,6 @@ local format = string.format
 local tostring, tonumber = tostring, tonumber
 
 local InternalEvents = Events.Internal
-local UIFacade = feature.UI
-
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Widgets/ReservesUI", {
@@ -49,14 +51,13 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
 end
 
 do
-    if not UIFacade:IsEnabled("Reserves") then
+    if not UIWidgets.IsEnabled("Reserves") then
         return
     end
 
     Widgets.ReservesUI = Widgets.ReservesUI or {}
     local module = Widgets.ReservesUI
-    module._ui = UIScaffold.EnsureModuleUi(module)
-    local UI = module._ui
+    local uiState = Scaffold.EnsureModuleState(module)
     local Reserves = Services and Services.Reserves
 
     -- ----- Internal state ----- --
@@ -84,7 +85,7 @@ do
         return Reserves and Reserves.HasData and Reserves:HasData() or false
     end
 
-    function UI.AcquireRefs(frame)
+    function uiState.AcquireRefs(frame)
         return {
             closeButton = Frames.GetRef(frame, "CloseButton"),
             clearButton = Frames.GetRef(frame, "ClearButton"),
@@ -139,7 +140,7 @@ do
 
         if row.iconBtn then
             row.iconBtn:SetScript("OnEnter", showItemTooltip)
-            row.iconBtn:SetScript("OnLeave", Frames.HideTooltip)
+            row.iconBtn:SetScript("OnLeave", Tooltips.Hide)
         end
 
         if row.textBlock then
@@ -154,7 +155,7 @@ do
                 hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
                 hs:EnableMouse(true)
                 hs:SetScript("OnEnter", showItemTooltip)
-                hs:SetScript("OnLeave", Frames.HideTooltip)
+                hs:SetScript("OnLeave", Tooltips.Hide)
                 row._nameHotspot = hs
             end
 
@@ -167,7 +168,7 @@ do
                 hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
                 hs:EnableMouse(true)
                 hs:SetScript("OnEnter", showPlayersTooltip)
-                hs:SetScript("OnLeave", Frames.HideTooltip)
+                hs:SetScript("OnLeave", Tooltips.Hide)
                 row._playersHotspot = hs
             end
         end
@@ -285,14 +286,14 @@ do
         module:RequestRefresh()
     end
 
-    function UI.Localize()
-        if UI.Localized then
+    function uiState.Localize()
+        if uiState.Localized then
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogReservesUIAlreadyLocalized)
             end
             return
         end
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -314,11 +315,11 @@ do
         if closeButton then
             closeButton:SetText(L.BtnClose)
         end
-        UI.Localized = true
+        uiState.Localized = true
     end
 
-    function UI.Refresh()
-        local frameName = UI.FrameName
+    function uiState.Refresh()
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -327,11 +328,11 @@ do
         if clearButton then
             clearButton:SetText(hasData and L.BtnClearReserves or L.BtnImport)
             clearButton:Show()
-            UIPrimitives.EnableDisable(clearButton, true)
+            Primitives.SetEnabled(clearButton, true)
         end
         local queryButton = _G[frameName .. "QueryButton"]
         if queryButton then
-            UIPrimitives.EnableDisable(queryButton, hasData)
+            Primitives.SetEnabled(queryButton, hasData)
         end
     end
 
@@ -369,7 +370,7 @@ do
     end
 
     local function createReserveHeader(parent, source, yOffset, index)
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return nil
         end
@@ -395,7 +396,7 @@ do
     end
 
     local function createReserveRow(parent, info, yOffset, index, isFirstInGroup)
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return nil
         end
@@ -436,7 +437,7 @@ do
 
     local function renderReserveListUI()
         local frame = getFrame()
-        if not frame or not scrollChild or not UI.FrameName then
+        if not frame or not scrollChild or not uiState.FrameName then
             return
         end
 
@@ -538,10 +539,10 @@ do
     -- ----- Public methods ----- --
 
     local function refreshReservesUi()
-        if not UI.Localized then
-            UI.Localize()
+        if not uiState.Localized then
+            uiState.Localize()
         end
-        UI.Refresh()
+        uiState.Refresh()
         renderReserveListUI()
     end
 
@@ -563,7 +564,7 @@ do
                 if hasReserveData() then
                     clearSavedReservesFromUI()
                 else
-                    UIFacade:Call("Reserves", "ToggleImport")
+                    UIWidgets.Call("Reserves", "ToggleImport")
                 end
             end)
             if isDebugEnabled() then
@@ -589,7 +590,7 @@ do
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesFrameLoaded)
         end
-        UI.FrameName = Frames.BindModuleFrame(module, frame, {
+        uiState.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 if isDebugEnabled() then
@@ -601,9 +602,9 @@ do
                     addon:debug(Diag.D.LogReservesHideWindow)
                 end
             end,
-        }) or UI.FrameName
-        UI.Loaded = UI.FrameName ~= nil
-        if not UI.Loaded then
+        }) or uiState.FrameName
+        uiState.Loaded = uiState.FrameName ~= nil
+        if not uiState.Loaded then
             return
         end
 
@@ -629,16 +630,16 @@ do
 
     local function OnLoadFrame(frame)
         loadReservesFrame(frame)
-        return UI.FrameName
+        return uiState.FrameName
     end
 
-    UIScaffold.DefineModuleUi({
+    Scaffold.DefineModule({
         module = module,
         getFrame = getFrame,
-        acquireRefs = UI.AcquireRefs,
+        acquireRefs = uiState.AcquireRefs,
         bind = BindHandlers,
         localize = function()
-            UI.Localize()
+            uiState.Localize()
         end,
         onLoad = OnLoadFrame,
         refresh = function()
@@ -650,21 +651,12 @@ do
 
     module.Import = module.Import or {}
     local Import = module.Import
-    Import._ui = Import._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
-    local ImportUI = Import._ui
+    local importUiState = Scaffold.EnsureModuleState(Import)
     local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
     local MODE_MULTI, MODE_PLUS = 0, 1
     local importFormat = "json"
 
-    function ImportUI.AcquireRefs(frame)
+    function importUiState.AcquireRefs(frame)
         return {
             cancelButton = _G["KRTImportCancelButton"],
             confirmButton = _G["KRTImportConfirmButton"],
@@ -767,8 +759,8 @@ do
         }
     end
 
-    function ImportUI.Localize()
-        if ImportUI.Localized then
+    function importUiState.Localize()
+        if importUiState.Localized then
             return
         end
         local frame = getImportFrame()
@@ -777,7 +769,7 @@ do
             return
         end
 
-        Frames.SetFrameTitle(ImportUI.FrameName or frame, L.StrImportReservesTitle)
+        Frames.SetFrameTitle(importUiState.FrameName or frame, L.StrImportReservesTitle)
 
         local hint = _G["KRTImportWindowHint"]
         if hint then
@@ -818,7 +810,7 @@ do
             cancelButton:SetText(L.BtnClose)
         end
 
-        ImportUI.Localized = true
+        importUiState.Localized = true
     end
 
     local function configureImportEditBox(editBox, scrollFrame)
@@ -951,8 +943,8 @@ do
     end
 
     local function refreshImportFrame()
-        if not ImportUI.Localized then
-            ImportUI.Localize()
+        if not importUiState.Localized then
+            importUiState.Localize()
         end
 
         refreshChoiceButtons()
@@ -964,10 +956,10 @@ do
     end
 
     local function loadImportFrame(frame)
-        ImportUI.FrameName = Frames.BindModuleFrame(Import, frame, {
+        importUiState.FrameName = Frames.BindModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
-                Frames.ResetEditBox(_G["KRTImportEditBox"])
+                EditBoxes.Reset(_G["KRTImportEditBox"])
                 local editBox = _G["KRTImportEditBox"]
                 if editBox then
                     editBox:SetFocus()
@@ -976,9 +968,9 @@ do
                 setImportStatus("")
                 Import:RequestRefresh()
             end,
-        }) or ImportUI.FrameName
-        ImportUI.Loaded = ImportUI.FrameName ~= nil
-        if not ImportUI.Loaded then
+        }) or importUiState.FrameName
+        importUiState.Loaded = importUiState.FrameName ~= nil
+        if not importUiState.Loaded then
             return
         end
 
@@ -987,16 +979,16 @@ do
 
     local function onLoadImportFrame(frame)
         loadImportFrame(frame)
-        return ImportUI.FrameName
+        return importUiState.FrameName
     end
 
-    UIScaffold.DefineModuleUi({
+    Scaffold.DefineModule({
         module = Import,
         getFrame = getImportFrame,
-        acquireRefs = ImportUI.AcquireRefs,
+        acquireRefs = importUiState.AcquireRefs,
         bind = bindImportHandlers,
         localize = function()
-            ImportUI.Localize()
+            importUiState.Localize()
         end,
         onLoad = onLoadImportFrame,
         refresh = function()
@@ -1055,9 +1047,9 @@ do
         return true, nPlayersOrErr
     end
 
-    UIFacade:Register(
+    UIWidgets.Register(
         "Reserves",
-        UIScaffold.MakeStandardWidgetApi(module, {
+        Scaffold.CreateWidgetApi(module, {
             ToggleImport = function()
                 Import:Toggle()
             end,

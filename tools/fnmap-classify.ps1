@@ -162,7 +162,7 @@ function Test-FrameworkHook([object]$row, [string]$functionKey) {
         return $true
     }
 
-    if ($fn -match "^(UI|ImportUI|Box)\.(AcquireRefs|Localize|LocalizeUI|RefreshUI)$") {
+    if ($fn -match "^(uiState|importUiState|Box)\.(AcquireRefs|Localize|LocalizeUI|RefreshUI)$") {
         return $true
     }
 

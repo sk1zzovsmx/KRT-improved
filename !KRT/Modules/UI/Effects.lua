@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: publish module APIs on addon.*
+-- exports: addon.UI.Effects
 -- events: none; owns UI effect OnUpdate drivers
 
 local addon = select(2, ...)
@@ -12,8 +12,9 @@ local max = math.max
 local lower = string.lower
 local pairs = pairs
 
-local UIEffects = feature.UIEffects or {}
-addon.UIEffects = UIEffects
+local UI = feature.UI or {}
+local Effects = UI.Effects or {}
+UI.Effects = Effects
 
 -- ----- Internal state ----- --
 local DEFAULT_GLOW_METHOD = "Proc"
@@ -70,7 +71,7 @@ local METHOD_VISUALS = {
     },
 }
 
-UIEffects.GlowMethods = {
+Effects.GlowMethods = {
     canonical = { "ACShine", "Pixel", "Proc", "buttonOverlay" },
     types = METHOD_VISUALS,
     defaultSettings = {},
@@ -122,7 +123,7 @@ local function buildMethodDefaults(methodKey, options)
 end
 
 for methodKey, _ in pairs(METHOD_VISUALS) do
-    UIEffects.GlowMethods.defaultSettings[methodKey] = buildMethodDefaults(methodKey)
+    Effects.GlowMethods.defaultSettings[methodKey] = buildMethodDefaults(methodKey)
 end
 
 -- ----- Private helpers ----- --
@@ -559,7 +560,7 @@ local function ensureGlow(button)
     return glow
 end
 
-function UIEffects.SetButtonGlow(button, enabled, r, g, b, methodName, options)
+function Effects.SetButtonGlow(button, enabled, r, g, b, methodName, options)
     local glow = ensureGlow(button)
 
     if not enabled then

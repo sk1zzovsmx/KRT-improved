@@ -153,6 +153,20 @@ Get-ChildItem -Recurse !KRT/UI -Filter *.xml |
   Select-String -Pattern "<Scripts>|<On[A-Za-z]+>"
 ```
 
+## 4.1 UI Contract Review Checklist
+
+Use this manual checklist for Controller, Widget, XML, and shared UI changes:
+
+- Controller/Widget frame lifecycle uses `UI.Scaffold.DefineModule(cfg)` or documents an exception.
+- `addon.UI.ModuleState` keeps the canonical `Loaded`, `Bound`, `Localized`, `Dirty`, `Reason`, `FrameName`.
+- Repeated scroll lists or tables use `addon.UI.Lists` unless static or explicitly exempt.
+- Standard list widgets use `FrameNameScrollFrame` and `FrameNameScrollFrameScrollChild`.
+- Selectable row selected/focused state uses `addon.UI.Rows`.
+- Editbox behavior uses `EditBoxes.BindHandlers`, `EditBoxes.Reset`, or `EditBoxes.SetValue`.
+- Reusable border, spacing, row visual, glow, and primitive behavior stays under `Modules/UI/*`.
+- Services do not reference frames, widgets, Controllers, `UI.Scaffold`, or shared UI helper modules.
+- XML remains layout-only with no `<Scripts>` or `<On...>` handlers.
+
 ## 5) Release-Path Checks
 
 ```powershell

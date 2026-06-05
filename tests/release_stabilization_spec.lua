@@ -727,7 +727,20 @@ local function newHarness()
         Services = services,
         Widgets = {},
         DB = {},
-        UIPrimitives = {},
+        UI = {
+            Widgets = {},
+            Primitives = {},
+            Rows = {},
+            Scaffold = {},
+            Frames = {},
+            Lists = {},
+            Selection = {},
+            Effects = {},
+            Layout = {},
+            EditBoxes = {},
+            Popups = {},
+            Tooltips = {},
+        },
         Colors = {},
         Base64 = {},
         C = C,
@@ -1072,7 +1085,7 @@ local function newHarness()
         return active
     end
 
-    addon.UI = {
+    addon.UI.Widgets = {
         IsEnabled = function()
             return true
         end,
@@ -1080,19 +1093,19 @@ local function newHarness()
         Call = function() end,
     }
 
-    addon.UIPrimitives.EnableDisable = function(frame, enabled)
+    addon.UI.Primitives.SetEnabled = function(frame, enabled)
         if frame then
             frame._enabled = enabled and true or false
         end
     end
 
-    addon.UIPrimitives.SetButtonGlow = function(frame, enabled)
+    addon.UI.Primitives.SetButtonGlow = function(frame, enabled)
         if frame then
             frame._glow = enabled and true or false
         end
     end
 
-    addon.UIPrimitives.Toggle = function(frame)
+    addon.UI.Primitives.Toggle = function(frame)
         if not frame then
             return
         end
@@ -1103,7 +1116,7 @@ local function newHarness()
         end
     end
 
-    addon.UIPrimitives.ShowHide = function(frame, shown)
+    addon.UI.Primitives.SetShown = function(frame, shown)
         if not frame then
             return
         end
@@ -1114,10 +1127,10 @@ local function newHarness()
         end
     end
 
-    addon.UIRowVisuals = {
-        EnsureRowVisuals = function() end,
-        SetRowSelected = function() end,
-        SetRowFocused = function() end,
+    addon.UI.Rows = {
+        EnsureVisuals = function() end,
+        SetSelected = function() end,
+        SetFocused = function() end,
     }
 
     addon.Comms = {
@@ -1143,9 +1156,10 @@ local function newHarness()
         end,
     }
 
-    addon.UIScaffold = {
-        EnsureModuleUi = function(module)
-            module._ui = module._ui
+    local moduleStateStore = setmetatable({}, { __mode = "k" })
+    addon.UI.ModuleState = {
+        Ensure = function(module)
+            moduleStateStore[module] = moduleStateStore[module]
                 or {
                     Loaded = false,
                     Bound = false,
@@ -1154,15 +1168,23 @@ local function newHarness()
                     Reason = nil,
                     FrameName = nil,
                 }
-            return module._ui
+            return moduleStateStore[module]
         end,
-        DefineModuleUi = function() end,
-        MakeStandardWidgetApi = function(_, api)
+        Get = function(module)
+            return moduleStateStore[module]
+        end,
+    }
+    addon.UI.Scaffold = {
+        EnsureModuleState = function(module)
+            return addon.UI.ModuleState.Ensure(module)
+        end,
+        DefineModule = function() end,
+        CreateWidgetApi = function(_, api)
             return api or {}
         end,
     }
 
-    addon.Frames = {
+    addon.UI.Frames = {
         Get = function(name)
             return _G[name]
         end,
@@ -1217,48 +1239,6 @@ local function newHarness()
         MakeFrameGetter = function(name)
             return function()
                 return _G[name]
-            end
-        end,
-        MakeEditBoxPopup = function(name, _, onAccept, onShow, validate)
-            _G[name] = {
-                onAccept = onAccept,
-                onShow = onShow,
-                validate = validate,
-            }
-        end,
-        SetTooltip = function() end,
-        SetEditBoxValue = function(editBox, value)
-            if editBox and editBox.SetText then
-                editBox:SetText(tostring(value or ""))
-            end
-        end,
-        BindEditBoxHandlers = function(frameName, specs, requestRefreshFn)
-            if type(frameName) ~= "string" or type(specs) ~= "table" then
-                return
-            end
-
-            for i = 1, #specs do
-                local spec = specs[i]
-                local suffix = spec and spec.suffix
-                local editBox = suffix and _G[frameName .. suffix] or nil
-                if editBox then
-                    if spec.onEscape then
-                        editBox.OnEscapePressed = spec.onEscape
-                    end
-                    if spec.onEnter then
-                        editBox.OnEnterPressed = spec.onEnter
-                    end
-                    if spec.onFocusLost then
-                        editBox.OnEditFocusLost = spec.onFocusLost
-                    end
-                    if requestRefreshFn then
-                        editBox.OnTextChanged = function(_, isUserInput)
-                            if isUserInput then
-                                requestRefreshFn()
-                            end
-                        end
-                    end
-                end
             end
         end,
         GetButtonPopup = function(cfg)
@@ -1377,20 +1357,67 @@ local function newHarness()
 
             return popup
         end,
-        ResetEditBox = function(editBox)
-            if editBox and editBox.SetText then
-                editBox:SetText("")
-            end
-        end,
     }
 
-    addon.ListController = {
-        CreateRowDrawer = function(fn)
+    addon.UI.Popups.DefineEditBox = function(name, _, onAccept, onShow, validate)
+        _G[name] = {
+            onAccept = onAccept,
+            onShow = onShow,
+            validate = validate,
+        }
+    end
+
+    addon.UI.Tooltips.Bind = function() end
+
+    addon.UI.EditBoxes.SetValue = function(editBox, value)
+        if editBox and editBox.SetText then
+            editBox:SetText(tostring(value or ""))
+        end
+    end
+
+    addon.UI.EditBoxes.BindHandlers = function(frameName, specs, requestRefreshFn)
+        if type(frameName) ~= "string" or type(specs) ~= "table" then
+            return
+        end
+
+        for i = 1, #specs do
+            local spec = specs[i]
+            local suffix = spec and spec.suffix
+            local editBox = suffix and _G[frameName .. suffix] or nil
+            if editBox then
+                if spec.onEscape then
+                    editBox.OnEscapePressed = spec.onEscape
+                end
+                if spec.onEnter then
+                    editBox.OnEnterPressed = spec.onEnter
+                end
+                if spec.onFocusLost then
+                    editBox.OnEditFocusLost = spec.onFocusLost
+                end
+                if requestRefreshFn then
+                    editBox.OnTextChanged = function(_, isUserInput)
+                        if isUserInput then
+                            requestRefreshFn()
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    addon.UI.EditBoxes.Reset = function(editBox)
+        if editBox and editBox.SetText then
+            editBox:SetText("")
+        end
+    end
+
+    addon.UI.Lists = {
+        CreateRowRenderer = function(fn)
             return function(row, it)
                 return fn(row, it)
             end
         end,
-        MakeListController = function(cfg)
+        CreateController = function(cfg)
             local controller = { cfg = cfg, dirtyCount = 0 }
             function controller:Dirty()
                 self.dirtyCount = self.dirtyCount + 1
@@ -1404,7 +1431,7 @@ local function newHarness()
 
             return controller
         end,
-        BindListController = function(target, controller)
+        BindController = function(target, controller)
             if not target or not controller then
                 return
             end
@@ -1429,7 +1456,7 @@ local function newHarness()
         end,
     }
 
-    addon.MultiSelect = {
+    addon.UI.Selection = {
         SetModifierPolicy = function() end,
         SetAnchor = function() end,
         GetCount = function()
@@ -1471,7 +1498,7 @@ local function newHarness()
     local feature = {
         L = L,
         Diag = Diag,
-        Frames = addon.Frames,
+        Frames = addon.UI.Frames,
         Events = Events,
         C = C,
         coreState = addon.State,
@@ -1594,8 +1621,6 @@ local function newHarness()
         Colors = addon.Colors,
         Base64 = addon.Base64,
         Sort = Sort,
-        ListController = addon.ListController,
-        MultiSelect = addon.MultiSelect,
         Comms = addon.Comms,
         Item = addon.Item,
         Services = addon.Services,
@@ -1646,7 +1671,7 @@ local function newHarness()
     local function hydrateFeatureShared()
         feature.L = addon.L or feature.L
         feature.Diag = addon.Diag or feature.Diag
-        feature.Frames = addon.Frames or feature.Frames
+        feature.UI = addon.UI or feature.UI
         feature.Events = addon.Events or feature.Events
         feature.C = addon.C or feature.C
         feature.coreState = addon.State or feature.coreState
@@ -1660,8 +1685,7 @@ local function newHarness()
         feature.Base64 = addon.Base64 or feature.Base64
         feature.Json = addon.Json or feature.Json
         feature.Sort = addon.Sort or feature.Sort
-        feature.ListController = addon.ListController or feature.ListController
-        feature.MultiSelect = addon.MultiSelect or feature.MultiSelect
+        feature.UI = addon.UI or feature.UI
         feature.Comms = addon.Comms or feature.Comms
         feature.Item = addon.Item or feature.Item
         feature.LootSourcesData = addon.LootSourcesData or feature.LootSourcesData
@@ -1669,11 +1693,6 @@ local function newHarness()
         feature.IgnoredItems = addon.IgnoredItems or feature.IgnoredItems
         feature.IgnoredMobs = addon.IgnoredMobs or feature.IgnoredMobs
         feature.UI = addon.UI or feature.UI
-        feature.UIEffects = addon.UIEffects or feature.UIEffects
-        feature.UIScaffold = addon.UIScaffold or feature.UIScaffold
-        feature.UIPrimitives = addon.UIPrimitives or feature.UIPrimitives
-        feature.UIRowVisuals = addon.UIRowVisuals or feature.UIRowVisuals
-        feature.OptionsLayout = addon.OptionsLayout or feature.OptionsLayout
         feature.Services = addon.Services or feature.Services
         feature.Controllers = addon.Controllers or feature.Controllers
         feature.Widgets = addon.Widgets or feature.Widgets
@@ -2437,13 +2456,13 @@ local function setupInventoryTradeHarness(order, rollsByName)
     end
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
 
     local function getSelectedWinners()
         local selected = {}
         for i = 1, #order do
             local name = order[i]
-            if h.addon.MultiSelect.IsSelected("MLRollWinners", name) then
+            if h.addon.UI.Selection.IsSelected("MLRollWinners", name) then
                 selected[#selected + 1] = {
                     name = name,
                     roll = rollsByName[name] or 0,
@@ -2704,9 +2723,9 @@ local function setupInventoryTradeHarness(order, rollsByName)
     h.feature.lootState.fromInventory = true
     h.feature.lootState.winner = order[1]
 
-    h.addon.MultiSelect.EnsureState("MLRollWinners")
+    h.addon.UI.Selection.EnsureState("MLRollWinners")
     for i = 1, #order do
-        h.addon.MultiSelect.Toggle("MLRollWinners", order[i], true)
+        h.addon.UI.Selection.Toggle("MLRollWinners", order[i], true)
     end
 
     return {
@@ -2801,7 +2820,7 @@ local function setupMasterAwardHarness(cfg)
     end
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
 
     h.addon.Services.Loot = {
         GetItem = function()
@@ -4784,7 +4803,7 @@ end)
 test("warnings panel templates add default raid warnings without duplicates", function()
     local h = newHarness()
     _G.KRT_Warnings = {}
-    h.addon.UIScaffold.CreateListPanelScaffold = function()
+    h.addon.UI.Scaffold.CreateListPanel = function()
         return {
             OnLoad = function(_, frame)
                 return frame and frame.GetName and frame:GetName() or "KRTWarnings"
@@ -4811,7 +4830,7 @@ test("warnings panel seeds stock templates for fresh saved variables", function(
     local h = newHarness()
     _G.KRT_Warnings = {}
     h.addon.State.warningsSavedVariablesFresh = true
-    h.addon.UIScaffold.CreateListPanelScaffold = function()
+    h.addon.UI.Scaffold.CreateListPanel = function()
         return {
             OnLoad = function(_, frame)
                 return frame and frame.GetName and frame:GetName() or "KRTWarnings"
@@ -4833,7 +4852,7 @@ test("warnings panel clear saved warnings removes every saved message", function
         { name = "Stack", content = "Stack on marker." },
     }
     h.addon.L.StrConfigRaidWarningPreviewEmpty = "No raid warnings configured."
-    h.addon.UIScaffold.CreateListPanelScaffold = function()
+    h.addon.UI.Scaffold.CreateListPanel = function()
         return {
             OnLoad = function(_, frame)
                 return frame and frame.GetName and frame:GetName() or "KRTWarnings"
@@ -4857,7 +4876,7 @@ end)
 test("warnings panel clear saved warnings can keep stock templates", function()
     local h = newHarness()
     _G.KRT_Warnings = {}
-    h.addon.UIScaffold.CreateListPanelScaffold = function()
+    h.addon.UI.Scaffold.CreateListPanel = function()
         return {
             OnLoad = function(_, frame)
                 return frame and frame.GetName and frame:GetName() or "KRTWarnings"
@@ -8444,15 +8463,15 @@ test("reserve list action button opens import when reserves are empty", function
         end,
     }
 
-    h.addon.Frames.GetRef = function(frame, suffix)
+    h.addon.UI.Frames.GetRef = function(frame, suffix)
         local name = frame and frame.GetName and frame:GetName() or nil
         return name and _G[name .. suffix] or nil
     end
 
-    h.addon.UI.Register = function(_, name, api)
+    h.addon.UI.Widgets.Register = function(name, api)
         registeredApis[name] = api
     end
-    h.addon.UI.Call = function(_, name, methodName, ...)
+    h.addon.UI.Widgets.Call = function(name, methodName, ...)
         uiCalls[#uiCalls + 1] = {
             name = name,
             methodName = methodName,
@@ -8464,35 +8483,35 @@ test("reserve list action button opens import when reserves are empty", function
         return nil
     end
 
-    h.addon.UIScaffold.DefineModuleUi = function(cfg)
+    h.addon.UI.Scaffold.DefineModule = function(cfg)
         local module = cfg.module
-        module._ui = h.addon.UIScaffold.EnsureModuleUi(module)
+        local uiState = h.addon.UI.Scaffold.EnsureModuleState(module)
 
         function module:BindUI()
-            if self._ui.Bound then
+            if uiState.Bound then
                 return self.frame, self.refs
             end
 
             local frame = cfg.getFrame()
-            self._ui.FrameName = frame and frame:GetName() or self._ui.FrameName
-            self._ui.Loaded = self._ui.FrameName ~= nil
+            uiState.FrameName = frame and frame:GetName() or uiState.FrameName
+            uiState.Loaded = uiState.FrameName ~= nil
             self.frame = frame
-            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, self._ui.FrameName) or {}
+            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, uiState.FrameName) or {}
 
             if cfg.bind then
-                cfg.bind(self._ui.FrameName, frame, self.refs)
+                cfg.bind(uiState.FrameName, frame, self.refs)
             end
             if cfg.localize then
-                cfg.localize(self._ui.FrameName, frame, self.refs)
-                self._ui.Localized = true
+                cfg.localize(uiState.FrameName, frame, self.refs)
+                uiState.Localized = true
             end
 
-            self._ui.Bound = true
+            uiState.Bound = true
             return self.frame, self.refs
         end
 
         function module:EnsureUI()
-            if not self._ui.Bound then
+            if not uiState.Bound then
                 self:BindUI()
             end
             return self.frame
@@ -8500,10 +8519,10 @@ test("reserve list action button opens import when reserves are empty", function
 
         function module:RequestRefresh(reason)
             self:EnsureUI()
-            self._ui.Dirty = true
-            self._ui.Reason = reason
+            uiState.Dirty = true
+            uiState.Reason = reason
             if cfg.refresh then
-                return cfg.refresh(self._ui.FrameName, self.frame, self.refs, true, reason)
+                return cfg.refresh(uiState.FrameName, self.frame, self.refs, true, reason)
             end
             return nil
         end
@@ -8615,38 +8634,38 @@ test("reserves import window uses compact mode and format buttons", function()
         end,
     }
     h.feature.Services = h.addon.Services
-    h.addon.UI.Register = function(_, name, api)
+    h.addon.UI.Widgets.Register = function(name, api)
         registeredApis[name] = api
     end
-    h.addon.UIScaffold.DefineModuleUi = function(cfg)
+    h.addon.UI.Scaffold.DefineModule = function(cfg)
         local module = cfg.module
-        module._ui = h.addon.UIScaffold.EnsureModuleUi(module)
+        local uiState = h.addon.UI.Scaffold.EnsureModuleState(module)
 
         function module:BindUI()
-            if self._ui.Bound then
+            if uiState.Bound then
                 return self.frame, self.refs
             end
 
             local frame = cfg.getFrame()
-            self._ui.FrameName = frame and frame:GetName() or self._ui.FrameName
-            self._ui.Loaded = self._ui.FrameName ~= nil
+            uiState.FrameName = frame and frame:GetName() or uiState.FrameName
+            uiState.Loaded = uiState.FrameName ~= nil
             self.frame = frame
-            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, self._ui.FrameName) or {}
+            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, uiState.FrameName) or {}
 
             if cfg.bind then
-                cfg.bind(self._ui.FrameName, frame, self.refs)
+                cfg.bind(uiState.FrameName, frame, self.refs)
             end
             if cfg.localize then
-                cfg.localize(self._ui.FrameName, frame, self.refs)
-                self._ui.Localized = true
+                cfg.localize(uiState.FrameName, frame, self.refs)
+                uiState.Localized = true
             end
 
-            self._ui.Bound = true
+            uiState.Bound = true
             return self.frame, self.refs
         end
 
         function module:EnsureUI()
-            if not self._ui.Bound then
+            if not uiState.Bound then
                 self:BindUI()
             end
             return self.frame
@@ -8654,10 +8673,10 @@ test("reserves import window uses compact mode and format buttons", function()
 
         function module:RequestRefresh(reason)
             self:EnsureUI()
-            self._ui.Dirty = true
-            self._ui.Reason = reason
+            uiState.Dirty = true
+            uiState.Reason = reason
             if cfg.refresh then
-                return cfg.refresh(self._ui.FrameName, self.frame, self.refs, true, reason)
+                return cfg.refresh(uiState.FrameName, self.frame, self.refs, true, reason)
             end
             return nil
         end
@@ -8812,8 +8831,8 @@ test("ui primitives expose pixel-aligned sizing helpers", function()
         self._point = { point, relativeTo, relativePoint, x, y }
     end
 
-    h.addon.UIPrimitives.SetPixelSize(frame, 10.2, 10.7, 1, 1)
-    h.addon.UIPrimitives.SetPixelPoint(frame, "TOPLEFT", nil, "TOPLEFT", 2.2, -2.2, 1, 1)
+    h.addon.UI.Primitives.SetPixelSize(frame, 10.2, 10.7, 1, 1)
+    h.addon.UI.Primitives.SetPixelPoint(frame, "TOPLEFT", nil, "TOPLEFT", 2.2, -2.2, 1, 1)
 
     assertTrue(math.abs(frame:GetWidth() - 9.9555555555556) < 0.0000001, "expected width to align to physical pixels")
     assertTrue(math.abs(frame:GetHeight() - 10.666666666667) < 0.0000001, "expected height to align to physical pixels")
@@ -10948,7 +10967,7 @@ test("single winner ctrl-click clears and replaces the prefilled multiselect win
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -10963,7 +10982,7 @@ test("single winner ctrl-click clears and replaces the prefilled multiselect win
     Rolls:SetRollRecordingEnabled(false)
     Rolls:GetDisplayModel()
 
-    assertEqual(h.addon.MultiSelect.GetCount("MLRollWinners"), 0, "expected Rolls service to stop owning prefilled single-award multiselect state")
+    assertEqual(h.addon.UI.Selection.GetCount("MLRollWinners"), 0, "expected Rolls service to stop owning prefilled single-award multiselect state")
     assertEqual(h.feature.lootState.winner, nil, "expected Rolls service to stop mutating the selected winner mirror directly")
 end)
 
@@ -11068,7 +11087,7 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -11134,7 +11153,7 @@ test("resolved winner uses rollWinner from the raw display model", function()
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -11217,7 +11236,7 @@ test("reserved rolls exclude non-reservers and expose softres context in the dis
     }
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -11294,7 +11313,7 @@ test("late accepted rolls show OOT info when intake remains open", function()
     h.feature.Services = h.addon.Services
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -11356,7 +11375,7 @@ test("late tied OOT rolls stay excluded from manual resolution and reroll", func
     h.feature.Services = h.addon.Services
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -11480,7 +11499,7 @@ test("master roll intake reopens after announcing rolls with service-owned sessi
     })
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
     loadMasterController(h)
 
@@ -11546,7 +11565,7 @@ test("master assignment buttons stay disabled until a target is selected", funct
     })
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -11673,7 +11692,7 @@ test("master auto loot suggestions stay visual only", function()
     h.feature.Services = h.addon.Services
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -11779,7 +11798,7 @@ test("master workflow model names rolling and ready states without changing stat
     h.feature.Services = h.addon.Services
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -11885,7 +11904,7 @@ test("master workflow model centralizes button capabilities without changing gat
     h.feature.Services = h.addon.Services
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -12066,7 +12085,7 @@ test("master dropdown click uses UIDropDown owner/value arguments", function()
     end
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -12175,7 +12194,7 @@ test("master item count bindings use shared edit-box handlers", function()
     })
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -12227,9 +12246,9 @@ test("master item count bindings use shared edit-box handlers", function()
     refreshMasterFrameForTest(Master)
 
     local itemCountBox = _G.KRTMasterItemCount
-    assertTrue(type(itemCountBox.OnTextChanged) == "function", "expected OnTextChanged to be bound through Frames.BindEditBoxHandlers")
-    assertTrue(type(itemCountBox.OnEnterPressed) == "function", "expected OnEnterPressed to be bound through Frames.BindEditBoxHandlers")
-    assertTrue(type(itemCountBox.OnEditFocusLost) == "function", "expected OnEditFocusLost to be bound through Frames.BindEditBoxHandlers")
+    assertTrue(type(itemCountBox.OnTextChanged) == "function", "expected OnTextChanged to be bound through UI.EditBoxes.BindHandlers")
+    assertTrue(type(itemCountBox.OnEnterPressed) == "function", "expected OnEnterPressed to be bound through UI.EditBoxes.BindHandlers")
+    assertTrue(type(itemCountBox.OnEditFocusLost) == "function", "expected OnEditFocusLost to be bound through UI.EditBoxes.BindHandlers")
 
     refreshCount = 0
     itemCountBox:OnTextChanged(true)
@@ -12313,7 +12332,7 @@ test("master item selection popup stays clickable", function()
     end
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -12417,7 +12436,7 @@ test("master workflow model exposes compact session winners", function()
     h.feature.Services = h.addon.Services
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Private = h.addon.Controllers.Master._Private
@@ -12630,7 +12649,7 @@ test("master loot opened stays hidden while passively observing group loot", fun
     })
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -12713,9 +12732,9 @@ test("master roll rows stay clickable through the shared list controller", funct
     })
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Modules/UI/ListController.lua")
-    h.feature.ListController = h.addon.ListController
+    h.feature.UI = h.addon.UI
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
@@ -12771,7 +12790,7 @@ test("master roll rows stay clickable through the shared list controller", funct
 
     row:OnClick()
 
-    assertTrue(h.addon.MultiSelect.IsSelected("MLRollWinners", "Alice"), "expected clicking the rendered row to select the winner")
+    assertTrue(h.addon.UI.Selection.IsSelected("MLRollWinners", "Alice"), "expected clicking the rendered row to select the winner")
 end)
 
 test("manual exclusion blocks candidate eligibility and roll intake", function()
@@ -12814,7 +12833,7 @@ test("manual exclusion blocks candidate eligibility and roll intake", function()
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -12873,7 +12892,7 @@ test("explicit pass stays visible without entering winner resolution", function(
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -12941,7 +12960,7 @@ test("explicit pass can transition back into a valid roll while the session stay
     }
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -12995,7 +13014,7 @@ test("validate winner rejects explicit pass with a service-owned denial reason",
     }
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13054,7 +13073,7 @@ test("cancelled response keeps raw roll history but leaves current resolution", 
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13120,7 +13139,7 @@ test("validate winner allows non-roll assignment targets without an active roll 
     }
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13165,7 +13184,7 @@ test("cancelled responses can roll again while the session stays open", function
     }
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13229,7 +13248,7 @@ test("timed out responses stay terminal for the current session", function()
     }
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13289,7 +13308,7 @@ test("tie reroll resets intake to tied players only", function()
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13364,7 +13383,7 @@ test("duplicate roll attempts stay visible on the accepted response row", functi
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13650,7 +13669,7 @@ test("row info tags stay separate from counter values", function()
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13716,7 +13735,7 @@ test("inventory winner stays undecorated in the pure rolls service model", funct
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13733,7 +13752,7 @@ test("inventory winner stays undecorated in the pure rolls service model", funct
     local model = Rolls:GetDisplayModel()
     local first = model and model.rows and model.rows[1]
 
-    assertEqual(h.addon.MultiSelect.GetCount("MLRollWinners"), 0, "expected inventory flow to keep the winner outside the loot-window multiselect")
+    assertEqual(h.addon.UI.Selection.GetCount("MLRollWinners"), 0, "expected inventory flow to keep the winner outside the loot-window multiselect")
     assertTrue(first ~= nil, "expected at least one rendered roll row")
     assertEqual(first.name, "Alice", "expected the top roller to stay first in the display model")
     assertTrue(first.displayName == nil, "expected the pure rolls service model to stop applying UI selection markers")
@@ -13781,7 +13800,7 @@ test("inventory multi winners stay undecorated in the pure rolls service model",
     _G.RANDOM_ROLL_RESULT = "%s %d"
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
-    h.feature.MultiSelect = h.addon.MultiSelect
+    h.feature.UI = h.addon.UI
     h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
@@ -13797,7 +13816,7 @@ test("inventory multi winners stay undecorated in the pure rolls service model",
     Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
-    assertEqual(h.addon.MultiSelect.GetCount("MLRollWinners"), 0, "expected Rolls service to stop prefiling inventory multi-copy multiselect state")
+    assertEqual(h.addon.UI.Selection.GetCount("MLRollWinners"), 0, "expected Rolls service to stop prefiling inventory multi-copy multiselect state")
     assertTrue(model.rows[1].displayName == nil, "expected the pure rolls service model to omit UI display-name decoration")
     assertTrue(model.rows[2].displayName == nil, "expected the pure rolls service model to omit UI display-name decoration")
     assertEqual(h.feature.lootState.winner, nil, "expected Rolls service to stop mutating the primary inventory winner directly")
@@ -13816,7 +13835,7 @@ test("inventory multi self-keep consumes one item and advances to the next winne
     assertEqual(#ctx.initiatedTrades, 0, "expected self-keep to avoid opening a trade window")
     assertEqual(ctx.h.feature.lootState.itemTraded, 1, "expected self-keep to consume exactly one inventory copy")
     assertEqual(ctx.h.feature.lootState.winner, "Alice", "expected self-keep to advance to the next selected winner")
-    assertEqual(ctx.h.addon.MultiSelect.GetCount("MLRollWinners"), 1, "expected self-keep to remove the completed winner from multiselect")
+    assertEqual(ctx.h.addon.UI.Selection.GetCount("MLRollWinners"), 1, "expected self-keep to remove the completed winner from multiselect")
     assertEqual(#ctx.addCounts, 1, "expected one LootCounter increment for the completed winner")
     assertEqual(ctx.addCounts[1].name, "Tester", "expected self-keep to credit the trader as the completed winner")
     assertEqual(ctx.addCounts[1].count, 1, "expected self-keep to credit exactly one awarded item")
@@ -13846,7 +13865,7 @@ test("inventory multi trade completion consumes one item and advances like self-
 
     assertEqual(ctx.h.feature.lootState.itemTraded, 1, "expected trade completion to consume exactly one inventory copy")
     assertEqual(ctx.h.feature.lootState.winner, "Tester", "expected trade completion to advance to the remaining selected winner")
-    assertEqual(ctx.h.addon.MultiSelect.GetCount("MLRollWinners"), 1, "expected trade completion to remove the completed winner from multiselect")
+    assertEqual(ctx.h.addon.UI.Selection.GetCount("MLRollWinners"), 1, "expected trade completion to remove the completed winner from multiselect")
     assertEqual(#ctx.addCounts, 1, "expected one LootCounter increment after trade completion")
     assertEqual(ctx.addCounts[1].name, "Alice", "expected trade completion to credit the traded winner")
     assertEqual(ctx.addCounts[1].count, 1, "expected trade completion to credit exactly one awarded item")

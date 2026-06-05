@@ -185,7 +185,7 @@ local expectedWidgets = {
     {
         name = "Widgets/LootCounter",
         path = "!KRT/Widgets/LootCounter.lua",
-        gate = 'UIFacade:IsEnabled("LootCounter")',
+        gate = 'UIWidgets.IsEnabled("LootCounter")',
         registryFromFeature = true,
         deps = {
             "Init",
@@ -208,7 +208,7 @@ local expectedWidgets = {
     {
         name = "Widgets/ReservesUI",
         path = "!KRT/Widgets/ReservesUI.lua",
-        gate = 'UIFacade:IsEnabled("Reserves")',
+        gate = 'UIWidgets.IsEnabled("Reserves")',
         registryFromFeature = true,
         deps = {
             "Init",
@@ -233,7 +233,7 @@ local expectedWidgets = {
     {
         name = "Widgets/Config",
         path = "!KRT/Widgets/Config.lua",
-        gate = 'UIFacade:IsEnabled("Config")',
+        gate = 'UIWidgets.IsEnabled("Config")',
         registryFromFeature = true,
         deps = {
             "Init",
@@ -811,8 +811,8 @@ local function assertControllerDispatchPair(controllerName, methodName, sourcePa
     local context = sourcePath .. " -> " .. controllerName .. ":" .. methodName
 
     if scaffoldControllerMethods[methodName] then
-        local message = context .. " must be backed by UIScaffold.DefineModuleUi"
-        assertContains(controllerSource, "UIScaffold.DefineModuleUi({", message)
+        local message = context .. " must be backed by UI.Scaffold.DefineModule"
+        assert(controllerSource:find("Scaffold.DefineModule({", 1, true) or controllerSource:find("UI.Scaffold.DefineModule({", 1, true), message)
     else
         assertModuleMethod(controllerSource, methodName, context)
     end
@@ -851,8 +851,8 @@ local function assertWidgetDispatchPair(widgetId, methodName, sourcePath)
     local context = sourcePath .. " -> " .. widgetId .. ":" .. methodName
 
     if standardWidgetMethods[methodName] then
-        local message = context .. " must be backed by UIScaffold.MakeStandardWidgetApi"
-        assertContains(widgetSource, "UIScaffold.MakeStandardWidgetApi(module,", message)
+        local message = context .. " must be backed by UI.Scaffold.CreateWidgetApi"
+        assertContains(widgetSource, "Scaffold.CreateWidgetApi(module,", message)
     else
         assertWidgetMethod(widgetSource, methodName, context)
     end
@@ -872,11 +872,11 @@ local function assertWidgetDispatchContracts()
         },
         {
             path = "!KRT/Controllers/Master.lua",
-            pattern = 'UIFacade:Call%("([%w_]+)"%s*,%s*"([%w_]+)"',
+            pattern = 'UI%.Widgets%.Call%("([%w_]+)"%s*,%s*"([%w_]+)"',
         },
         {
-            path = "!KRT/EntryPoints/Minimap.lua",
-            pattern = 'UIFacade:Call%("([%w_]+)"%s*,%s*"([%w_]+)"',
+            path = "!KRT/Widgets/ReservesUI.lua",
+            pattern = 'UIWidgets%.Call%("([%w_]+)"%s*,%s*"([%w_]+)"',
         },
     }
     local total = 0
@@ -960,13 +960,16 @@ local function assertWidgetFeatureUiDependencyContract()
     for i = 1, #widgetSources do
         local spec = widgetSources[i]
         local source = read(spec.path)
-        assertContains(source, "local UIScaffold = feature.UIScaffold", spec.path .. " must localize UIScaffold from feature shared")
-        assertContains(source, "local UIFacade = feature.UI", spec.path .. " must localize UI facade from feature shared")
+        assertContains(source, "local UI = feature.UI", spec.path .. " must localize UI root from feature shared")
+        assertContains(source, "local UIWidgets = UI.Widgets", spec.path .. " must localize widget facade from UI root")
+        assertContains(source, "local Scaffold = UI.Scaffold", spec.path .. " must localize scaffold helpers from UI root")
         assertNotContains(source, "local UIScaffold = addon.UIScaffold", spec.path .. " must not read UIScaffold from addon root")
         assertNotContains(source, "local UIFacade = addon.UI", spec.path .. " must not read UI facade from addon root")
+        assertNotContains(source, "feature.UIScaffold", spec.path .. " must not use legacy UIScaffold feature field")
         if spec.needsPrimitives then
-            assertContains(source, "local UIPrimitives = feature.UIPrimitives", spec.path .. " must localize UIPrimitives from feature shared")
+            assertContains(source, "local Primitives = UI.Primitives", spec.path .. " must localize primitives from UI root")
             assertNotContains(source, "local UIPrimitives = addon.UIPrimitives", spec.path .. " must not read UIPrimitives from addon root")
+            assertNotContains(source, "feature.UIPrimitives", spec.path .. " must not use legacy UIPrimitives feature field")
         end
     end
 
@@ -1012,7 +1015,7 @@ local function assertEntryPointFeatureUiDependencyContract()
     local entryPointSources = {
         {
             path = "!KRT/EntryPoints/Minimap.lua",
-            localName = "UIFacade",
+            localName = "UI",
         },
         {
             path = "!KRT/EntryPoints/SlashEvents.lua",
@@ -1023,7 +1026,8 @@ local function assertEntryPointFeatureUiDependencyContract()
     for i = 1, #entryPointSources do
         local spec = entryPointSources[i]
         local source = read(spec.path)
-        assertContains(source, "local " .. spec.localName .. " = feature.UI", spec.path .. " must localize UI facade from feature shared")
+        assertContains(source, "local " .. spec.localName .. " = feature.UI", spec.path .. " must localize UI root from feature shared")
+        assertContains(source, "local UIWidgets = UI.Widgets", spec.path .. " must localize widget facade from UI root")
         assertNotContains(source, "local " .. spec.localName .. " = addon.UI", spec.path .. " must not read UI facade from addon root")
     end
 

@@ -16,7 +16,7 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 4. `UI/Templates/Common.xml`
    Shared XML templates only.
 5. `Modules/*`
-   Shared infra (`Timer`, `Events`, `Bus`, `Item`, `Sort`, `Frames`, `UIScaffold`, `UI` facade, ...).
+   Shared infra (`Timer`, `Events`, `Bus`, `Item`, `Sort`, `Frames`, `UI.Scaffold`, `UI` facade, ...).
 6. `Database/DBRaid*.lua`, `Services/*`, `Controllers/*`, `Widgets/*`, `EntryPoints/*`
    Runtime feature implementation and entrypoints.
 7. `KRT.xml` -> `UI/*.xml`
@@ -104,7 +104,7 @@ compatibility exception is `addon:Print` for `LibLogger-1.0`.
 
 - Services must not reference parent owners or parent frames.
 - Services must not own frame lifecycle or UI setup (`OnLoad`, `Refresh`, `SetScript`,
-  `Show`, `Hide`, `UIScaffold`, `InterfaceOptions`, panel APIs, or UI handler hooks).
+  `Show`, `Hide`, `UI.Scaffold`, `InterfaceOptions`, panel APIs, or UI handler hooks).
 - Controllers must not reference other parent owners directly.
 - Upward communication should use `addon.Bus` and canonical event names from `Modules/Events.lua`.
 - Prefer existing internal events (`SetItem`, `RaidRosterDelta`, etc.) over new micro-events.
@@ -151,16 +151,18 @@ endpoints, while `Minimap:*` methods are entrypoint-owned minimap lifecycle/stat
   no `<Scripts>` and no `<On...>` blocks in `!KRT/UI/*.xml` or `!KRT/UI/Templates/*.xml`.
 - Do not reintroduce `Modules/UI/Binder/*` or binder-style mapping registries.
 - UI script wiring belongs in Lua via explicit `SetScript`/handler binding in owning modules.
-- For Controllers/Widgets, prefer `UIScaffold.DefineModuleUi(cfg)` as the canonical lifecycle contract.
+- For Controllers/Widgets, prefer `UI.Scaffold.DefineModule(cfg)` as the canonical lifecycle contract.
 - Modules should implement UI hooks only:
   `AcquireRefs`, `BindHandlers`, `Localize`, `OnLoadFrame`, `RefreshUI`/`Refresh`.
 - Scaffold-generated methods own shared lifecycle methods:
   `BindUI`, `EnsureUI`, `Toggle`, `Show`, `Hide`, `RequestRefresh`, `MarkDirty`.
-- Keep UI cache/state schema uniform under `module._ui`.
+- Keep UI cache/state schema uniform in `addon.UI.ModuleState`; use `uiState` for local references.
 - Optional widget routing goes through `addon.UI` (`Modules/UI/Facade.lua`) + `addon.Features`.
 - `OnUpdate` is allowed only for minimap drag and shared UI driver/effect modules.
 - Option access uses namespace configs (`cfg:Get`, `cfg:Set`); `addon.options` remains a
   read-only compatibility proxy owned by `Database/DBOptions.lua`.
+- Reusable layout, scrollframe, table, row, editbox, border, and spacing rules live in
+  `docs/UI_CODING_RULES.md`. Follow that guide before adding new feature-local UI styling.
 
 ## Quick Layering Verification
 
@@ -189,6 +191,7 @@ verify architecture-specific constraints during refactors.
 - `AGENTS.md` - binding architecture and coding policy
 - `docs/OVERVIEW.md` - runtime ownership and module map
 - `docs/LUA_WRITING_RULES.md` - Lua style and naming rules
+- `docs/UI_CODING_RULES.md` - reusable UI layout and template rules
 - `docs/DEV_CHECKS.md` - quick checks and audit commands
 - `docs/KRT_MCP.md` - MCP tools for repo workflows
 - `docs/AGENT_SKILLS.md` - skill sync and Mechanic companion workflow

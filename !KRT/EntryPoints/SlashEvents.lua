@@ -11,7 +11,9 @@ local L = feature.L
 local Features = feature.Features
 local coreState = feature.coreState
 local Options = feature.Options
-local Frames = feature.Frames
+local UI = feature.UI
+local UIWidgets = UI.Widgets
+local Frames = UI.Frames
 local Colors = feature.Colors
 local Strings = feature.Strings
 local Database = feature.Database
@@ -31,8 +33,6 @@ local type = type
 local tostring, tonumber = tostring, tonumber
 local floor = math.floor
 local _G = _G
-
-local UI = feature.UI
 
 -- =========== Slash Commands  =========== --
 local function getDatabaseService(getterName)
@@ -322,7 +322,7 @@ local function getFeatureProfile()
 end
 
 local function notifyWidgetCallUnavailable(widgetId, methodName)
-    if type(UI.IsEnabled) == "function" and not UI:IsEnabled(widgetId) then
+    if UIWidgets and type(UIWidgets.IsEnabled) == "function" and not UIWidgets.IsEnabled(widgetId) then
         addon:warn(L.MsgFeatureDisabledByProfile, widgetId, getFeatureProfile())
         return
     end
@@ -330,17 +330,21 @@ local function notifyWidgetCallUnavailable(widgetId, methodName)
 end
 
 local function callWidget(widgetId, methodName, ...)
-    if type(UI.IsEnabled) == "function" and not UI:IsEnabled(widgetId) then
+    if UIWidgets and type(UIWidgets.IsEnabled) == "function" and not UIWidgets.IsEnabled(widgetId) then
         notifyWidgetCallUnavailable(widgetId, methodName)
         return nil
     end
 
-    if type(UI.IsRegistered) == "function" and not UI:IsRegistered(widgetId) then
+    if UIWidgets and type(UIWidgets.IsRegistered) == "function" and not UIWidgets.IsRegistered(widgetId) then
         notifyWidgetCallUnavailable(widgetId, methodName)
         return nil
     end
 
-    return UI:Call(widgetId, methodName, ...)
+    if UIWidgets and type(UIWidgets.Call) == "function" then
+        return UIWidgets.Call(widgetId, methodName, ...)
+    end
+    notifyWidgetCallUnavailable(widgetId, methodName)
+    return nil
 end
 
 local function registerAliases(list, fn)

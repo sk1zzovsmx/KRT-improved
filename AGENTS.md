@@ -11,6 +11,7 @@ Developer docs package:
 - `docs/ARCHITECTURE.md` - architecture/layering map and XML/UI policy
 - `docs/OVERVIEW.md` - runtime ownership and module map
 - `docs/LUA_WRITING_RULES.md` - Lua writing and naming rules
+- `docs/UI_CODING_RULES.md` - reusable UI layout, template, list, and editbox rules
 - `docs/DEV_CHECKS.md` - local checks and gates
 - `docs/AGENT_SKILLS.md` - agent skills and companion tooling
 - `docs/KRT_MCP.md` - repo-local MCP server usage
@@ -65,8 +66,10 @@ Rules:
 - Upward communication uses `addon.Bus`.
 - EntryPoints may call Parent `:Toggle()` methods.
 - Child widgets attach Parent -> Child only.
-- Use `addon.UI:Call(...)` for Controller/EntryPoint -> Widget calls.
+- Use `addon.UI.Widgets.Call(...)` for Controller/EntryPoint -> Widget calls.
 - Do not reintroduce retired root aliases such as `addon.Master`, `addon.Raid`, or `addon.Config`.
+- Do not reintroduce legacy UI root aliases such as `addon.Frames`, `addon.UIScaffold`,
+  `addon.ListController`, `addon.UIPrimitives`, `addon.UIRowVisuals`, or `addon.MultiSelect`.
 - `addon:Print` remains the only root-method compatibility exception for LibLogger.
 
 ---
@@ -85,6 +88,7 @@ Use the canonical namespaces:
 - `addon.Controllers.*`
 - `addon.Services.*`
 - `addon.Widgets.*`
+- `addon.UI.*`
 - `addon.Modules` are exposed by concrete names such as `addon.Item`, `addon.Sort`, `addon.Bus`.
 
 Keep bootstrap ownership centralized in `Init.lua` for:
@@ -163,8 +167,8 @@ Options:
 
 - Prefer event-driven redraws. Avoid feature-frame polling with `OnUpdate`.
 - Allowed `OnUpdate` exceptions: minimap drag, LibCompat internals, and shared refresher drivers.
-- Use `addon.UIScaffold.DefineModuleUi(cfg)` where feasible.
-- Keep UI state uniform: `module._ui = { Loaded, Bound, Localized, Dirty, Reason, FrameName }`.
+- Use `addon.UI.Scaffold.DefineModule(cfg)` where feasible.
+- Keep UI lifecycle state in `addon.UI.ModuleState`; local lifecycle variables use `uiState`.
 - Modules implement hooks such as `AcquireRefs`, `BindHandlers`, `Localize`, `OnLoadFrame`, `RefreshUI`.
 - Scaffold-generated methods own `BindUI`, `EnsureUI`, `Toggle`, `Show`, `Hide`, `RequestRefresh`, `MarkDirty`.
 - Prefer the dominant `_G[frameName .. suffix]` named-frame access pattern.
@@ -172,6 +176,22 @@ Options:
 - Keep shared UI glue in `Init.lua` or `Modules/UI/*`; keep feature-specific UI in feature modules.
 - In options panels, rows with action buttons must reserve a fixed-width right command column.
 - Do not anchor button columns to variable-width or wrapped description text.
+- Controller/Widget frame lifecycle should use `addon.UI.Scaffold.DefineModule(cfg)` or document why not.
+- `addon.UI.ModuleState` uses canonical `Loaded`, `Bound`, `Localized`, `Dirty`, `Reason`, `FrameName`.
+- `BindUI`, `EnsureUI`, `Toggle`, `Hide`, `RequestRefresh`, and `MarkDirty` are scaffold-owned.
+- Use shared KRT semantic XML templates and `Modules/UI/*` helpers before feature-local UI styling.
+- New shared XML templates keep the `KRT` prefix and use role names such as `Window`, `Panel`,
+  `Dialog`, `ActionButton`, `ListScrollFrame`, `TextInput`, `TableRow`, or `HeaderRow`.
+- Historical templates remain compatibility surfaces; do not mass-rename them without a migration plan.
+- New repeated list/table UIs should prefer `addon.UI.Lists`.
+- Selectable row selected/focused visuals should use `addon.UI.Rows`.
+- ScrollFrame tables use stable names: `FrameNameScrollFrame` and `FrameNameScrollFrameScrollChild`.
+- Scroll children must have explicit synced width and calculated content height before refresh completes.
+- Table rows use fixed row heights, fixed command columns, and scrollbar-aware right inset handling.
+- EditBox widgets use KRT editbox templates, `autoFocus=false`, and shared `addon.UI.EditBoxes` helpers.
+- Shared borders, spacing, row visuals, glow effects, and reusable primitives stay under `Modules/UI/*`.
+- Feature files may compose UI pieces, but must not copy divergent border, spacing, or highlight systems.
+- Services must not reference frames, Widgets, Controllers, `addon.UI.Scaffold`, or shared UI helper modules.
 
 Logger visual direction:
 - Wrath raid-log look inspired by MizusRaidTracker.

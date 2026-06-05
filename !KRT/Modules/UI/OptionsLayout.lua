@@ -1,20 +1,21 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: addon.OptionsLayout
+-- exports: addon.UI.Layout
 -- events: none
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
-local Frames = feature.Frames
+local UI = feature.UI or {}
+local Frames = UI.Frames
 
 local _G = _G
 
 local type, tonumber = type, tonumber
 local max = math.max
 
-local OptionsLayout = feature.OptionsLayout or {}
-addon.OptionsLayout = OptionsLayout
+local Layout = UI.Layout or {}
+UI.Layout = Layout
 
 -- ----- Internal state ----- --
 local defaults = {
@@ -284,7 +285,7 @@ local function applyRow(frame, row, cfg, cursorY)
 end
 
 -- ----- Public methods ----- --
-function OptionsLayout.Apply(frameOrName, rows, cfg)
+function Layout.ApplyRows(frameOrName, rows, cfg)
     local frame = resolveFrame(frameOrName)
     if not (frame and type(rows) == "table") then
         return 0

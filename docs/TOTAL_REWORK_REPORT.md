@@ -22,7 +22,7 @@ le regole binding di `AGENTS.md` restano prioritarie.
   Non deve spostare, caricare dinamicamente o invocare moduli.
 - Il primo package reale registrato e l'infrastruttura `Modules/UI`.
 - Le registrazioni UI documentano il primo grafo esplicito per `Facade`, `Effects`, `Visuals`,
-  `Frames`, `ListController` e `MultiSelect`.
+  `Frames`, `ListController` e `Selection`.
 - Stato corrente: il grafo registry metadata-first copre ora l'intero layer caricato prima di XML:
   `Init`, `Modules`, `Database`, `Services`, `EntryPoints`, `Controllers` e `Widgets`.
 
@@ -334,7 +334,7 @@ Note di confine:
   Database/UI facade.
 - Widgets non dipendono da Controllers/EntryPoints; `ReservesUI` dipende dal facade
   `Services/Reserves`, non helper interni.
-- Widget metadata e volutamente prima del feature gate `UIFacade:IsEnabled(...)`, per non perdere il
+- Widget metadata e volutamente prima del feature gate `UI.Widgets.IsEnabled(...)`, per non perdere il
   marker quando una feature e disabilitata.
 
 ## Wave G completed: Raid API reduction
@@ -356,7 +356,7 @@ excludes vendored `!KRT/Libs`, and fails if retired top-level aliases such as `a
 ## Wave I completed: LootCounter widget API reduction
 
 Wave I localized LootCounter widget-only helpers for Master attachment, grouped count announce, and
-reset-all behavior. The stable UI facade contract remains `UIFacade:Call("LootCounter",
+reset-all behavior. The stable UI facade contract remains `UI.Widgets.Call("LootCounter",
 "AttachToMaster", ...)`, while the implementation no longer exposes these widget-only helpers on
 `addon.Widgets.LootCounter`.
 
@@ -459,7 +459,7 @@ source-level string mismatches fail the UI entrypoint registry spec.
 ## Wave X completed: generated lifecycle public API pruning
 
 Wave X moved generated UI lifecycle plumbing out of public controller/widget APIs. Controllers and
-widgets now feed `UIScaffold.DefineModuleUi` with explicit local `onLoad`/`refresh` callbacks where
+widgets now feed `UI.Scaffold.DefineModule` with explicit local `onLoad`/`refresh` callbacks where
 the lifecycle did not need to be an external contract. The cleanup covered Warnings, Changes,
 Spammer, Logger, Config, LootCounter, ReservesUI, ReservesUI.Import, and selected Master/Logger popup
 refresh paths.
@@ -482,7 +482,7 @@ EntryPoints.
 
 Wave Z closed the final non-public controller lifecycle tail by localizing Logger popup box loading:
 `Box:OnLoad` became local popup load glue with an underscore-prefixed internal hook for the parent
-logger binder. Infrastructure-owned lifecycle hooks in `UIScaffold`, `ListController`, and internal
+logger binder. Infrastructure-owned lifecycle hooks in `UI.Scaffold`, `ListController`, and internal
 `UI.Refresh` helpers remain intentionally in place because they are implementation hooks, not public
 feature APIs.
 

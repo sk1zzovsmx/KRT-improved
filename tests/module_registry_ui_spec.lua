@@ -86,50 +86,61 @@ for i = 1, #expectedModules do
     assertContains(source, 'registry.SetLoaded("' .. expected.name .. '")', expected.path .. " must mark its registry module loaded")
 end
 
-local featureOwnedUiModuleTables = {
+local uiModuleTables = {
     {
         path = "!KRT/Modules/UI/Facade.lua",
-        name = "UI",
+        localName = "Widgets",
+        fieldName = "Widgets",
     },
     {
         path = "!KRT/Modules/UI/Effects.lua",
-        name = "UIEffects",
+        localName = "Effects",
+        fieldName = "Effects",
     },
     {
         path = "!KRT/Modules/UI/Visuals.lua",
-        name = "UIPrimitives",
+        localName = "Primitives",
+        fieldName = "Primitives",
     },
     {
         path = "!KRT/Modules/UI/Visuals.lua",
-        name = "UIRowVisuals",
+        localName = "Rows",
+        fieldName = "Rows",
     },
     {
         path = "!KRT/Modules/UI/Frames.lua",
-        name = "Frames",
+        localName = "Frames",
+        fieldName = "Frames",
     },
     {
         path = "!KRT/Modules/UI/Frames.lua",
-        name = "UIScaffold",
+        localName = "Scaffold",
+        fieldName = "Scaffold",
     },
     {
         path = "!KRT/Modules/UI/ListController.lua",
-        name = "ListController",
+        localName = "Lists",
+        fieldName = "Lists",
     },
     {
         path = "!KRT/Modules/UI/MultiSelect.lua",
-        name = "MultiSelect",
+        localName = "Selection",
+        fieldName = "Selection",
     },
     {
         path = "!KRT/Modules/UI/OptionsLayout.lua",
-        name = "OptionsLayout",
+        localName = "Layout",
+        fieldName = "Layout",
     },
 }
 
-for i = 1, #featureOwnedUiModuleTables do
-    local expected = featureOwnedUiModuleTables[i]
+for i = 1, #uiModuleTables do
+    local expected = uiModuleTables[i]
     local source = read(expected.path)
-    assertContains(source, "local " .. expected.name .. " = feature." .. expected.name .. " or {}", expected.path .. " must bind owner table from feature shared")
-    assert(not source:find("local " .. expected.name .. " = addon." .. expected.name, 1, true), expected.path .. " must not bind owner table directly from addon root")
+    assertContains(source, "local UI = feature.UI or {}", expected.path .. " must bind UI root from feature shared")
+    assertContains(source, "local " .. expected.localName .. " = UI." .. expected.fieldName, expected.path .. " must bind " .. expected.fieldName .. " from UI root")
+    assertContains(source, "UI." .. expected.fieldName .. " = " .. expected.localName, expected.path .. " must publish " .. expected.fieldName .. " on UI root")
+    assert(not source:find("addon." .. expected.fieldName, 1, true), expected.path .. " must not bind UI subtable directly from addon root")
 end
 
 local facadeSource = read("!KRT/Modules/UI/Facade.lua")
@@ -137,9 +148,9 @@ assertContains(facadeSource, "local Features = feature.Features", "Facade must l
 assert(not facadeSource:find("local Features = addon.Features", 1, true), "Facade must not read Features from addon root")
 
 local listControllerSource = read("!KRT/Modules/UI/ListController.lua")
-assertContains(listControllerSource, "local UIRowVisuals = feature.UIRowVisuals", "ListController must localize row visuals from feature shared")
-assertContains(listControllerSource, "local UIPrimitives = feature.UIPrimitives", "ListController must localize UI primitives from feature shared")
-assertContains(listControllerSource, "local Frames = feature.Frames", "ListController must localize Frames from feature shared")
+assertContains(listControllerSource, "local Rows = UI.Rows", "ListController must localize row visuals from UI root")
+assertContains(listControllerSource, "local Primitives = UI.Primitives", "ListController must localize UI primitives from UI root")
+assertContains(listControllerSource, "local Frames = UI.Frames", "ListController must localize Frames from UI root")
 assert(not listControllerSource:find("addon.UIRowVisuals", 1, true), "ListController must not read row visuals from addon root")
 assert(not listControllerSource:find("addon.UIPrimitives", 1, true), "ListController must not read UI primitives from addon root")
 assert(not listControllerSource:find("addon.Frames", 1, true), "ListController must not read Frames from addon root")
@@ -157,7 +168,7 @@ assertContains(multiSelectSource, "local coreState = feature.coreState", "MultiS
 assert(not multiSelectSource:find("addon and addon.State and addon.State.debugEnabled", 1, true), "MultiSelect must use local coreState for debugEnabled")
 
 local visualsSource = read("!KRT/Modules/UI/Visuals.lua")
-assertContains(visualsSource, "local UIEffects = feature.UIEffects", "Visuals must localize UI effects from feature shared")
+assertContains(visualsSource, "local Effects = UI.Effects", "Visuals must localize UI effects from UI root")
 assert(not visualsSource:find("addon.UIEffects", 1, true), "Visuals must not read UI effects from addon root")
 
 local optionsLayoutSource = read("!KRT/Modules/UI/OptionsLayout.lua")

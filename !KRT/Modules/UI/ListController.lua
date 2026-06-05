@@ -1,16 +1,17 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: publish module APIs on addon.*
+-- exports: addon.UI.Lists
 -- events: none; owns deferred list refresh driver
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
-local Frames = feature.Frames
-local UIRowVisuals = feature.UIRowVisuals
-local UIPrimitives = feature.UIPrimitives
+local UI = feature.UI or {}
+local Frames = UI.Frames
+local Rows = UI.Rows
+local Primitives = UI.Primitives
 
 local _G = _G
 local type, pairs, tostring = type, pairs, tostring
@@ -18,18 +19,18 @@ local twipe = table.wipe
 
 local CreateFrame = _G.CreateFrame
 
-local ListController = feature.ListController or {}
-addon.ListController = ListController
+local Lists = UI.Lists or {}
+UI.Lists = Lists
 
 -- ----- Internal state ----- --
 
 -- ----- Private helpers ----- --
 local function getRowVisuals()
-    return UIRowVisuals or {}
+    return Rows or {}
 end
 
-local function getUIPrimitives()
-    return UIPrimitives or {}
+local function getPrimitives()
+    return Primitives or {}
 end
 
 local function getListDiag(bucketName, keyName)
@@ -45,7 +46,7 @@ local function isDebugEnabled()
 end
 
 -- ----- Public methods ----- --
-function ListController.CreateRowDrawer(fn)
+function Lists.CreateRowRenderer(fn)
     local rowHeight
     return function(row, it, ...)
         if not rowHeight then
@@ -56,7 +57,7 @@ function ListController.CreateRowDrawer(fn)
     end
 end
 
-function ListController.MakeListController(cfg)
+function Lists.CreateController(cfg)
     local self = {
         frameName = nil,
         data = {},
@@ -91,8 +92,8 @@ function ListController.MakeListController(cfg)
         if row then
             row:Show()
             local RowVisuals = getRowVisuals()
-            if RowVisuals.EnsureRowVisuals then
-                RowVisuals.EnsureRowVisuals(row)
+            if RowVisuals.EnsureVisuals then
+                RowVisuals.EnsureVisuals(row)
             end
             return row
         end
@@ -101,8 +102,8 @@ function ListController.MakeListController(cfg)
         self._rowByName[btnName] = row
         buildRowParts(btnName, row)
         local RowVisuals = getRowVisuals()
-        if RowVisuals.EnsureRowVisuals then
-            RowVisuals.EnsureRowVisuals(row)
+        if RowVisuals.EnsureVisuals then
+            RowVisuals.EnsureVisuals(row)
         end
         return row
     end
@@ -234,7 +235,7 @@ function ListController.MakeListController(cfg)
         self._lastHL = combo
 
         local RowVisuals = getRowVisuals()
-        local UIPrimitives = getUIPrimitives()
+        local Primitives = getPrimitives()
         for i = 1, #self.data do
             local it = self.data[i]
             local row = self._rows[i]
@@ -246,14 +247,14 @@ function ListController.MakeListController(cfg)
                     isSel = cfg.highlightFn(it.id, it, i, row) and true or false
                 end
 
-                if RowVisuals.SetRowSelected then
-                    RowVisuals.SetRowSelected(row, isSel)
-                elseif UIPrimitives.ToggleHighlight then
-                    UIPrimitives.ToggleHighlight(row, isSel)
+                if RowVisuals.SetSelected then
+                    RowVisuals.SetSelected(row, isSel)
+                elseif Primitives.SetHighlighted then
+                    Primitives.SetHighlighted(row, isSel)
                 end
 
-                if RowVisuals.SetRowFocused then
-                    RowVisuals.SetRowFocused(row, focusId ~= nil and it.id == focusId)
+                if RowVisuals.SetFocused then
+                    RowVisuals.SetFocused(row, focusId ~= nil and it.id == focusId)
                 end
             end
         end
@@ -491,14 +492,10 @@ function ListController.MakeListController(cfg)
         postUpdate()
     end
 
-    if Frames then
-        self._makeConfirmPopup = Frames.MakeConfirmPopup
-    end
-
     return self
 end
 
-function ListController.BindListController(module, controller)
+function Lists.BindController(module, controller)
     module.OnLoad = function(_, frame)
         controller:OnLoad(frame)
     end

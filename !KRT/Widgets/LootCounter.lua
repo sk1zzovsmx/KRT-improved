@@ -9,9 +9,13 @@ local feature = addon.Database.GetFeatureShared()
 local L = feature.L
 
 local Widgets = feature.Widgets
-local Frames = feature.Frames
+local UI = feature.UI
+local UIWidgets = UI.Widgets
+local Frames = UI.Frames
+local Scaffold = UI.Scaffold
+local Popups = UI.Popups
+local Tooltips = UI.Tooltips
 local Colors = feature.Colors
-local UIScaffold = feature.UIScaffold
 local Events = feature.Events
 local C = feature.C
 local Options = feature.Options
@@ -31,8 +35,6 @@ local type, tostring, tonumber = type, tostring, tonumber
 local strlen = string.len
 
 local InternalEvents = Events.Internal
-local UIFacade = feature.UI
-
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Widgets/LootCounter", {
@@ -59,14 +61,13 @@ end
 -- Loot counter module.
 -- Tracks and edits item distribution counts (MS wins).
 do
-    if not UIFacade:IsEnabled("LootCounter") then
+    if not UIWidgets.IsEnabled("LootCounter") then
         return
     end
 
     Widgets.LootCounter = Widgets.LootCounter or {}
     local module = Widgets.LootCounter
-    module._ui = UIScaffold.EnsureModuleUi(module)
-    local UI = module._ui
+    local uiState = Scaffold.EnsureModuleState(module)
 
     -- Namespace registration: LootCounter widget options.
     Options.AddNamespace("LootCounter", {
@@ -126,7 +127,7 @@ do
     end
 
     -- ----- Private helpers ----- --
-    function UI.AcquireRefs(frame)
+    function uiState.AcquireRefs(frame)
         local refs = {
             scrollFrame = frame and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"]) or nil,
             announceBtn = Frames.GetRef(frame, "AnnounceBtn"),
@@ -141,7 +142,7 @@ do
         if refs and refs.announceBtn then
             return refs.announceBtn
         end
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return nil
         end
@@ -153,7 +154,7 @@ do
         if refs and refs.resetAllBtn then
             return refs.resetAllBtn
         end
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return nil
         end
@@ -168,7 +169,7 @@ do
             return true
         end
 
-        Frames.MakeConfirmPopup(RESET_ALL_POPUP_KEY, L.StrConfirmLootCounterResetAll, resetAllCounts)
+        Popups.DefineConfirm(RESET_ALL_POPUP_KEY, L.StrConfirmLootCounterResetAll, resetAllCounts)
 
         local popup = StaticPopupDialogs[RESET_ALL_POPUP_KEY]
         if popup then
@@ -276,8 +277,8 @@ do
         end
     end
 
-    function UI.Localize()
-        local frameName = UI.FrameName
+    function uiState.Localize()
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -285,12 +286,12 @@ do
         local announceBtn = getAnnounceButton()
         if announceBtn then
             announceBtn:SetText(L.BtnLootCounterAnnounce)
-            Frames.SetTooltip(announceBtn, L.TipLootCounterAnnounce)
+            Tooltips.Bind(announceBtn, L.TipLootCounterAnnounce)
         end
         local resetAllBtn = getResetAllButton()
         if resetAllBtn then
             resetAllBtn:SetText(L.BtnLootCounterResetAll)
-            Frames.SetTooltip(resetAllBtn, L.TipLootCounterResetAll)
+            Tooltips.Bind(resetAllBtn, L.TipLootCounterResetAll)
         end
     end
 
@@ -300,8 +301,8 @@ do
             return false
         end
 
-        UI.FrameName = UI.FrameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
-        scrollFrame = scrollFrame or frame.ScrollFrame or _G[UI.FrameName .. "ScrollFrame"] or _G["KRTLootCounterFrameScrollFrame"]
+        uiState.FrameName = uiState.FrameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
+        scrollFrame = scrollFrame or frame.ScrollFrame or _G[uiState.FrameName .. "ScrollFrame"] or _G["KRTLootCounterFrameScrollFrame"]
 
         scrollChild = scrollChild or (scrollFrame and scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         return true
@@ -565,7 +566,7 @@ do
     -- ----- Public methods ----- --
     local function loadLootCounterFrame(frame)
         local f = frame or getFrame()
-        UI.FrameName = Frames.BindModuleFrame(module, f, { enableDrag = true }) or UI.FrameName
+        uiState.FrameName = Frames.BindModuleFrame(module, f, { enableDrag = true }) or uiState.FrameName
         if not ensureFrames() then
             return
         end
@@ -727,16 +728,16 @@ do
 
     local function OnLoadFrame(frame)
         loadLootCounterFrame(frame)
-        return UI.FrameName
+        return uiState.FrameName
     end
 
-    UIScaffold.DefineModuleUi({
+    Scaffold.DefineModule({
         module = module,
         getFrame = getFrame,
-        acquireRefs = UI.AcquireRefs,
+        acquireRefs = uiState.AcquireRefs,
         bind = BindHandlers,
         localize = function()
-            UI.Localize()
+            uiState.Localize()
         end,
         onLoad = OnLoadFrame,
         refresh = function()
@@ -758,9 +759,9 @@ do
     -- New raid session: reset view.
     Bus.RegisterCallback(InternalEvents.RaidCreate, requestRefresh)
 
-    UIFacade:Register(
+    UIWidgets.Register(
         "LootCounter",
-        UIScaffold.MakeStandardWidgetApi(module, {
+        Scaffold.CreateWidgetApi(module, {
             AttachToMaster = function(masterFrame)
                 attachCounterToMaster(masterFrame)
             end,

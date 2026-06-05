@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: publish module APIs on addon.*
+-- exports: addon.UI.Frames/Scaffold/ModuleState/EditBoxes/Popups/Tooltips
 -- events: none; owns shared refresh driver
 
 local addon = select(2, ...)
@@ -21,14 +21,28 @@ local C = feature.C
 local Strings = feature.Strings
 local coreState = feature.coreState
 
-local Frames = feature.Frames or {}
-addon.Frames = Frames
+local UI = feature.UI or {}
+local Frames = UI.Frames or {}
+UI.Frames = Frames
 
-local UIScaffold = feature.UIScaffold or {}
-addon.UIScaffold = UIScaffold
+local Scaffold = UI.Scaffold or {}
+UI.Scaffold = Scaffold
+
+local ModuleState = UI.ModuleState or {}
+UI.ModuleState = ModuleState
+
+local EditBoxes = UI.EditBoxes or {}
+UI.EditBoxes = EditBoxes
+
+local Popups = UI.Popups or {}
+UI.Popups = Popups
+
+local Tooltips = UI.Tooltips or {}
+UI.Tooltips = Tooltips
 local tooltipColor = HIGHLIGHT_FONT_COLOR
 
 -- ----- Internal state ----- --
+local stateByModule = setmetatable({}, { __mode = "k" })
 
 -- ----- Private helpers ----- --
 local function resolveFrameName(frameOrName)
@@ -46,6 +60,65 @@ local function isModuleUiBound(module, uiState)
 end
 
 -- ----- Public methods ----- --
+local function createModuleState()
+    return {
+        Loaded = false,
+        Bound = false,
+        Localized = false,
+        Dirty = true,
+        Reason = nil,
+        FrameName = nil,
+    }
+end
+
+function ModuleState.Ensure(module)
+    if type(module) ~= "table" then
+        return nil
+    end
+
+    local uiState = stateByModule[module]
+    if not uiState then
+        uiState = createModuleState()
+        stateByModule[module] = uiState
+    end
+    return uiState
+end
+
+function ModuleState.Get(module)
+    if type(module) ~= "table" then
+        return nil
+    end
+    return stateByModule[module]
+end
+
+function ModuleState.Reset(module)
+    if type(module) == "table" then
+        stateByModule[module] = nil
+    end
+end
+
+function ModuleState.MarkDirty(module, reason)
+    local uiState = ModuleState.Ensure(module)
+    if not uiState then
+        return nil
+    end
+
+    uiState.Dirty = true
+    if reason then
+        uiState.Reason = reason
+    end
+    return uiState
+end
+
+function ModuleState.ClearDirty(module)
+    local uiState = ModuleState.Get(module)
+    if uiState then
+        uiState.Dirty = false
+        uiState.Reason = nil
+    end
+    return uiState
+end
+
 function Frames.EnableDrag(frame, dragButton)
     if not frame or not frame.RegisterForDrag then
         return
@@ -86,7 +159,7 @@ function Frames.EnableDrag(frame, dragButton)
     frame:RegisterForDrag(dragButton or "LeftButton")
 end
 
-function Frames.MakeConfirmPopup(key, text, onAccept, cancels)
+function Popups.DefineConfirm(key, text, onAccept, cancels)
     StaticPopupDialogs[key] = {
         text = text,
         button1 = OKAY,
@@ -99,7 +172,7 @@ function Frames.MakeConfirmPopup(key, text, onAccept, cancels)
     }
 end
 
-function Frames.MakeEditBoxPopup(key, text, onAccept, onShow, validate)
+function Popups.DefineEditBox(key, text, onAccept, onShow, validate)
     StaticPopupDialogs[key] = {
         text = text,
         button1 = SAVE,
@@ -148,7 +221,7 @@ function Frames.SetFrameTitle(frameOrName, titleText, titleFormat)
     titleFrame:SetText(format(fmt, titleText))
 end
 
-function Frames.ResetEditBox(editBox, hide)
+function EditBoxes.Reset(editBox, hide)
     if not editBox then
         return
     end
@@ -159,7 +232,7 @@ function Frames.ResetEditBox(editBox, hide)
     end
 end
 
-function Frames.SetEditBoxValue(editBox, value, focus)
+function EditBoxes.SetValue(editBox, value, focus)
     if not editBox then
         return
     end
@@ -279,11 +352,11 @@ local function showTooltip(frame)
     GameTooltip:Show()
 end
 
-function Frames.HideTooltip()
+function Tooltips.Hide()
     GameTooltip:Hide()
 end
 
-function Frames.SetTooltip(frame, text, anchor, title)
+function Tooltips.Bind(frame, text, anchor, title)
     if not frame then
         return
     end
@@ -294,7 +367,7 @@ function Frames.SetTooltip(frame, text, anchor, title)
         return
     end
     frame:SetScript("OnEnter", showTooltip)
-    frame:SetScript("OnLeave", Frames.HideTooltip)
+    frame:SetScript("OnLeave", Tooltips.Hide)
 end
 
 function Frames.MakeEventDrivenRefresher(targetOrGetter, updateFn)
@@ -452,19 +525,11 @@ local function bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     return uiController
 end
 
-function UIScaffold.EnsureModuleUi(mod)
-    mod._ui = mod._ui or {
-        Loaded = false,
-        Bound = false,
-        Localized = false,
-        Dirty = true,
-        Reason = nil,
-        FrameName = nil,
-    }
-    return mod._ui
+function Scaffold.EnsureModuleState(mod)
+    return ModuleState.Ensure(mod)
 end
 
-function UIScaffold.DefineModuleUi(cfg)
+function Scaffold.DefineModule(cfg)
     cfg = cfg or {}
     local module = cfg.module
     local getFrame = cfg.getFrame
@@ -476,29 +541,28 @@ function UIScaffold.DefineModuleUi(cfg)
     local refreshFn = cfg.refresh
 
     if type(module) ~= "table" then
-        error("UIScaffold.DefineModuleUi: cfg.module must be a table")
+        error("UI.Scaffold.DefineModule: cfg.module must be a table")
     end
     if type(getFrame) ~= "function" then
-        error("UIScaffold.DefineModuleUi: cfg.getFrame must be a function")
+        error("UI.Scaffold.DefineModule: cfg.getFrame must be a function")
     end
     if acquireRefs and type(acquireRefs) ~= "function" then
-        error("UIScaffold.DefineModuleUi: cfg.acquireRefs must be a function")
+        error("UI.Scaffold.DefineModule: cfg.acquireRefs must be a function")
     end
     if bindHandlers and type(bindHandlers) ~= "function" then
-        error("UIScaffold.DefineModuleUi: cfg.bind must be a function")
+        error("UI.Scaffold.DefineModule: cfg.bind must be a function")
     end
     if localize and type(localize) ~= "function" then
-        error("UIScaffold.DefineModuleUi: cfg.localize must be a function")
+        error("UI.Scaffold.DefineModule: cfg.localize must be a function")
     end
     if onLoadFrame and type(onLoadFrame) ~= "function" then
-        error("UIScaffold.DefineModuleUi: cfg.onLoad must be a function")
+        error("UI.Scaffold.DefineModule: cfg.onLoad must be a function")
     end
     if refreshFn and type(refreshFn) ~= "function" then
-        error("UIScaffold.DefineModuleUi: cfg.refresh must be a function")
+        error("UI.Scaffold.DefineModule: cfg.refresh must be a function")
     end
 
-    module._ui = UIScaffold.EnsureModuleUi(module)
-    local UI = module._ui
+    local uiState = Scaffold.EnsureModuleState(module)
 
     local function doRefresh()
         local frame = getFrame()
@@ -506,17 +570,17 @@ function UIScaffold.DefineModuleUi(cfg)
             return
         end
 
-        local dirty = UI.Dirty
-        local reason = UI.Reason
-        UI.Dirty = false
-        UI.Reason = nil
+        local dirty = uiState.Dirty
+        local reason = uiState.Reason
+        uiState.Dirty = false
+        uiState.Reason = nil
 
         local refs = module.refs
         if refreshFn then
-            return refreshFn(UI.FrameName, frame, refs, dirty, reason)
+            return refreshFn(uiState.FrameName, frame, refs, dirty, reason)
         end
         if type(module.RefreshUI) == "function" then
-            return module:RefreshUI(UI.FrameName, frame, refs, dirty, reason)
+            return module:RefreshUI(uiState.FrameName, frame, refs, dirty, reason)
         end
         if type(module.Refresh) == "function" then
             return module:Refresh(dirty, reason)
@@ -526,10 +590,7 @@ function UIScaffold.DefineModuleUi(cfg)
     local requestRefresh = Frames.MakeEventDrivenRefresher(getFrame, doRefresh)
 
     function module:MarkDirty(reason)
-        UI.Dirty = true
-        if reason then
-            UI.Reason = reason
-        end
+        ModuleState.MarkDirty(module, reason)
     end
 
     function module:RequestRefresh(reason)
@@ -542,7 +603,7 @@ function UIScaffold.DefineModuleUi(cfg)
     end)
 
     function module:BindUI()
-        if isModuleUiBound(self, UI) then
+        if isModuleUiBound(self, uiState) then
             return self.frame, self.refs
         end
 
@@ -551,31 +612,31 @@ function UIScaffold.DefineModuleUi(cfg)
             return nil
         end
 
-        if not UI.Loaded then
+        if not uiState.Loaded then
             local frameName
             if onLoadFrame then
                 frameName = onLoadFrame(frame)
             else
                 frameName = Frames.BindModuleFrame(module, frame, initFrameOpts)
             end
-            UI.FrameName = frameName or (frame.GetName and frame:GetName()) or UI.FrameName
-            UI.Loaded = UI.FrameName ~= nil
+            uiState.FrameName = frameName or (frame.GetName and frame:GetName()) or uiState.FrameName
+            uiState.Loaded = uiState.FrameName ~= nil
         end
 
-        local refs = acquireRefs and acquireRefs(frame, UI.FrameName) or {}
+        local refs = acquireRefs and acquireRefs(frame, uiState.FrameName) or {}
         self.frame = frame
         self.refs = refs
 
         if bindHandlers then
-            bindHandlers(UI.FrameName, frame, refs)
+            bindHandlers(uiState.FrameName, frame, refs)
         end
 
-        if (not UI.Localized) and localize then
-            localize(UI.FrameName, frame, refs)
-            UI.Localized = true
+        if (not uiState.Localized) and localize then
+            localize(uiState.FrameName, frame, refs)
+            uiState.Localized = true
         end
 
-        UI.Bound = true
+        uiState.Bound = true
 
         if frame.IsShown and frame:IsShown() then
             self:RequestRefresh("bind")
@@ -585,7 +646,7 @@ function UIScaffold.DefineModuleUi(cfg)
     end
 
     function module:EnsureUI()
-        if isModuleUiBound(self, UI) then
+        if isModuleUiBound(self, uiState) then
             return self.frame
         end
         local frame = self:BindUI()
@@ -606,12 +667,12 @@ function UIScaffold.DefineModuleUi(cfg)
         return uiController:Hide()
     end
 
-    return UI
+    return uiState
 end
 
-function UIScaffold.MakeStandardWidgetApi(module, extraMethods)
+function Scaffold.CreateWidgetApi(module, extraMethods)
     if type(module) ~= "table" then
-        error("UIScaffold.MakeStandardWidgetApi: module must be a table")
+        error("UI.Scaffold.CreateWidgetApi: module must be a table")
     end
 
     local api = {
@@ -635,20 +696,20 @@ function UIScaffold.MakeStandardWidgetApi(module, extraMethods)
     return api
 end
 
-function UIScaffold.CreateListPanelScaffold(cfg)
+function Scaffold.CreateListPanel(cfg)
     cfg = cfg or {}
     local module = cfg.module
     local getFrame = cfg.getFrame
     local controller = cfg.controller
 
     if type(module) ~= "table" then
-        error("UIScaffold.CreateListPanelScaffold: cfg.module must be a table")
+        error("UI.Scaffold.CreateListPanel: cfg.module must be a table")
     end
     if type(getFrame) ~= "function" then
-        error("UIScaffold.CreateListPanelScaffold: cfg.getFrame must be a function")
+        error("UI.Scaffold.CreateListPanel: cfg.getFrame must be a function")
     end
     if type(controller) ~= "table" then
-        error("UIScaffold.CreateListPanelScaffold: cfg.controller must be a table")
+        error("UI.Scaffold.CreateListPanel: cfg.controller must be a table")
     end
 
     local frameName
@@ -717,7 +778,7 @@ function UIScaffold.CreateListPanelScaffold(cfg)
     return scaffold
 end
 
-function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
+function EditBoxes.BindHandlers(frameName, specs, requestRefreshFn)
     if type(frameName) ~= "string" or type(specs) ~= "table" then
         return
     end

@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: publish module APIs on addon.*
+-- exports: addon.UI.Widgets
 -- events: none
 
 local addon = select(2, ...)
@@ -14,8 +14,11 @@ local type = type
 local UI = feature.UI or {}
 addon.UI = UI
 
+local Widgets = UI.Widgets or {}
+UI.Widgets = Widgets
+
 -- ----- Internal state ----- --
-UI._registry = UI._registry or {}
+Widgets._registry = Widgets._registry or {}
 
 -- ----- Private helpers ----- --
 local function isWidgetEnabled(widgetId)
@@ -33,41 +36,41 @@ local function isWidgetEnabled(widgetId)
 end
 
 -- ----- Public methods ----- --
-function UI:IsEnabled(widgetId)
+function Widgets.IsEnabled(widgetId)
     if type(widgetId) ~= "string" or widgetId == "" then
         return false
     end
     return isWidgetEnabled(widgetId)
 end
 
-function UI:IsRegistered(widgetId)
+function Widgets.IsRegistered(widgetId)
     if type(widgetId) ~= "string" or widgetId == "" then
         return false
     end
-    local api = self._registry and self._registry[widgetId]
+    local api = Widgets._registry and Widgets._registry[widgetId]
     return type(api) == "table"
 end
 
-function UI:Register(widgetId, apiTable)
+function Widgets.Register(widgetId, apiTable)
     if type(widgetId) ~= "string" or widgetId == "" then
         return false
     end
     if type(apiTable) ~= "table" then
         return false
     end
-    if not self:IsEnabled(widgetId) then
-        self._registry[widgetId] = nil
+    if not Widgets.IsEnabled(widgetId) then
+        Widgets._registry[widgetId] = nil
         return false
     end
-    self._registry[widgetId] = apiTable
+    Widgets._registry[widgetId] = apiTable
     return true
 end
 
-function UI:Call(widgetId, methodName, ...)
-    if not self:IsEnabled(widgetId) then
+function Widgets.Call(widgetId, methodName, ...)
+    if not Widgets.IsEnabled(widgetId) then
         return nil
     end
-    local api = self._registry and self._registry[widgetId]
+    local api = Widgets._registry and Widgets._registry[widgetId]
     if type(api) ~= "table" then
         return nil
     end

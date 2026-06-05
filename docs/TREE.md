@@ -218,7 +218,8 @@
 |   |-- TECH_CLEANUP_BACKLOG.md
 |   |-- TECH_CLEANUP_WORKFLOW.md
 |   |-- TOTAL_REWORK_REPORT.md
-|   \\-- TREE.md
+|   |-- TREE.md
+|   \\-- UI_CODING_RULES.md
 |-- tests
 |   |-- fixtures
 |   |   \\-- sv
@@ -232,7 +233,8 @@
 |   |-- module_registry_spec.lua
 |   |-- module_registry_ui_entrypoints_spec.lua
 |   |-- module_registry_ui_spec.lua
-|   \\-- release_stabilization_spec.lua
+|   |-- release_stabilization_spec.lua
+|   \\-- ui_api_namespace_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
 |   |-- api-contract-cleanup-wave.md

@@ -11,10 +11,13 @@ local L = feature.L
 local Widgets = feature.Widgets
 local Database = feature.Database
 local Options = feature.Options
-local Frames = feature.Frames
+local UI = feature.UI
+local UIWidgets = UI.Widgets
+local Frames = UI.Frames
+local Scaffold = UI.Scaffold
+local Layout = UI.Layout
+local Popups = UI.Popups
 local Strings = feature.Strings
-local UIScaffold = feature.UIScaffold
-local OptionsLayout = feature.OptionsLayout
 local Events = feature.Events
 local Bus = feature.Bus
 local Services = feature.Services
@@ -27,8 +30,6 @@ local format = string.format
 local strlen = string.len
 local strsub = string.sub
 local type, tostring, tonumber = type, tostring, tonumber
-
-local UIFacade = feature.UI
 
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
@@ -50,14 +51,13 @@ end
 
 -- =========== Configuration Frame Module  =========== --
 do
-    if not UIFacade:IsEnabled("Config") then
+    if not UIWidgets.IsEnabled("Config") then
         return
     end
 
     Widgets.Config = Widgets.Config or {}
     local module = Widgets.Config
-    module._ui = UIScaffold.EnsureModuleUi(module)
-    local UI = module._ui
+    local uiState = Scaffold.EnsureModuleState(module)
 
     -- Namespace registration: generic UI options (tooltip toggle).
     -- Other options exposed by this widget are owned by their source modules
@@ -159,7 +159,7 @@ do
         return refs
     end
 
-    function UI.AcquireRefs(frame)
+    function uiState.AcquireRefs(frame)
         return collectConfigRefs(frame, true)
     end
 
@@ -316,8 +316,8 @@ do
     end
 
     local function applyOptionsLayout(frameName, rows, cfg)
-        if OptionsLayout and OptionsLayout.Apply then
-            return OptionsLayout.Apply(frameName, rows, cfg)
+        if Layout and Layout.ApplyRows then
+            return Layout.ApplyRows(frameName, rows, cfg)
         end
         return 0
     end
@@ -958,13 +958,13 @@ do
     end
 
     local function loadConfigFrame(frame)
-        UI.FrameName = Frames.BindModuleFrame(module, frame, {
+        uiState.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 module:MarkDirty("show")
             end,
-        }) or UI.FrameName
-        if not UI.FrameName then
+        }) or uiState.FrameName
+        if not uiState.FrameName then
             return
         end
     end
@@ -1216,11 +1216,11 @@ do
     end
 
     local function ensureLootHistoryConfirmPopups()
-        if type(StaticPopupDialogs) ~= "table" or not (Frames and Frames.MakeConfirmPopup) then
+        if type(StaticPopupDialogs) ~= "table" or not (Popups and Popups.DefineConfirm) then
             return false
         end
         if not StaticPopupDialogs["KRT_CONFIG_PURGE_LOOT_HISTORY"] then
-            Frames.MakeConfirmPopup("KRT_CONFIG_PURGE_LOOT_HISTORY", L.StrConfirmPurgeLootHistory, function()
+            Popups.DefineConfirm("KRT_CONFIG_PURGE_LOOT_HISTORY", L.StrConfirmPurgeLootHistory, function()
                 module:RequestLoggerMaintenance("purge")
             end)
         end
@@ -1715,26 +1715,26 @@ do
 
     local function OnLoadFrame(frame)
         loadConfigFrame(frame)
-        return UI.FrameName
+        return uiState.FrameName
     end
 
-    UIScaffold.DefineModuleUi({
+    Scaffold.DefineModule({
         module = module,
         getFrame = getFrame,
-        acquireRefs = UI.AcquireRefs,
+        acquireRefs = uiState.AcquireRefs,
         bind = BindHandlers,
         localize = function()
-            UI.Localize()
+            uiState.Localize()
         end,
         onLoad = OnLoadFrame,
         refresh = function(_, _, _, dirty)
-            UI.Refresh(dirty)
+            uiState.Refresh(dirty)
         end,
     })
 
     -- Localizes UI elements.
-    function UI.Localize()
-        local frameName = UI.FrameName
+    function uiState.Localize()
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -1743,23 +1743,23 @@ do
     end
 
     -- UI refresh handler for the configuration frame.
-    function UI.Refresh(dirty)
-        if not dirty and not UI.Dirty then
+    function uiState.Refresh(dirty)
+        if not dirty and not uiState.Dirty then
             return
         end
 
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
         refreshConfigControls(frameName)
 
-        UI.Dirty = false
+        uiState.Dirty = false
     end
 
-    UIFacade:Register(
+    UIWidgets.Register(
         "Config",
-        UIScaffold.MakeStandardWidgetApi(module, {
+        Scaffold.CreateWidgetApi(module, {
             Default = function()
                 loadDefaultOptions()
             end,

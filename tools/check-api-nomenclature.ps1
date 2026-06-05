@@ -70,9 +70,6 @@ function Get-ApiScope([string]$target, [string]$method) {
     if ($target -match "(^|\.)_[A-Za-z0-9_]+(\.|$)") {
         return "Internal"
     }
-    if ($target -match "(^|\.)_ui(\.|$)") {
-        return "Internal"
-    }
     return "Public"
 }
 

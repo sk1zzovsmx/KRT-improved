@@ -109,7 +109,7 @@ Final stage-2/stage-3 snapshot:
 Interpretation:
 
 - The +1 API delta versus the stage-1 snapshot comes from promoting the shared
-  tooltip helper to the canonical `addon.Frames.HideTooltip` surface.
+  tooltip helper to the canonical `addon.UI.Tooltips.Hide` surface.
 - The mechanical duplication lane is now closed; the remaining work is contract
   review and selective naming/API simplification, not wrapper collapse.
 - The first high-signal contract-cleanup lane is `Database/DB`, where DB-manager-backed
@@ -165,7 +165,7 @@ Stage 2 target set:
 Stage 2 completed:
 
 - merged Logger popup helper pairs onto one shared `ensurePopupRefs(...)` path
-- centralized tooltip hide wiring on `addon.Frames.HideTooltip`
+- centralized tooltip hide wiring on `addon.UI.Tooltips.Hide`
 - removed all `merge-now` exact-clone entries from `docs/FN_CLUSTERS.md`
 
 Contract wave seed (`2026-04-06`):
@@ -377,7 +377,7 @@ Signals used for this backlog:
 - `tools/check-layering.ps1`: passed
 - `tools/check-ui-binding.ps1`: passed
 - file-size scan for KRT-owned Lua and XML
-- module contract scan for `module._ui`, `UIScaffold`, and frame getter usage
+- module contract scan for `UI.ModuleState`, `UI.Scaffold`, and frame getter usage
 
 What this means:
 
@@ -836,7 +836,7 @@ Completed:
 - Collapsed repeated same-file helper noise in Logger/Spammer/Timer/LootCounter
   where the change was behavior-neutral and reduced catalog drift.
 - Updated `tools/fnmap-classify.ps1` to classify ListController,
-  UIScaffold, popup, and EasyMenu callbacks as `framework-hook` instead of
+  UI.Scaffold, popup, and EasyMenu callbacks as `framework-hook` instead of
   rename/extract candidates. This keeps intentional `getData`, `rowName`,
   `localize`, `postUpdate`, `func`, `Box._doSave`, `OnShow`, and `OnHide`
   callbacks out of the actionable duplicate queue.
@@ -847,5 +847,5 @@ Next candidates:
    package-internal contracts; alias, collapse, readiness, and display methods
    are currently real slash/UI/controller contracts.
 2. Leave remaining `getData`/`rowName`/`localize`/`postUpdate` entries alone
-   unless ListController/UIScaffold contract names change; those names are
+   unless ListController/UI.Scaffold contract names change; those names are
    configuration hooks, not duplicated runtime ownership.

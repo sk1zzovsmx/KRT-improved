@@ -53,19 +53,19 @@ No non-conformant methods found.
 
 | API | File | Line |
 | --- | --- | ---: |
-| addon:ADDON_LOADED | !KRT/Init.lua | 848 |
-| addon:CHAT_MSG_ADDON | !KRT/Init.lua | 1077 |
-| addon:CHAT_MSG_LOOT | !KRT/Init.lua | 1008 |
-| addon:CHAT_MSG_MONSTER_YELL | !KRT/Init.lua | 1097 |
-| addon:CHAT_MSG_SYSTEM | !KRT/Init.lua | 1035 |
-| addon:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Init.lua | 1109 |
-| addon:PLAYER_DIFFICULTY_CHANGED | !KRT/Init.lua | 955 |
-| addon:PLAYER_ENTERING_WORLD | !KRT/Init.lua | 967 |
-| addon:PLAYER_LOGOUT | !KRT/Init.lua | 1117 |
-| addon:RAID_INSTANCE_WELCOME | !KRT/Init.lua | 938 |
-| addon:RAID_ROSTER_UPDATE | !KRT/Init.lua | 920 |
-| addon:START_LOOT_ROLL | !KRT/Init.lua | 1064 |
-| addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 961 |
+| addon:ADDON_LOADED | !KRT/Init.lua | 842 |
+| addon:CHAT_MSG_ADDON | !KRT/Init.lua | 1071 |
+| addon:CHAT_MSG_LOOT | !KRT/Init.lua | 1002 |
+| addon:CHAT_MSG_MONSTER_YELL | !KRT/Init.lua | 1091 |
+| addon:CHAT_MSG_SYSTEM | !KRT/Init.lua | 1029 |
+| addon:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Init.lua | 1103 |
+| addon:PLAYER_DIFFICULTY_CHANGED | !KRT/Init.lua | 949 |
+| addon:PLAYER_ENTERING_WORLD | !KRT/Init.lua | 961 |
+| addon:PLAYER_LOGOUT | !KRT/Init.lua | 1111 |
+| addon:RAID_INSTANCE_WELCOME | !KRT/Init.lua | 932 |
+| addon:RAID_ROSTER_UPDATE | !KRT/Init.lua | 914 |
+| addon:START_LOOT_ROLL | !KRT/Init.lua | 1058 |
+| addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 955 |
 
 ## Extraction Rules
 
@@ -73,5 +73,5 @@ No non-conformant methods found.
 - Resolves local aliases when assigned directly from `addon.*` paths.
 - Captures both `function X:Y()` and `X.Y = function()` forms.
 - Excludes vendored libraries under `!KRT/Libs`.
-- Classifies public vs internal APIs using method underscore prefixes, underscore owner segments, and `._ui` targets.
+- Classifies public vs internal APIs using method underscore prefixes and underscore owner segments.
 - Applies a public-API verb taxonomy for readability tracking.

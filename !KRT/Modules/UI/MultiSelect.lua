@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: publish module APIs on addon.*
+-- exports: publish selection APIs on addon.UI.Selection
 -- events: none
 
 local addon = select(2, ...)
@@ -12,15 +12,16 @@ local coreState = feature.coreState
 
 local pairs, tostring, tonumber, type = pairs, tostring, tonumber, type
 
-local MultiSelect = feature.MultiSelect or {}
-addon.MultiSelect = MultiSelect
+local UI = feature.UI or {}
+local Selection = UI.Selection or {}
+UI.Selection = Selection
 
 -- ----- Internal state ----- --
-local stateByContext = MultiSelect._stateByContext or {}
-MultiSelect._stateByContext = stateByContext
+local stateByContext = Selection._stateByContext or {}
+Selection._stateByContext = stateByContext
 
-local modifierPolicyByScope = MultiSelect._modifierPolicyByScope or {}
-MultiSelect._modifierPolicyByScope = modifierPolicyByScope
+local modifierPolicyByScope = Selection._modifierPolicyByScope or {}
+Selection._modifierPolicyByScope = modifierPolicyByScope
 
 -- ----- Private helpers ----- --
 local function normalizeScopeKey(scopeKey)
@@ -115,7 +116,7 @@ local function getModifierPolicy(scopeKey)
     return policy.allowMulti ~= false, policy.allowRange ~= false
 end
 
-function MultiSelect.EnsureState(contextKey)
+function Selection.EnsureState(contextKey)
     local st, key = ensureContext(contextKey)
     st.set = {}
     st.count = 0
@@ -124,7 +125,7 @@ function MultiSelect.EnsureState(contextKey)
     return st
 end
 
-function MultiSelect.SetModifierPolicy(scopeKey, policy)
+function Selection.SetModifierPolicy(scopeKey, policy)
     local key = normalizeScopeKey(scopeKey)
 
     if policy == nil then
@@ -139,7 +140,7 @@ function MultiSelect.SetModifierPolicy(scopeKey, policy)
     modifierPolicyByScope[key] = normalizeModifierPolicy(policy)
 end
 
-function MultiSelect.ResolveModifiers(scopeKey, opts)
+function Selection.ResolveModifiers(scopeKey, opts)
     local policyAllowMulti, policyAllowRange = getModifierPolicy(scopeKey)
     local allowMulti = policyAllowMulti
     local allowRange = policyAllowRange
@@ -171,7 +172,7 @@ function MultiSelect.ResolveModifiers(scopeKey, opts)
     return isMulti, isRange
 end
 
-function MultiSelect.Toggle(contextKey, id, isMulti, allowDeselect)
+function Selection.Toggle(contextKey, id, isMulti, allowDeselect)
     local st, key = ensureContext(contextKey)
     local k = msKey(id)
     if k == nil then
@@ -219,7 +220,7 @@ function MultiSelect.Toggle(contextKey, id, isMulti, allowDeselect)
     return action, st.count or 0
 end
 
-function MultiSelect.SetAnchor(contextKey, id)
+function Selection.SetAnchor(contextKey, id)
     local st, key = ensureContext(contextKey)
     local before = st.anchor
     local k = msKey(id)
@@ -229,12 +230,12 @@ function MultiSelect.SetAnchor(contextKey, id)
     return st.anchor
 end
 
-function MultiSelect.GetAnchor(contextKey)
+function Selection.GetAnchor(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return st and st.anchor or nil
 end
 
-function MultiSelect.SelectRange(contextKey, ordered, id, isAdd)
+function Selection.SelectRange(contextKey, ordered, id, isAdd)
     local st, key = ensureContext(contextKey)
     local k = msKey(id)
     if k == nil then
@@ -283,7 +284,7 @@ function MultiSelect.SelectRange(contextKey, ordered, id, isAdd)
     return action, st.count or 0
 end
 
-function MultiSelect.IsSelected(contextKey, id)
+function Selection.IsSelected(contextKey, id)
     local st = stateByContext[contextKey or "_default"]
     if not st or not st.set then
         return false
@@ -292,17 +293,17 @@ function MultiSelect.IsSelected(contextKey, id)
     return (k ~= nil) and (st.set[k] == true) or false
 end
 
-function MultiSelect.GetCount(contextKey)
+function Selection.GetCount(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return (st and st.count) or 0
 end
 
-function MultiSelect.GetVersion(contextKey)
+function Selection.GetVersion(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return (st and st.ver) or 0
 end
 
-function MultiSelect.GetSelected(contextKey)
+function Selection.GetSelected(contextKey)
     local st = stateByContext[contextKey or "_default"]
     local out = {}
     if not st or not st.set then

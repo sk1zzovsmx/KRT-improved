@@ -10,11 +10,14 @@ local L = feature.L
 local Controllers = feature.Controllers
 local Database = feature.Database
 
-local Frames = feature.Frames
+local UI = feature.UI
+local Frames = UI.Frames
+local Scaffold = UI.Scaffold
+local Primitives = UI.Primitives
+local EditBoxes = UI.EditBoxes
+local Tooltips = UI.Tooltips
 local Strings = feature.Strings
 local Services = feature.Services
-local UIScaffold = feature.UIScaffold
-local UIPrimitives = feature.UIPrimitives
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -39,8 +42,7 @@ local ChatApi = {
 do
     Controllers.Spammer = Controllers.Spammer or {}
     local module = Controllers.Spammer
-    module._ui = UIScaffold.EnsureModuleUi(module)
-    local UI = module._ui
+    local uiState = Scaffold.EnsureModuleState(module)
     -- ----- Internal state ----- --
 
     local getFrame = makeModuleFrameGetter(module, "KRTSpammer")
@@ -147,7 +149,7 @@ do
         return store.Channels
     end
 
-    function UI.AcquireRefs(frame)
+    function uiState.AcquireRefs(frame)
         local refs = {
             clearBtn = Frames.GetRef(frame, "ClearBtn"),
             startBtn = Frames.GetRef(frame, "StartBtn"),
@@ -188,7 +190,7 @@ do
     end
 
     local function getNamedPart(suffix)
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return nil
         end
@@ -374,14 +376,14 @@ do
 
     -- ----- Public methods ----- --
     local function loadSpammerFrame(frame)
-        UI.FrameName = Frames.BindModuleFrame(module, frame, {
+        uiState.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 requestRefresh()
             end,
-        }) or UI.FrameName
-        UI.Loaded = UI.FrameName ~= nil
-        if not UI.Loaded then
+        }) or uiState.FrameName
+        uiState.Loaded = uiState.FrameName ~= nil
+        if not uiState.Loaded then
             return
         end
 
@@ -448,23 +450,23 @@ do
 
     local function OnLoadFrame(frame)
         loadSpammerFrame(frame)
-        return UI.FrameName
+        return uiState.FrameName
     end
 
-    UIScaffold.DefineModuleUi({
+    Scaffold.DefineModule({
         module = module,
         getFrame = getFrame,
-        acquireRefs = UI.AcquireRefs,
+        acquireRefs = uiState.AcquireRefs,
         bind = BindHandlers,
         localize = function()
-            UI.Localize()
+            uiState.Localize()
         end,
         onLoad = OnLoadFrame,
         refresh = function()
-            if not UI.Localized then
-                UI.Localize()
+            if not uiState.Localized then
+                uiState.Localize()
             end
-            UI.Refresh()
+            uiState.Refresh()
         end,
     })
 
@@ -474,7 +476,7 @@ do
             return
         end
 
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -626,7 +628,7 @@ do
         stopSpam()
 
         for _, field in ipairs(resetFields) do
-            Frames.ResetEditBox(getNamedPart(field))
+            EditBoxes.Reset(getNamedPart(field))
         end
 
         local durationBox = getNamedPart("Duration")
@@ -634,7 +636,7 @@ do
         duration = DEFAULT_DURATION_STR
 
         if durationBox then
-            Frames.ResetEditBox(durationBox)
+            EditBoxes.Reset(durationBox)
             durationBox:SetText(DEFAULT_DURATION_STR)
         end
 
@@ -647,11 +649,11 @@ do
     end
 
     -- Localize UI
-    function UI.Localize()
-        if UI.Localized then
+    function uiState.Localize()
+        if uiState.Localized then
             return
         end
-        local frameName = UI.FrameName
+        local frameName = uiState.FrameName
         if not frameName then
             return
         end
@@ -684,11 +686,11 @@ do
 
         local durationBox = getNamedPart("Duration")
         durationBox.tooltip_title = AUCTION_DURATION
-        Frames.SetTooltip(durationBox, L.StrSpammerDurationHelp)
+        Tooltips.Bind(durationBox, L.StrSpammerDurationHelp)
 
         local messageBox = getNamedPart("Message")
         messageBox.tooltip_title = L.StrMessage
-        Frames.SetTooltip(messageBox, {
+        Tooltips.Bind(messageBox, {
             L.StrSpammerMessageHelp1,
             L.StrSpammerMessageHelp2,
             L.StrSpammerMessageHelp3,
@@ -733,7 +735,7 @@ do
         -- Initialize default UI length once
         resetLengthUI()
 
-        UI.Localized = true
+        uiState.Localized = true
     end
 
     -- Tick display
@@ -785,11 +787,11 @@ do
         end
 
         for i = 1, 8 do
-            UIPrimitives.EnableDisable(getNamedPart("Chat" .. i), not locked)
+            Primitives.SetEnabled(getNamedPart("Chat" .. i), not locked)
         end
-        UIPrimitives.EnableDisable(getNamedPart("ChatGuild"), not locked)
-        UIPrimitives.EnableDisable(getNamedPart("ChatYell"), not locked)
-        UIPrimitives.EnableDisable(getNamedPart("ClearBtn"), not locked)
+        Primitives.SetEnabled(getNamedPart("ChatGuild"), not locked)
+        Primitives.SetEnabled(getNamedPart("ChatYell"), not locked)
+        Primitives.SetEnabled(getNamedPart("ClearBtn"), not locked)
     end
 
     -- Controls update
@@ -807,11 +809,11 @@ do
         local frame = getFrame()
         if frame then
             setInputsLocked(locked)
-            if UIPrimitives.SetText then
-                UIPrimitives.SetText(getNamedPart("StartBtn"), btnLabel, L.BtnStart, isStop)
+            if Primitives.SetText then
+                Primitives.SetText(getNamedPart("StartBtn"), btnLabel, L.BtnStart, isStop)
             end
-            if UIPrimitives.EnableDisable then
-                UIPrimitives.EnableDisable(getNamedPart("StartBtn"), canStart)
+            if Primitives.SetEnabled then
+                Primitives.SetEnabled(getNamedPart("StartBtn"), canStart)
             end
         end
 
@@ -899,7 +901,7 @@ do
     end
 
     -- UI update tick
-    function UI.Refresh()
+    function uiState.Refresh()
         local frame = getFrame()
         if not (frame and frame:IsShown()) then
             return

@@ -64,6 +64,6 @@ Permanent guardrails for function mapping and unification work.
 - EntryPoint controller lookup: `Database.GetController(name)`
 - UI primitives: `!KRT/Modules/UI/Visuals.lua`
 - UI row visuals: `!KRT/Modules/UI/Visuals.lua`
-- UI scaffold orchestration: `!KRT/Modules/UI/Frames.lua` (`addon.UIScaffold.*`)
+- UI scaffold orchestration: `!KRT/Modules/UI/Frames.lua` (`addon.UI.Scaffold.*`)
 - Widget facade ownership: `!KRT/Modules/UI/Facade.lua` (`addon.UI.*`)
 - Item link/tooltip helpers: `!KRT/Modules/Item.lua` (`addon.Item.*`)

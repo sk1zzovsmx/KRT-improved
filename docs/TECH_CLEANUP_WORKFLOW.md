@@ -79,7 +79,7 @@ Useful repo checks:
 
 ```powershell
 git status --short
-rg "UIScaffold|MakeModuleFrameGetter|FrameName|RefreshUI|_ui" !KRT -g "*.lua"
+rg "UI.ModuleState|UI.Scaffold|MakeModuleFrameGetter|FrameName|RefreshUI|uiState" !KRT -g "*.lua"
 rg "addon\\.(Master|Logger|Warnings|Changes|Spammer)" !KRT -g "*.lua"
 rg "feature\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+addon\\.|addon\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+feature\\." !KRT -g "*.lua" -g "!Libs/**"
 rg "addon\\.options|OnUpdate" !KRT -g "*.lua" -g "!Libs/**"
@@ -114,8 +114,8 @@ behavior review.
 ### 6.1 Controllers and Widgets
 
 Target outcome:
-- canonical `module._ui` state
-- canonical `UIScaffold.DefineModuleUi(...)` contract
+- canonical `addon.UI.ModuleState` lifecycle state
+- canonical `UI.Scaffold.DefineModule(...)` contract
 - clear frame ownership
 - event-driven refresh flow
 
@@ -130,13 +130,13 @@ Preferred contract:
 Checklist:
 
 1. Centralize frame lookup with `feature.MakeModuleFrameGetter(...)`.
-2. Keep UI state under:
-   `module._ui = { Loaded, Bound, Localized, Dirty, Reason, FrameName }`
+2. Keep UI state in `addon.UI.ModuleState`; local references use:
+   `local uiState = UI.Scaffold.EnsureModuleState(module)`
 3. Move idempotent bindings into scaffold hooks instead of ad-hoc `OnLoad` branches.
 4. Use named-part helpers instead of repeating `_G[frameName .. suffix]` everywhere.
 5. Keep refresh entrypoints explicit:
    `RefreshUI`, `Refresh`, `RequestRefresh`, `MarkDirty`
-6. Remove duplicate local flags when `_ui` or scaffold state already owns them.
+6. Remove duplicate local flags when `uiState` or scaffold state already owns them.
 7. Keep XML layout-only and bind scripts in Lua.
 
 ### 6.2 Services

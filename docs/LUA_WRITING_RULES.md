@@ -56,7 +56,7 @@ from `feature.X` and then export the same table back to `addon.X`.
 Use `PascalCase` for exported/public APIs:
 
 - `module:*` on Controllers/Services/Widgets/EntryPoints
-- infra namespaces (`Database`, `Bus`, `Frames`, `UIScaffold`, `UI`, `ListController`, ...)
+- infra namespaces (`Database`, `Bus`, `Frames`, `UI.Scaffold`, `UI`, `ListController`, ...)
 - structured owners (`Store:*`, `View:*`, `Actions:*`, `Box:*`)
 
 Examples:
@@ -101,7 +101,7 @@ Examples:
 
 ```lua
 function module:Refresh() ... end
-function UIScaffold.DefineModuleUi(cfg) ... end
+function UI.Scaffold.DefineModule(cfg) ... end
 ```
 
 ## 4) Formatting and Layout
@@ -119,14 +119,16 @@ Prefer stable, scoped diffs over mass reformatting untouched code.
 
 - Services remain UI-free: no parent frame ownership, no direct UI lifecycle control.
 - XML is layout-only: no inline `<Scripts>` / `<On...>` handlers.
-- For Controllers/Widgets, prefer `UIScaffold.DefineModuleUi(cfg)` as canonical UI contract.
-- Keep module-local UI state under `module._ui` with uniform fields.
+- For Controllers/Widgets, prefer `UI.Scaffold.DefineModule(cfg)` as canonical UI contract.
+- Keep module-local UI lifecycle state in `addon.UI.ModuleState`; local variables use `uiState`.
 - Prefer event-driven redraw (`RequestRefresh`/`Refresh`) over polling `OnUpdate` loops.
 - `OnUpdate` is confined to minimap drag and shared UI driver/effect modules.
 - `addon.options` is confined to the read-only compatibility proxy in `Database/DBOptions.lua`.
   New option reads/writes use namespace `cfg:Get(...)` and `cfg:Set(...)`.
 - Do not add new public Controller/Widget `OnLoad`, `RefreshUI`, or `Refresh` exports without an
   architecture change. Prefer scaffold callbacks or local hooks.
+- For reusable UI layout, scrollframe, table, row, editbox, border, and spacing policy, follow
+  `docs/UI_CODING_RULES.md` before adding feature-local UI helpers.
 
 ## 6) Local Quality Gates
 

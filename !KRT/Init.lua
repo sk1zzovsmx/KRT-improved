@@ -28,7 +28,8 @@ addon.Services = addon.Services or {}
 addon.Services.Logger = addon.Services.Logger or {}
 addon.Widgets = addon.Widgets or {}
 addon.Bus = addon.Bus or {}
-addon.Frames = addon.Frames or {}
+addon.UI = addon.UI or {}
+addon.UI.Frames = addon.UI.Frames or {}
 addon.Time = addon.Time or {}
 
 local _G = _G
@@ -370,14 +371,6 @@ function Database.GetFeatureShared()
         IgnoredMobs = addon.IgnoredMobs,
 
         UI = addon.UI,
-        Frames = addon.Frames,
-        UIEffects = addon.UIEffects,
-        UIScaffold = addon.UIScaffold,
-        UIPrimitives = addon.UIPrimitives,
-        UIRowVisuals = addon.UIRowVisuals,
-        OptionsLayout = addon.OptionsLayout,
-        ListController = addon.ListController,
-        MultiSelect = addon.MultiSelect,
 
         Services = addon.Services,
         Controllers = addon.Controllers,
@@ -432,7 +425,8 @@ do
     local Diag = feature.Diag
 
     local Bus = feature.Bus
-    local Frames = feature.Frames
+    local UI = feature.UI
+    local Frames = UI and UI.Frames
     local Time = feature.Time
     local Events = feature.Events
     local C = feature.C

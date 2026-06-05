@@ -75,9 +75,6 @@ function Get-ApiScope([string]$target, [string]$method) {
     if ($target -match "(^|\.)_[A-Za-z0-9_]+(\.|$)") {
         return "Internal"
     }
-    if ($target -match "(^|\.)_ui(\.|$)") {
-        return "Internal"
-    }
     return "Public"
 }
 
@@ -609,7 +606,7 @@ $md.Add('- Includes method definitions on `addon.*` tables.')
 $md.Add('- Resolves local aliases when assigned directly from `addon.*` paths.')
 $md.Add('- Captures both `function X:Y()` and `X.Y = function()` forms.')
 $md.Add('- Excludes vendored libraries under `!KRT/Libs`.')
-$md.Add('- Classifies public vs internal APIs using method underscore prefixes, underscore owner segments, and `._ui` targets.')
+$md.Add('- Classifies public vs internal APIs using method underscore prefixes and underscore owner segments.')
 $md.Add('- Applies a public-API verb taxonomy for readability tracking.')
 
 Write-KrtUtf8NoBom -Path $mdOut -Value $md
