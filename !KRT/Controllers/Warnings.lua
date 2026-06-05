@@ -62,6 +62,37 @@ do
         }
     end
 
+    local function cancelWarning()
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
+        Frames.ResetEditBox(_G[frameName .. "Name"])
+        Frames.ResetEditBox(_G[frameName .. "Content"])
+        selectedID = nil
+        tempSelectedID = nil
+        isEdit = false
+        module:RequestRefresh()
+    end
+
+    local function selectWarning(btn)
+        if btn == nil or isEdit == true then
+            return
+        end
+        local bName = btn:GetName()
+        local wID = tonumber(_G[bName .. "ID"]:GetText())
+        if KRT_Warnings[wID] == nil then
+            return
+        end
+        if IsControlKeyDown() then
+            selectedID = nil
+            tempSelectedID = wID
+            return module:Announce(tempSelectedID)
+        end
+        selectedID = (wID ~= selectedID) and wID or nil
+        module:RequestRefresh()
+    end
+
     local function bindWarningRow(row)
         if not row or row._krtBound then
             return
@@ -70,7 +101,7 @@ do
             row:RegisterForClicks("LeftButtonUp")
         end
         Frames.SafeSetScript(row, "OnClick", function(self, button)
-            module:Select(self, button)
+            selectWarning(self, button)
         end)
         row._krtBound = true
     end
@@ -137,17 +168,17 @@ do
         end
         if frame.HookScript then
             frame:HookScript("OnShow", function()
-                module:Cancel()
+                cancelWarning()
             end)
             frame:HookScript("OnHide", function()
-                module:Cancel()
+                cancelWarning()
             end)
         else
             Frames.SafeSetScript(frame, "OnShow", function()
-                module:Cancel()
+                cancelWarning()
             end)
             Frames.SafeSetScript(frame, "OnHide", function()
-                module:Cancel()
+                cancelWarning()
             end)
         end
         Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
@@ -193,25 +224,6 @@ do
     -- OnLoad frame:
     function module:OnLoad(frame)
         return OnLoadFrame(frame)
-    end
-
-    -- Warning selection:
-    function module:Select(btn)
-        if btn == nil or isEdit == true then
-            return
-        end
-        local bName = btn:GetName()
-        local wID = tonumber(_G[bName .. "ID"]:GetText())
-        if KRT_Warnings[wID] == nil then
-            return
-        end
-        if IsControlKeyDown() then
-            selectedID = nil
-            tempSelectedID = wID
-            return self:Announce(tempSelectedID)
-        end
-        selectedID = (wID ~= selectedID) and wID or nil
-        module:RequestRefresh()
     end
 
     -- Edit/Save warning:
@@ -293,20 +305,6 @@ do
         return ChatApi.AnnounceWarningMessage(Chat, KRT_Warnings[wID].content)
     end
 
-    -- Cancel editing/adding:
-    function module:Cancel()
-        local frameName = UI.FrameName
-        if not frameName then
-            return
-        end
-        Frames.ResetEditBox(_G[frameName .. "Name"])
-        Frames.ResetEditBox(_G[frameName .. "Content"])
-        selectedID = nil
-        tempSelectedID = nil
-        isEdit = false
-        module:RequestRefresh()
-    end
-
     -- Localizing UI frame:
     function UI.Localize()
         if UI.Localized then
@@ -324,8 +322,8 @@ do
         _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
         Frames.SetFrameTitle(frameName, RAID_WARNING)
         Frames.BindEditBoxHandlers(frameName, {
-            { suffix = "Name", onEscape = module.Cancel, onEnter = module.Edit },
-            { suffix = "Content", onEscape = module.Cancel, onEnter = module.Edit },
+            { suffix = "Name", onEscape = cancelWarning, onEnter = module.Edit },
+            { suffix = "Content", onEscape = cancelWarning, onEnter = module.Edit },
         }, function()
             module:RequestRefresh()
         end)

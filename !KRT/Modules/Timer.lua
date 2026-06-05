@@ -1,6 +1,6 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...); LibStub("LibCompat-1.0")
--- exports: addon.Timer (mixin: Embed; static: GetStats, ResetStats, DumpStats)
+-- exports: addon.Timer (mixin: ScheduleTimer/CancelTimer; static: RefreshStats/ShowStats)
 -- events: none (purely a timer mixin; does not emit Bus events)
 local addon = select(2, ...)
 
@@ -171,27 +171,6 @@ function mixin:CancelTimer(handle)
     return false
 end
 
-function mixin:CancelAllTimers()
-    local state = getState(self)
-    local handles = {}
-    local idx = 0
-    for h in pairs(state.active) do
-        idx = idx + 1
-        handles[idx] = h
-    end
-    for i = 1, idx do
-        local h = handles[i]
-        unregisterHandle(state, h, "cancel")
-        lcCancelTimer(h, true)
-    end
-    return idx
-end
-
-function mixin:GetActiveTimerCount()
-    local state = getState(self)
-    return state.count or 0
-end
-
 -- ----- Public static API ----- --
 function Timer.BindMixin(target, name)
     if type(target) ~= "table" then
@@ -215,27 +194,6 @@ function Timer.BindMixin(target, name)
 
     Timer._targets[stateName] = target
     return target
-end
-
-function Timer.GetStats()
-    local perTarget = {}
-    for name, target in pairs(Timer._targets) do
-        local state = rawget(target, "_timerState")
-        if state then
-            perTarget[name] = {
-                active = state.count or 0,
-                total = state.totalCreated or 0,
-            }
-        end
-    end
-    return {
-        created = stats.created,
-        cancelled = stats.cancelled,
-        completed = stats.completed,
-        active = stats.active,
-        maxActive = stats.maxActive,
-        perTarget = perTarget,
-    }
 end
 
 function Timer.RefreshStats()

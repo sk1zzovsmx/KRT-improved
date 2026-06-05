@@ -7,6 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
+local Diag = feature.Diag
 local Strings = feature.Strings
 local Base64 = feature.Base64
 local Core = feature.Core
@@ -22,13 +23,25 @@ local time = time
 feature.EnsureServiceNamespace("Logger", "Actions")
 local Actions = addon.Services.Logger.Actions
 local Store = addon.Services.Logger.Store
+local Helpers = addon.Services.Logger.Helpers
 
 -- Controller binding (injected by Controllers/Logger.lua at setup time).
 local _controller = nil
 local _triggerSelectionEvent = nil
 local commitRaidSelections
+local resolveLoggerLootEntry
+local applyLoggerLootMutation
+local verifyLoggerLootMutation
+local trimText
 
 -- ----- Private helpers ----- --
+
+trimText = function(value)
+    if Strings.TrimText then
+        return Strings.TrimText(value or "")
+    end
+    return Strings.NormalizeName(value) or ""
+end
 
 -- ----- Public methods ----- --
 
@@ -147,6 +160,162 @@ commitRaidSelections = function(raid, opts)
             _triggerSelectionEvent(log, "selectedItem")
         end
     end
+end
+
+resolveLoggerLootEntry = function(raidID, lootNid)
+    local raid = Store:GetRaid(raidID)
+    if not raid then
+        addon:error(Diag.E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(lootNid)))
+        return nil, nil
+    end
+
+    local lootCount = raid.loot and #raid.loot or 0
+    local it = Store:GetLoot(raid, lootNid)
+    if not it then
+        local rawItemMatch, rawItemMatches = addon.Services.Logger.Helpers.FindLootByItemId(raid, lootNid)
+        if rawItemMatch and addon.error then
+            addon:error(Diag.E.LogLoggerLootNidExpected:format(tostring(raidID), tostring(lootNid), tostring(rawItemMatch.itemLink), tonumber(rawItemMatches) or 0))
+        end
+        addon:error(Diag.E.LogLoggerItemNotFound:format(raidID, tostring(lootNid), lootCount))
+        return nil, nil
+    end
+
+    return raid, it
+end
+
+applyLoggerLootMutation = function(raid, it, raidID, lootNid, looter, rollType, rollValue)
+    if not looter or looter == "" then
+        addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(lootNid), tostring(it.itemLink)))
+    end
+    if rollType == nil then
+        addon:warn(Diag.W.LogLoggerRollTypeNil:format(raidID, tostring(lootNid), tostring(looter)))
+    end
+
+    local currentLooterName = Store._ResolveLootLooterName(raid, it)
+    if addon.hasDebug then
+        addon:debug(Diag.D.LogLoggerLootBefore:format(raidID, tostring(lootNid), tostring(it.itemLink), tostring(currentLooterName), tostring(it.rollType), tostring(it.rollValue)))
+    end
+    if currentLooterName and currentLooterName ~= "" and looter and looter ~= "" and currentLooterName ~= looter then
+        addon:warn(Diag.W.LogLoggerLootOverwrite:format(raidID, tostring(lootNid), tostring(it.itemLink), tostring(currentLooterName), tostring(looter)))
+    end
+
+    local expectedLooterNid
+    local expectedRollType
+    local expectedRollValue
+    if looter and looter ~= "" then
+        local looterNid = Store._ResolveLootLooterNid(raid, looter)
+        if not looterNid then
+            addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(lootNid), tostring(it.itemLink)))
+            return false, nil, nil, nil
+        end
+        it.looterNid = looterNid
+        it.looter = nil
+        expectedLooterNid = looterNid
+    end
+    if tonumber(rollType) then
+        it.rollType = tonumber(rollType)
+        expectedRollType = tonumber(rollType)
+    end
+    if tonumber(rollValue) then
+        it.rollValue = tonumber(rollValue)
+        expectedRollValue = tonumber(rollValue)
+    end
+
+    return true, expectedLooterNid, expectedRollType, expectedRollValue
+end
+
+verifyLoggerLootMutation = function(raidID, lootNid, it, recordedLooterName, expectedLooterNid, expectedRollType, expectedRollValue)
+    local ok = true
+    if expectedLooterNid and tonumber(it.looterNid) ~= expectedLooterNid then
+        ok = false
+    end
+    if expectedRollType and it.rollType ~= expectedRollType then
+        ok = false
+    end
+    if expectedRollValue and it.rollValue ~= expectedRollValue then
+        ok = false
+    end
+    if not ok then
+        addon:error(Diag.E.LogLoggerVerifyFailed:format(raidID, tostring(lootNid), tostring(recordedLooterName), tostring(it.rollType), tostring(it.rollValue)))
+        return false
+    end
+
+    if addon.hasDebug then
+        addon:debug(Diag.D.LogLoggerVerified:format(raidID, tostring(lootNid)))
+        if not Core.GetLastBoss() then
+            addon:debug(Diag.D.LogLoggerRecordedNoBossContext:format(raidID, tostring(lootNid), tostring(it.itemLink)))
+        end
+    end
+    return true
+end
+
+function Actions:SetLootEntry(raidID, lootNid, looter, rollType, rollValue, source)
+    if addon.hasTrace then
+        addon:trace(
+            Diag.D.LogLoggerLootLogAttempt:format(
+                tostring(source),
+                tostring(raidID),
+                tostring(lootNid),
+                tostring(looter),
+                tostring(rollType),
+                tostring(rollValue),
+                tostring(Core.GetLastBoss())
+            )
+        )
+    end
+
+    local raid, it = resolveLoggerLootEntry(raidID, lootNid)
+    if not raid then
+        return false
+    end
+
+    local ok, expectedLooterNid, expectedRollType, expectedRollValue = applyLoggerLootMutation(raid, it, raidID, lootNid, looter, rollType, rollValue)
+    if not ok then
+        return false
+    end
+
+    local recordedLooterName = Store._ResolveLootLooterName(raid, it)
+    if addon.hasDebug then
+        addon:debug(
+            Diag.D.LogLoggerLootRecorded:format(
+                tostring(source),
+                raidID,
+                tostring(lootNid),
+                tostring(it.itemLink),
+                tostring(recordedLooterName),
+                tostring(it.rollType),
+                tostring(it.rollValue)
+            )
+        )
+    end
+
+    return verifyLoggerLootMutation(raidID, lootNid, it, recordedLooterName, expectedLooterNid, expectedRollType, expectedRollValue)
+end
+
+function Actions:ResolveLootEditWinner(raidID, lootNid, rawText)
+    local text = trimText(rawText)
+    local normalizedName = Strings.NormalizeLower(text)
+    if not normalizedName or normalizedName == "" then
+        return nil, L.ErrLoggerWinnerEmpty
+    end
+
+    local raid = Store:GetRaid(raidID)
+    if not raid then
+        return nil, L.ErrLoggerInvalidRaid
+    end
+
+    local loot = Store:GetLoot(raid, lootNid)
+    if not loot then
+        return nil, L.ErrLoggerInvalidItem
+    end
+
+    local bossKill = (loot.bossNid and raid) and Store:GetBoss(raid, loot.bossNid) or nil
+    local winner = Helpers.FindLoggerPlayer(normalizedName, raid, bossKill)
+    if not winner then
+        return nil, L.ErrLoggerWinnerNotFound:format(text)
+    end
+
+    return winner
 end
 
 function Actions:DeleteBoss(rID, bossNid)

@@ -94,11 +94,6 @@ do
         addon:info(L.MsgDefaultsRestored)
     end
 
-    -- Public method to reset options to default.
-    function module:Default()
-        return loadDefaultOptions()
-    end
-
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
         UI.FrameName = Frames.InitModuleFrame(module, frame, {
@@ -112,7 +107,7 @@ do
         end
     end
 
-    function module:InitCountdownSlider(slider)
+    local function initCountdownSlider(slider)
         if not slider then
             return
         end
@@ -130,45 +125,8 @@ do
         end
     end
 
-    local function BindHandlers(_, _, refs)
-        Frames.SafeSetScript(refs.closeBtn, "OnClick", function()
-            module:Hide()
-        end)
-        Frames.SafeSetScript(refs.defaultsBtn, "OnClick", function()
-            loadDefaultOptions()
-        end)
-        Frames.SafeSetScript(refs.countdownDuration, "OnValueChanged", function(self)
-            module:OnClick(self)
-        end)
-        module:InitCountdownSlider(refs.countdownDuration)
-
-        for i = 1, #optionSuffixes do
-            local suffix = optionSuffixes[i]
-            local optionBtn = refs.options[suffix]
-            Frames.SafeSetScript(optionBtn, "OnClick", function(self, button)
-                module:OnClick(self, button)
-            end)
-        end
-    end
-
-    local function OnLoadFrame(frame)
-        module:OnLoad(frame)
-        return UI.FrameName
-    end
-
-    UIScaffold.DefineModuleUi({
-        module = module,
-        getFrame = getFrame,
-        acquireRefs = UI.AcquireRefs,
-        bind = BindHandlers,
-        localize = function()
-            UI.Localize()
-        end,
-        onLoad = OnLoadFrame,
-    })
-
     -- OnClick handler for option controls.
-    function module:OnClick(btn)
+    local function onOptionClick(btn)
         if not btn then
             return
         end
@@ -209,6 +167,43 @@ do
 
         module:RequestRefresh("option_changed")
     end
+
+    local function BindHandlers(_, _, refs)
+        Frames.SafeSetScript(refs.closeBtn, "OnClick", function()
+            module:Hide()
+        end)
+        Frames.SafeSetScript(refs.defaultsBtn, "OnClick", function()
+            loadDefaultOptions()
+        end)
+        Frames.SafeSetScript(refs.countdownDuration, "OnValueChanged", function(self)
+            onOptionClick(self)
+        end)
+        initCountdownSlider(refs.countdownDuration)
+
+        for i = 1, #optionSuffixes do
+            local suffix = optionSuffixes[i]
+            local optionBtn = refs.options[suffix]
+            Frames.SafeSetScript(optionBtn, "OnClick", function(self, button)
+                onOptionClick(self, button)
+            end)
+        end
+    end
+
+    local function OnLoadFrame(frame)
+        module:OnLoad(frame)
+        return UI.FrameName
+    end
+
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
+        onLoad = OnLoadFrame,
+    })
 
     -- Localizes UI elements.
     function UI.Localize()
@@ -299,14 +294,12 @@ do
         return self:RefreshUI(nil, nil, nil, true)
     end
 
-    if UIFacade and UIFacade.Register then
-        UIFacade:Register(
-            "Config",
-            UIScaffold.MakeStandardWidgetApi(module, {
-                Default = function()
-                    module:Default()
-                end,
-            })
-        )
-    end
+    UIFacade:Register(
+        "Config",
+        UIScaffold.MakeStandardWidgetApi(module, {
+            Default = function()
+                loadDefaultOptions()
+            end,
+        })
+    )
 end

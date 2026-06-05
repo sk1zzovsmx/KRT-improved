@@ -11,6 +11,7 @@ local type, tostring = type, tostring
 
 addon.Events = addon.Events or feature.Events or {}
 local Events = addon.Events
+local Core = feature.Core
 
 -- ----- Internal state ----- --
 Events.Internal = Events.Internal or {}
@@ -18,6 +19,8 @@ Events.Wow = Events.Wow or {}
 
 local Internal = Events.Internal
 local Wow = Events.Wow
+
+Core.EnsureBootstrapEvents()
 
 Internal.AddRoll = "AddRoll"
 Internal.LoggerLootLogRequest = "LoggerLootLogRequest"
@@ -31,22 +34,11 @@ Internal.RaidCreate = "RaidCreate"
 Internal.RaidChangesUpdated = "RaidChangesUpdated"
 Internal.RaidLeave = "RaidLeave"
 Internal.RaidLootUpdate = "RaidLootUpdate"
-Internal.RaidRosterDelta = "RaidRosterDelta"
 Internal.ReservesDataChanged = "ReservesDataChanged"
 Internal.SetItem = "SetItem"
 
 Internal.ConfigSortAscending = "ConfigsortAscending"
 Internal.ConfigShowLootCounterDuringMSRoll = "ConfigshowLootCounterDuringMSRoll"
-
--- Canonical forwarded WoW-event names.
-Wow.LootOpened = Wow.LootOpened or "wow.LOOT_OPENED"
-Wow.LootClosed = Wow.LootClosed or "wow.LOOT_CLOSED"
-Wow.LootSlotCleared = Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
-Wow.UiErrorMessage = Wow.UiErrorMessage or "wow.UI_ERROR_MESSAGE"
-Wow.ChatMsgWhisper = Wow.ChatMsgWhisper or "wow.CHAT_MSG_WHISPER"
-Wow.TradeAcceptUpdate = Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
-Wow.TradeRequestCancel = Wow.TradeRequestCancel or "wow.TRADE_REQUEST_CANCEL"
-Wow.TradeClosed = Wow.TradeClosed or "wow.TRADE_CLOSED"
 
 -- ----- Private helpers ----- --
 

@@ -120,7 +120,3 @@ function Rules:GetItemSuggestion(item, opts)
 
     return buildDecision(ACTION_NONE, REASON_NONE)
 end
-
-function Rules:GetSuggestion(item, opts)
-    return self:GetItemSuggestion(item, opts)
-end

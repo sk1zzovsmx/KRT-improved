@@ -27,25 +27,13 @@ local tinsert, twipe = table.insert, table.wipe
 local ipairs, type, select = ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
+local IsTrashMobName = IgnoredMobs.IsTrashMobName
+local GetTrashMobName = IgnoredMobs.GetTrashMobName
 local UnitExists = UnitExists
 local UnitGUID = UnitGUID
 local UnitIsDead = UnitIsDead
 local UnitName = UnitName
 local UnitRace = UnitRace
-
-local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
-local function resolveTrashMobName()
-    local localizedName = L and L.StrTrashMobName
-    if type(localizedName) ~= "string" or localizedName == "" then
-        return LEGACY_TRASH_MOB_NAME
-    end
-    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
-        return LEGACY_TRASH_MOB_NAME
-    end
-    return localizedName
-end
-
-local TRASH_MOB_NAME = resolveTrashMobName()
 
 -- Raid helper module.
 -- Manages raid state, roster, boss kills, and loot logging.
@@ -59,10 +47,6 @@ do
         rosterVersion = nil,
         indexByName = {},
     }
-
-    local function isTrashMobName(name)
-        return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
-    end
 
     local function trimText(value, allowNil)
         if Strings and type(Strings.TrimText) == "function" then
@@ -300,7 +284,7 @@ do
         end
 
         context.raidNum = tonumber(context.raidNum) or 0
-        context.kind = (context.kind == "boss" or context.kind == "trash") and context.kind or nil
+        context.kind = (context.kind == "boss" or context.kind == "trash" or context.kind == "shared") and context.kind or nil
         context.bossNid = tonumber(context.bossNid) or 0
         context.sourceNpcId = tonumber(context.sourceNpcId) or 0
         context.sourceName = context.sourceName or nil
@@ -356,6 +340,21 @@ do
             if isCurrentRaid and isRecent then
                 recentSourceNpcId = tonumber(recentContext.sourceNpcId) or nil
                 recentSourceName = recentContext.sourceName
+            end
+        end
+        if not recentSourceName then
+            local bossEventContext = getBossEventContextState()
+            if type(bossEventContext) == "table" then
+                local resolvedRaidNum = tonumber(raidNum) or 0
+                local contextRaidNum = tonumber(bossEventContext.raidNum) or 0
+                local seenAt = tonumber(bossEventContext.seenAt) or 0
+                local currentTime = tonumber(now) or Time.GetCurrentTime()
+                local isCurrentRaid = resolvedRaidNum <= 0 or contextRaidNum == resolvedRaidNum
+                local isRecent = seenAt <= 0 or currentTime - seenAt <= BOSS_EVENT_CONTEXT_TTL_SECONDS
+
+                if isCurrentRaid and isRecent then
+                    recentSourceName = bossEventContext.name
+                end
             end
         end
 
@@ -536,7 +535,7 @@ do
 
     setActiveLootSource = function(raid, raidNum, kind, bossNid, sourceMeta, now, ttlSeconds, snapshotId)
         local resolvedRaidNum = tonumber(raidNum) or 0
-        local resolvedKind = (kind == "boss" or kind == "trash" or kind == "object") and kind or nil
+        local resolvedKind = (kind == "boss" or kind == "trash" or kind == "shared" or kind == "object") and kind or nil
         if resolvedRaidNum <= 0 or not resolvedKind then
             clearLootSourceState()
             return nil
@@ -582,7 +581,7 @@ do
         activeLoot.sourceName = sourceMeta and sourceMeta.name or tostring(boss.name)
         activeLoot.windowExpiresAt = expiresAt
         if updateLootSource ~= false then
-            activeLoot.kind = isTrashMobName(boss.name) and "trash" or "boss"
+            activeLoot.kind = IsTrashMobName(boss.name) and "trash" or "boss"
             activeLoot.snapshotId = tonumber(snapshotId) or nil
             activeLoot.openedAt = tonumber(now) or Time.GetCurrentTime()
             activeLoot.expiresAt = expiresAt
@@ -803,7 +802,7 @@ do
         local contextBossName = bossEventContext.name
         local delta = (tonumber(now) or 0) - (tonumber(bossEventContext.seenAt) or 0)
 
-        if contextRaidNum ~= (tonumber(raidNum) or 0) or contextBossNid <= 0 or isTrashMobName(contextBossName) then
+        if contextRaidNum ~= (tonumber(raidNum) or 0) or contextBossNid <= 0 or IsTrashMobName(contextBossName) then
             clearBossEventContext()
             return 0
         end
@@ -976,12 +975,18 @@ do
 
         local sourceNpcId = tonumber(source.npcId) or 0
         local sourceName = trimText(source.npcName, true)
-        if sourceNpcId <= 0 or not sourceName or sourceName == "" then
+        if not sourceName or sourceName == "" then
+            return 0
+        end
+        if source.kind ~= "shared" and sourceNpcId <= 0 then
             return 0
         end
 
-        local existingBoss = findBossBySourceNpcId(raid, sourceNpcId)
-        if not existingBoss and source.kind == "boss" then
+        local existingBoss
+        if sourceNpcId > 0 then
+            existingBoss = findBossBySourceNpcId(raid, sourceNpcId)
+        end
+        if not existingBoss and (source.kind == "boss" or source.kind == "shared") then
             existingBoss = findBossByName(raid, sourceName)
         end
         if existingBoss then
@@ -1106,7 +1111,7 @@ do
         local bossKills = raid and raid.bossKills or {}
         for i = #bossKills, 1, -1 do
             local boss = bossKills[i]
-            if boss and isTrashMobName(boss.name) then
+            if boss and IsTrashMobName(boss.name) then
                 local existingBossNid = tonumber(boss.bossNid) or 0
                 if existingBossNid > 0 then
                     return existingBossNid
@@ -1114,7 +1119,7 @@ do
             end
         end
 
-        local createdBossNid = tonumber(module:AddBoss(TRASH_MOB_NAME, nil, raidNum)) or 0
+        local createdBossNid = tonumber(module:AddBoss(GetTrashMobName(), nil, raidNum)) or 0
         return createdBossNid
     end
 
@@ -1193,7 +1198,7 @@ do
         snapshot = createLootWindowItemSnapshot(raidNum, bossNid, items, options.source, options.now, options.ttlSeconds)
         if not snapshot then
             local boss = findBossByNid(raid, bossNid)
-            setActiveLootSource(raid, raidNum, boss and isTrashMobName(boss.name) and "trash" or "boss", bossNid, nil, options.now, options.ttlSeconds, nil)
+            setActiveLootSource(raid, raidNum, boss and IsTrashMobName(boss.name) and "trash" or "boss", bossNid, nil, options.now, options.ttlSeconds, nil)
             return bossNid
         end
 
@@ -1241,7 +1246,7 @@ do
             bossNid = findOrCreateTrashBossNid(raidNum, raid)
             if bossNid > 0 then
                 setActiveLootSource(raid, raidNum, "trash", bossNid, {
-                    name = TRASH_MOB_NAME,
+                    name = GetTrashMobName(),
                 }, currentTime, ttlSeconds, nil)
             end
         end
@@ -1508,7 +1513,7 @@ do
             end
             return 0
         end
-        local isTrashBoss = isTrashMobName(bossName)
+        local isTrashBoss = IsTrashMobName(bossName)
 
         local raid = Core.EnsureRaidById(raidNum)
         if not raid then

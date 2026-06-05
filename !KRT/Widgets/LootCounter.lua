@@ -160,22 +160,11 @@ do
             return false, "not_in_raid"
         end
 
-        if type(raidService.GetCapabilityState) == "function" then
-            local state = raidService:GetCapabilityState("changes_broadcast")
-            if state and state.allowed == true then
-                return true
-            end
-            return false, state and state.reason or "missing_leadership"
+        local state = raidService:GetCapabilityState("changes_broadcast")
+        if state and state.allowed == true then
+            return true
         end
-
-        if Core.GetUnitRank then
-            local rank = tonumber(Core.GetUnitRank("player", 0)) or 0
-            if rank > 0 then
-                return true
-            end
-        end
-
-        return false, "missing_leadership"
+        return false, state and state.reason or "missing_leadership"
     end
 
     local function warnBroadcastDenied(reason)
@@ -558,7 +547,7 @@ do
         end
     end
 
-    function module:ConfirmResetAllCounts()
+    local function confirmResetAllCounts()
         if not ensureResetAllPopup() or type(StaticPopup_Show) ~= "function" then
             module:ResetAllCounts()
             return
@@ -712,7 +701,7 @@ do
             module:AnnounceCounts()
         end)
         Frames.SafeSetScript(refs.resetAllBtn, "OnClick", function()
-            module:ConfirmResetAllCounts()
+            confirmResetAllCounts()
         end)
     end
 
@@ -746,14 +735,12 @@ do
     -- New raid session: reset view.
     Bus.RegisterCallback(InternalEvents.RaidCreate, requestRefresh)
 
-    if UIFacade and UIFacade.Register then
-        UIFacade:Register(
-            "LootCounter",
-            UIScaffold.MakeStandardWidgetApi(module, {
-                AttachToMaster = function(masterFrame)
-                    module:AttachToMaster(masterFrame)
-                end,
-            })
-        )
-    end
+    UIFacade:Register(
+        "LootCounter",
+        UIScaffold.MakeStandardWidgetApi(module, {
+            AttachToMaster = function(masterFrame)
+                module:AttachToMaster(masterFrame)
+            end,
+        })
+    )
 end

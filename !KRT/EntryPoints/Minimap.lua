@@ -13,8 +13,6 @@ local Frames = feature.Frames
 local Colors = feature.Colors
 local Core = feature.Core
 local Services = feature.Services
-local Widgets = feature.Widgets
-
 local K_COLOR = feature.K_COLOR
 
 local UIFacade = addon.UI
@@ -29,26 +27,12 @@ local minimapNs = Options.AddNamespace("Minimap", {
     minimapPos = 325,
 })
 
-local function getLootCounterController()
-    local widget = Widgets.LootCounter
-    if type(widget) == "table" and type(widget.Toggle) == "function" then
-        return widget
-    end
-    return nil
-end
-
 local function getRaidService()
     return Services.Raid
 end
 
 local function isWidgetAvailable(widgetId)
-    if UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId) then
-        return true
-    end
-    if widgetId == "LootCounter" and getLootCounterController() then
-        return true
-    end
-    return false
+    return UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId)
 end
 
 local function callWidgetMethod(widgetId, methodName, ...)
@@ -59,11 +43,7 @@ local function callWidgetMethod(widgetId, methodName, ...)
 end
 
 local function toggleLootCounterWidget()
-    if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
-        return UIFacade:Call("LootCounter", "Toggle")
-    end
-    local widget = getLootCounterController()
-    return widget and type(widget.Toggle) == "function" and widget:Toggle() or nil
+    return callWidgetMethod("LootCounter", "Toggle")
 end
 
 -- ----- Internal state ----- --

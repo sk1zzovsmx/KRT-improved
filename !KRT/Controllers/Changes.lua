@@ -422,10 +422,6 @@ do
         end
     end
 
-    function module:CanBroadcast()
-        return canBroadcastChanges()
-    end
-
     -- Ask For module:
     function module:Demand()
         local ok, reason = canBroadcastChanges()
@@ -536,7 +532,7 @@ do
         lastAddBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "AddBtn", L.BtnAdd, L.BtnDelete, addBtnMode, lastAddBtnMode)
         UIPrimitives.ShowHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
         UIPrimitives.EnableDisableNamedPart(frameName, "ClearBtn", count > 0)
-        local canBroadcast = module:CanBroadcast()
+        local canBroadcast = canBroadcastChanges()
         UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", count > 0 and canBroadcast)
         local hasRaid = addon.Core.GetCurrentRaid()
         UIPrimitives.EnableDisableNamedPart(frameName, "AddBtn", hasRaid)

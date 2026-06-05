@@ -19,6 +19,7 @@ module._PendingAwards = module._PendingAwards or {}
 local PendingAwards = module._PendingAwards
 
 local tremove = table.remove
+local strlower = string.lower
 local strsub = string.sub
 local tostring, tonumber = tostring, tonumber
 local type = type
@@ -209,6 +210,36 @@ end
 
 -- ----- Public methods ----- --
 PendingAwards.NormalizePendingAwardItemKey = normalizePendingAwardItemKey
+
+function PendingAwards.IsMasterLootAwardFailureMessage(message)
+    local raw = tostring(message or "")
+    local text = strlower(raw)
+    if text == "" then
+        return false
+    end
+
+    local known = {
+        _G.ERR_INV_FULL,
+        _G.ERR_ITEM_MAX_COUNT,
+        _G.ERR_LOOT_LOCKED,
+        _G.ERR_LOOT_GONE,
+    }
+    for i = 1, #known do
+        local value = known[i]
+        if value and value ~= "" and raw == tostring(value) then
+            return true
+        end
+    end
+
+    return text:find("inventory is full", 1, true) ~= nil
+        or text:find("bags are full", 1, true) ~= nil
+        or text:find("can't carry", 1, true) ~= nil
+        or text:find("cannot carry", 1, true) ~= nil
+        or text:find("loot is gone", 1, true) ~= nil
+        or text:find("loot locked", 1, true) ~= nil
+        or text:find("item is locked", 1, true) ~= nil
+        or text:find("player not found", 1, true) ~= nil
+end
 
 function PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt, options)
     if not itemLink or not looter then

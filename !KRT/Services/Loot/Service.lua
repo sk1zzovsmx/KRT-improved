@@ -7,6 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
+local L = feature.L
 
 local Events = feature.Events
 local C = feature.C
@@ -46,8 +47,8 @@ end
 local itemExists, itemIsSoulbound, getItem
 local getItemName, getItemLink, getItemTexture
 
-local tinsert, twipe = table.insert, table.wipe
-local type = type
+local tinsert, tconcat, twipe = table.insert, table.concat, table.wipe
+local type, pairs = type, pairs
 local strmatch, strlower = string.match, string.lower
 
 local tostring, tonumber = tostring, tonumber
@@ -80,10 +81,47 @@ do
     local cacheWarmHandle
     local CACHE_WARM_DELAY_SECONDS = 0.15
     local CHEAP_SUGGESTION_OPTS = { allowItemInfo = false, allowTooltip = false }
+    local DISTRIBUTION_SESSION = "session"
+    local DISTRIBUTION_WINDOW_ITEMS = "window_items"
+    local DISTRIBUTION_ROLL_START = "roll_start"
+    local DISTRIBUTION_ROLL_END = "roll_end"
+    local DISTRIBUTION_ITEM_DONE = "item_done"
 
     -- ----- Private helpers ----- --
     local scheduleCacheWarm, refreshDeferredAutoLootSuggestion, evaluateAutoLootSuggestion
     local requestLootItemInfo
+
+    local function noopFalse()
+        return false
+    end
+
+    local function buildEmptyDistributionModel()
+        return {
+            prefix = "KRTDist",
+            sessionId = nil,
+            rows = {},
+        }
+    end
+
+    local function getDistributionSession()
+        local distribution = module._DistributionSession
+        if distribution then
+            return distribution
+        end
+
+        -- Runtime guard for stale installs/packages that load Service.lua before the new helper file.
+        distribution = {
+            RequestMessageHandling = noopFalse,
+            GetDisplayModel = buildEmptyDistributionModel,
+            PublishWindowItems = noopFalse,
+            Clear = noopFalse,
+            PublishRollStart = noopFalse,
+            PublishRollEnd = noopFalse,
+            PublishItemDone = noopFalse,
+        }
+        module._DistributionSession = distribution
+        return distribution
+    end
 
     local function warmItemCacheNow(itemLink)
         local probe = Item or addon.Item
@@ -155,6 +193,26 @@ do
 
         local rarity = tonumber(itemRarity) or 1
         return itemColors[rarity + 1] or itemColors[2]
+    end
+
+    local function buildDistributionWindowItems()
+        local items = {}
+        for i = 1, lootState.lootCount do
+            local item = lootTable[i]
+            if item and item.itemLink then
+                items[#items + 1] = {
+                    itemKey = item.itemKey or (Item.GetItemStringFromLink(item.itemLink) or item.itemLink),
+                    itemLink = item.itemLink,
+                    itemName = item.itemName,
+                    itemTexture = item.itemTexture,
+                    itemColor = item.itemColor,
+                    quality = item.itemRarity,
+                    count = tonumber(item.count) or 1,
+                    slot = i,
+                }
+            end
+        end
+        return items
     end
 
     requestLootItemInfo = function(index, itemLink)
@@ -269,6 +327,21 @@ do
         if type(raid) == "table" then
             raid._runtime = nil
         end
+    end
+
+    local function indexAppendedLootRuntime(raid, lootInfo, index)
+        if not (Core and Core.GetRaidStoreOrNil) then
+            invalidateRaidRuntime(raid)
+            return nil
+        end
+
+        local raidStore = Core.GetRaidStoreOrNil("Loot.UpsertLootIndex", { "UpsertLootIndex" })
+        if not (raidStore and raidStore.UpsertLootIndex) then
+            invalidateRaidRuntime(raid)
+            return nil
+        end
+
+        return raidStore:UpsertLootIndex(raid, lootInfo, index)
     end
 
     local function getLootItemKey(loot)
@@ -503,7 +576,367 @@ do
         }
     end
 
-    local function parseLootChatMessage(msg, rollType, rollValue)
+    local function resolveTradeAwardedCount()
+        local selected = tonumber(lootState.selectedItemCount) or 1
+        if selected < 1 then
+            selected = 1
+        end
+
+        local before = tonumber(itemInfo.tradeStartCount)
+        local after = nil
+        local source = "fallback"
+        local awarded = 1
+
+        local bag = tonumber(itemInfo.tradeStartBag) or tonumber(itemInfo.bagID)
+        local slot = tonumber(itemInfo.tradeStartSlot) or tonumber(itemInfo.slotID)
+        if bag and slot and before and before > 0 then
+            local expectedLink = itemInfo.tradeStartItemLink or lootState.tradeItemLink or getItemLink()
+            local expectedKey = expectedLink and (Item.GetItemStringFromLink(expectedLink) or expectedLink) or nil
+            local afterLink = GetContainerItemLink(bag, slot)
+            if not afterLink then
+                after = 0
+            else
+                local afterKey = Item.GetItemStringFromLink(afterLink) or afterLink
+                if expectedKey and afterKey == expectedKey then
+                    local _, count = GetContainerItemInfo(bag, slot)
+                    after = tonumber(count) or 1
+                else
+                    after = 0
+                end
+            end
+
+            local delta = before - (after or 0)
+            if delta > 0 then
+                awarded = delta
+                source = "delta"
+            end
+        end
+
+        if awarded < 1 then
+            awarded = 1
+        end
+
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogTradeAwardedCountResolved:format(awarded, source, tostring(before), tostring(after), selected))
+        end
+        return awarded
+    end
+
+    local function resolveInventoryAwardedCount()
+        local awardedCount = tonumber(lootState.selectedItemCount) or 1
+        if awardedCount < 1 then
+            awardedCount = 1
+        end
+        if lootState.fromInventory and awardedCount > 1 then
+            awardedCount = 1
+        end
+        return awardedCount
+    end
+
+    local function resolveInventoryAwardedCountFromArgs(selectedItemCount, fromInventory)
+        local awardedCount = tonumber(selectedItemCount) or 1
+        if awardedCount < 1 then
+            awardedCount = 1
+        end
+        if fromInventory and awardedCount > 1 then
+            awardedCount = 1
+        end
+        return awardedCount
+    end
+
+    local function buildTradeInitialOutputPlan(args)
+        args = type(args) == "table" and args or {}
+        local options = type(args.options) == "table" and args.options or {}
+        local itemLink = args.itemLink
+        local playerName = args.winnerName or args.playerName
+        local rollType = tonumber(args.rollType) or args.rollType
+
+        if args.isAwardRoll and options.announceOnWin then
+            return L.ChatAward:format(playerName, itemLink)
+        end
+        if rollType == rollTypes.HOLD and options.announceOnHold then
+            return L.ChatNoneRolledHold:format(itemLink, playerName)
+        end
+        if rollType == rollTypes.BANK and options.announceOnBank then
+            return L.ChatNoneRolledBank:format(itemLink, playerName)
+        end
+        if rollType == rollTypes.DISENCHANT and options.announceOnDisenchant then
+            return L.ChatNoneRolledDisenchant:format(itemLink, playerName)
+        end
+        return nil
+    end
+
+    local function buildTradeKeepWhisperPlan(args)
+        args = type(args) == "table" and args or {}
+        local rollType = tonumber(args.rollType) or args.rollType
+        if rollType == rollTypes.HOLD then
+            return L.WhisperHoldTrade:format(args.itemLink)
+        end
+        if rollType == rollTypes.BANK then
+            return L.WhisperBankTrade:format(args.itemLink)
+        end
+        if rollType == rollTypes.DISENCHANT then
+            return L.WhisperDisenchantTrade:format(args.itemLink)
+        end
+        return nil
+    end
+
+    local function getPlannerRolls(args)
+        local selected = type(args.selectedWinners) == "table" and args.selectedWinners or nil
+        if selected and #selected > 0 then
+            return selected, #selected
+        end
+
+        local fallback = type(args.fallbackRolls) == "table" and args.fallbackRolls or {}
+        local maxWinners = tonumber(args.maxWinners) or #fallback
+        return fallback, maxWinners
+    end
+
+    local function buildInventoryMultiWinnerTradePlan(args)
+        args = type(args) == "table" and args or {}
+        local markers = type(args.raidTargetMarkers) == "table" and args.raidTargetMarkers or {}
+        local traderName = args.traderName
+        local currentWinner = args.currentWinner
+        local rolls, maxWinners = getPlannerRolls(args)
+        local winners = {}
+        local raidTargets = {}
+
+        if traderName ~= currentWinner then
+            raidTargets[#raidTargets + 1] = {
+                name = traderName,
+                icon = 1,
+            }
+        end
+
+        for i = 1, maxWinners do
+            local roll = rolls[i]
+            if roll then
+                local name = roll.name
+                local rollValue = tonumber(roll.roll) or 0
+                if name == traderName then
+                    if traderName ~= currentWinner then
+                        tinsert(winners, "{star} " .. name .. "(" .. rollValue .. ")")
+                    else
+                        tinsert(winners, name .. "(" .. rollValue .. ")")
+                    end
+                elseif name and name ~= "" then
+                    raidTargets[#raidTargets + 1] = {
+                        name = name,
+                        icon = i + 1,
+                    }
+                    tinsert(winners, tostring(markers[i] or "") .. " " .. name .. "(" .. rollValue .. ")")
+                end
+            end
+        end
+
+        local winnersText = tconcat(winners, ", ")
+        return {
+            output = L.ChatTradeMutiple:format(winnersText, traderName),
+            clearRaidIcons = true,
+            raidTargets = raidTargets,
+            winnersText = winnersText,
+        }
+    end
+
+    local function buildTradeNotificationPlan(args)
+        args = type(args) == "table" and args or {}
+        local keep = not args.isAwardRoll
+        local output = buildTradeInitialOutputPlan(args)
+        local whisper
+        local markerPlan
+
+        if keep then
+            whisper = buildTradeKeepWhisperPlan(args)
+        elseif (tonumber(args.selectedItemCount) or 1) > 1 then
+            markerPlan = buildInventoryMultiWinnerTradePlan({
+                currentWinner = args.winnerName,
+                traderName = args.traderName,
+                selectedWinners = args.selectedWinners,
+                fallbackRolls = args.fallbackRolls,
+                maxWinners = tonumber(args.maxWinners) or tonumber(args.selectedItemCount) or 0,
+                raidTargetMarkers = args.raidTargetMarkers,
+            })
+            output = markerPlan.output
+        end
+
+        return {
+            keep = keep,
+            output = output,
+            whisper = whisper,
+            markerPlan = markerPlan,
+        }
+    end
+
+    local function buildAwardTargetPlan(args)
+        args = type(args) == "table" and args or {}
+        local target = tonumber(args.selectedItemCount) or 1
+        if target < 1 then
+            target = 1
+        end
+
+        local available = tonumber(args.availableItemCount) or 1
+        if available < 1 then
+            available = 1
+        end
+
+        if target > available then
+            target = available
+        end
+
+        local rollsCount = tonumber(args.rollsCount)
+        if rollsCount and target > rollsCount then
+            target = rollsCount
+        end
+
+        if target < 1 then
+            target = 1
+        end
+
+        return {
+            target = target,
+            available = available,
+        }
+    end
+
+    local function validateInventoryTradeSelection(args)
+        args = type(args) == "table" and args or {}
+        local target = tonumber(args.target) or 1
+        local selectedCount = tonumber(args.selectedCount) or 0
+        local pickedCount = tonumber(args.pickedCount) or 0
+
+        if selectedCount <= 0 then
+            return {
+                ok = false,
+                errType = "empty_selection",
+            }
+        end
+        if pickedCount < target then
+            return {
+                ok = false,
+                errType = "not_enough_selection",
+                wantedCount = target,
+                pickedCount = pickedCount,
+            }
+        end
+
+        return {
+            ok = true,
+        }
+    end
+
+    local function buildMultiAwardWinnersPlan(args)
+        args = type(args) == "table" and args or {}
+        local target = tonumber(args.target) or 1
+        if target < 1 then
+            target = 1
+        end
+
+        local selectedCount = tonumber(args.selectedCount) or 0
+        if selectedCount <= 0 then
+            return {
+                errType = "empty_selection",
+            }
+        end
+
+        local awardCount = selectedCount
+        if awardCount > target then
+            awardCount = target
+        end
+
+        local picked = type(args.pickedWinners) == "table" and args.pickedWinners or {}
+        if #picked < awardCount then
+            return {
+                errType = "not_enough_selection",
+                wantedCount = awardCount,
+                pickedCount = #picked,
+            }
+        end
+
+        local winners = {}
+        for i = 1, awardCount do
+            local p = picked[i]
+            if p and p.name then
+                winners[#winners + 1] = {
+                    name = p.name,
+                    roll = tonumber(p.roll) or 0,
+                }
+            end
+        end
+
+        if #winners <= 0 then
+            return {
+                errType = "empty_winners",
+                clearSelection = true,
+            }
+        end
+
+        return {
+            winners = winners,
+            clearSelection = true,
+        }
+    end
+
+    local function copyArray(values)
+        local out = {}
+        if type(values) ~= "table" then
+            return out
+        end
+        for i = 1, #values do
+            out[i] = values[i]
+        end
+        return out
+    end
+
+    local function copyMap(values)
+        local out = {}
+        if type(values) ~= "table" then
+            return out
+        end
+        for key, value in pairs(values) do
+            out[key] = value
+        end
+        return out
+    end
+
+    local function buildMultiAwardState(args)
+        args = type(args) == "table" and args or {}
+        local winners = type(args.winners) == "table" and args.winners or {}
+        local itemLink = args.itemLink
+        return {
+            state = {
+                active = true,
+                itemLink = itemLink,
+                itemKey = Item.GetItemStringFromLink(itemLink) or itemLink,
+                lastCount = tonumber(args.available) or 1,
+                rollType = args.rollType,
+                winners = winners,
+                currentWinner = winners[1] and winners[1].name or nil,
+                pos = 2,
+                total = #winners,
+                slotCandidates = copyArray(args.slotCandidates),
+                slotCandidateMap = copyMap(args.slotCandidateMap),
+                lastClearedSlot = nil,
+                waitingForDecrement = false,
+                announceOnWin = args.announceOnWin and true or false,
+                congratsSent = false,
+            },
+        }
+    end
+
+    local function isParsedGroupLootResult(parsedGroupLoot, msg, kind)
+        if type(parsedGroupLoot) ~= "table" then
+            return false
+        end
+        if parsedGroupLoot.msg ~= msg then
+            return false
+        end
+        if kind and parsedGroupLoot.kind ~= kind then
+            return false
+        end
+        return true
+    end
+
+    local function parseLootChatMessage(msg, rollType, rollValue, parsedGroupLoot)
         -- Parse loot chat variants ("receives loot" and "receives item").
         local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
         local itemCount = count or 1
@@ -535,13 +968,23 @@ do
 
         -- Fallback for alternate loot-roll chat formats.
         if not player or not itemLink then
-            local resolvedRollType, resolvedRollValue
-            player, itemLink, resolvedRollType, resolvedRollValue = PassiveGroupLoot.ParseGroupLootWinner(msg)
-            if itemLink then
-                itemCount = 1
-                rollType = rollType or resolvedRollType
+            if isParsedGroupLootResult(parsedGroupLoot, msg, "winner") and parsedGroupLoot.itemLink then
+                player = parsedGroupLoot.playerName
+                itemLink = parsedGroupLoot.itemLink
+                itemCount = tonumber(parsedGroupLoot.itemCount) or 1
+                rollType = rollType or parsedGroupLoot.rollType
                 if rollValue == nil then
-                    rollValue = resolvedRollValue
+                    rollValue = parsedGroupLoot.rollValue
+                end
+            else
+                local resolvedRollType, resolvedRollValue
+                player, itemLink, resolvedRollType, resolvedRollValue = PassiveGroupLoot.ParseGroupLootWinner(msg)
+                if itemLink then
+                    itemCount = 1
+                    rollType = rollType or resolvedRollType
+                    if rollValue == nil then
+                        rollValue = resolvedRollValue
+                    end
                 end
             end
         end
@@ -605,6 +1048,11 @@ do
         return isUncommonItem(itemRarity, itemLink) or itemClassMatches(itemType, "ITEM_CLASS_GEM", "gem") or itemClassMatches(itemType, "ITEM_CLASS_RECIPE", "recipe")
     end
 
+    local function shouldSkipPassiveGroupLootCounter(rollType)
+        local resolvedRollType = tonumber(rollType)
+        return resolvedRollType == rollTypes.NEED or resolvedRollType == rollTypes.GREED or resolvedRollType == rollTypes.DISENCHANT
+    end
+
     evaluateAutoLootSuggestion = function(itemLink, itemRarity, allowExpensiveMetadata)
         local rules = module._Rules
         if not (rules and rules.GetItemSuggestion) then
@@ -656,10 +1104,12 @@ do
         end
     end
 
-    local function resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue)
+    local function resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue, parsedGroupLoot)
         local passiveGroupLoot = PassiveGroupLoot.IsPassiveGroupLootMethod()
         local preferredRollSessionId = nil
-        if not passiveGroupLoot then
+        if passiveGroupLoot and type(parsedGroupLoot) == "table" then
+            preferredRollSessionId = parsedGroupLoot.sessionId and tostring(parsedGroupLoot.sessionId) or nil
+        elseif not passiveGroupLoot then
             preferredRollSessionId = resolveRollSessionIdForLoot(itemLink, itemString, itemId)
         end
 
@@ -699,7 +1149,8 @@ do
 
         if not rollSessionId then
             if passiveGroupLoot then
-                local passiveRoll = PassiveGroupLoot.GetPassiveLootRollEntry(itemLink)
+                local passiveRoll = parsedGroupLoot and parsedGroupLoot.rollId and PassiveGroupLoot.GetPassiveLootRollEntryByRollId(parsedGroupLoot.rollId)
+                    or PassiveGroupLoot.GetPassiveLootRollEntry(itemLink)
                 rollSessionId = passiveRoll and passiveRoll.sessionId or nil
                 outcome.matchedPassiveRoll = passiveRoll ~= nil
             else
@@ -830,7 +1281,6 @@ do
             loot.rollSessionId = tostring(rollSessionId)
         end
 
-        invalidateRaidRuntime(raid)
         bindLootNidToRollSession(loot.lootNid, loot.rollSessionId, loot.itemId, loot.itemString, loot.itemLink)
         Bus.TriggerEvent(InternalEvents.RaidLootUpdate, currentRaidId, loot)
         return true
@@ -844,11 +1294,11 @@ do
     end
 
     -- Adds a loot item to the active raid log.
-    function module:AddLoot(msg, rollType, rollValue)
+    function module:AddLoot(msg, rollType, rollValue, parsedGroupLoot)
         local player
         local itemCount
         local itemLink
-        player, itemCount, itemLink, rollType, rollValue = parseLootChatMessage(msg, rollType, rollValue)
+        player, itemCount, itemLink, rollType, rollValue = parseLootChatMessage(msg, rollType, rollValue, parsedGroupLoot)
         if not itemLink then
             if addon.hasDebug then
                 addon:debug(Diag.D.LogLootParseFailed:format(tostring(msg)))
@@ -872,10 +1322,10 @@ do
         end
 
         local passiveGroupLoot = PassiveGroupLoot.IsPassiveGroupLootMethod()
-        local isPassiveWinnerMessage = PassiveGroupLoot.IsPassiveLootWinnerMessage(msg)
+        local isPassiveWinnerMessage = isParsedGroupLootResult(parsedGroupLoot, msg, "winner") or PassiveGroupLoot.IsPassiveLootWinnerMessage(msg)
         local rollSessionId
         local rollOutcome
-        rollType, rollValue, rollSessionId, rollOutcome = resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue)
+        rollType, rollValue, rollSessionId, rollOutcome = resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue, parsedGroupLoot)
 
         if passiveGroupLoot and shouldSkipPassiveGroupLootEntry(itemRarity, itemType, itemLink) then
             PassiveGroupLoot.ConsumePassiveLootRollEntry(rollSessionId)
@@ -889,10 +1339,19 @@ do
             end
         end
 
-        local currentTime = Time.GetCurrentTime()
         local raidService = Services.Raid
-        local bossNid = resolveBossNidForLoot(raid, currentRaidId, rollSessionId, passiveGroupLoot, currentTime, itemId)
-        local lootSource = copyLootSourceForRecord(raidService, currentRaidId, bossNid)
+        local bossNid = 0
+        local lootSource
+        if not passiveGroupLoot and isParsedGroupLootResult(parsedGroupLoot, msg, "winner") then
+            bossNid = tonumber(parsedGroupLoot.bossNid) or 0
+        end
+        if not passiveGroupLoot and bossNid <= 0 then
+            local currentTime = Time.GetCurrentTime()
+            bossNid = resolveBossNidForLoot(raid, currentRaidId, rollSessionId, passiveGroupLoot, currentTime, itemId)
+        end
+        if not passiveGroupLoot then
+            lootSource = copyLootSourceForRecord(raidService, currentRaidId, bossNid)
+        end
         if bossNid <= 0 then
             if addon.hasDebug then
                 addon:debug(Diag.D.LogBossNoContextTrash)
@@ -910,7 +1369,11 @@ do
         -- LootCounter: passive/group loot credits on observed loot chat. Master-loot awards
         -- initiated by KRT may already be credited at GiveMasterLoot time because loot chat
         -- visibility is range-limited on 3.3.5 clients.
-        if raidService and not (rollOutcome and rollOutcome.consumedPendingAward and rollOutcome.pendingCounterApplied == true) then
+        if
+            raidService
+            and not (passiveGroupLoot and shouldSkipPassiveGroupLootCounter(rollType))
+            and not (rollOutcome and rollOutcome.consumedPendingAward and rollOutcome.pendingCounterApplied == true)
+        then
             raidService:AddPlayerCountForRollType(player, rollType, itemCount, currentRaidId)
         end
 
@@ -922,7 +1385,7 @@ do
         if lootState.opened == true and lootState.fromInventory ~= true and raidService and raidService._ConsumeLootWindowItemContext then
             raidService:_ConsumeLootWindowItemContext(itemLink)
         end
-        invalidateRaidRuntime(raid)
+        indexAppendedLootRuntime(raid, lootInfo, #raid.loot)
         bindLootNidToRollSession(lootNid, rollSessionId, itemId, itemString, itemLink)
         PassiveGroupLoot.ConsumePassiveLootRollEntry(rollSessionId)
         Bus.TriggerEvent(InternalEvents.RaidLootUpdate, currentRaidId, lootInfo)
@@ -996,7 +1459,7 @@ do
         }
 
         tinsert(raid.loot, lootInfo)
-        invalidateRaidRuntime(raid)
+        indexAppendedLootRuntime(raid, lootInfo, #raid.loot)
         bindLootNidToRollSession(lootNid, rollSessionId, itemId, itemString, itemLink)
         Bus.TriggerEvent(InternalEvents.RaidLootUpdate, raidNum, lootInfo)
         if addon.hasDebug then
@@ -1011,6 +1474,17 @@ do
 
     function module:AddGroupLootMessage(msg)
         return PassiveGroupLoot.AddGroupLootMessage(self, msg)
+    end
+
+    function module:GetGroupLootMessageResult(msg)
+        return PassiveGroupLoot.ObserveGroupLootMessage(self, msg)
+    end
+
+    function module:ObservePassiveLootMessage(msg, winnerOnly)
+        if winnerOnly then
+            return PassiveGroupLoot.ObserveGroupLootWinnerMessage(self, msg)
+        end
+        return PassiveGroupLoot.ObserveGroupLootMessage(self, msg)
     end
 
     -- Pending award helpers (shared with Master/Raid flows).
@@ -1028,6 +1502,39 @@ do
 
     function module:PurgePendingAwards(maxAge)
         return PendingAwards.Purge(maxAge)
+    end
+
+    function module:IsMasterLootAwardFailureMessage(message)
+        return PendingAwards.IsMasterLootAwardFailureMessage(message)
+    end
+
+    -- Master-owned distribution session facade.
+    function module:RequestDistributionMessageHandling(prefix, msg, channel, sender)
+        return getDistributionSession().RequestMessageHandling(prefix, msg, channel, sender)
+    end
+
+    function module:GetDistributionSessionModel()
+        return getDistributionSession().GetDisplayModel()
+    end
+
+    function module:SetDistributionState(kind, payload)
+        local distribution = getDistributionSession()
+        if kind == DISTRIBUTION_SESSION then
+            return distribution.Clear()
+        end
+        if kind == DISTRIBUTION_WINDOW_ITEMS then
+            return distribution.PublishWindowItems(buildDistributionWindowItems())
+        end
+        if kind == DISTRIBUTION_ROLL_START then
+            return distribution.PublishRollStart(payload and payload.itemLink, payload and payload.rollType, payload and payload.duration)
+        end
+        if kind == DISTRIBUTION_ROLL_END then
+            return distribution.PublishRollEnd(payload and payload.itemLink, payload and payload.winnerName, payload and payload.rollValue, payload and payload.reason)
+        end
+        if kind == DISTRIBUTION_ITEM_DONE then
+            return distribution.PublishItemDone(payload and payload.itemLink, payload and payload.winnerName)
+        end
+        return false
     end
 
     -- Fetches items from the currently open loot window.
@@ -1053,6 +1560,7 @@ do
 
         lootState.currentItemIndex = findTrackedLootItemIndex(oldItem) or 1
         self:PrepareItem()
+        self:SetDistributionState(DISTRIBUTION_WINDOW_ITEMS)
         if addon.hasTrace then
             addon:trace(Diag.D.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
         end
@@ -1283,5 +1791,36 @@ do
             selectedItemCount = arg4
         end
         return resolveTradeableInventoryItem(itemLink, cachedBag, cachedSlot, selectedItemCount)
+    end
+
+    function module:ResolveTradeAwardedCount()
+        return resolveTradeAwardedCount()
+    end
+
+    function module:ResolveInventoryAwardedCount(selectedItemCount, fromInventory)
+        if selectedItemCount ~= nil or fromInventory ~= nil then
+            return resolveInventoryAwardedCountFromArgs(selectedItemCount, fromInventory)
+        end
+        return resolveInventoryAwardedCount()
+    end
+
+    function module:BuildTradeNotificationPlan(args)
+        return buildTradeNotificationPlan(args)
+    end
+
+    function module:BuildAwardTargetPlan(args)
+        return buildAwardTargetPlan(args)
+    end
+
+    function module:ValidateInventoryTradeSelection(args)
+        return validateInventoryTradeSelection(args)
+    end
+
+    function module:BuildMultiAwardWinnersPlan(args)
+        return buildMultiAwardWinnersPlan(args)
+    end
+
+    function module:BuildMultiAwardState(args)
+        return buildMultiAwardState(args)
     end
 end

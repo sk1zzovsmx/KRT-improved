@@ -347,9 +347,7 @@ do
         row._decorInitialized = true
     end
 
-    -- ----- Public methods ----- --
-
-    function module:CreateReserveHeader(parent, source, yOffset, index)
+    local function createReserveHeader(parent, source, yOffset, index)
         local frameName = UI.FrameName
         if not frameName then
             return nil
@@ -366,7 +364,7 @@ do
         end
 
         if header.label then
-            local collapsed = Reserves and Reserves.IsSourceCollapsed and Reserves:IsSourceCollapsed(source)
+            local collapsed = Reserves:IsSourceCollapsed(source)
             local prefix = collapsed and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
             header.label:SetText(prefix .. source)
         end
@@ -375,7 +373,7 @@ do
         return header
     end
 
-    function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+    local function createReserveRow(parent, info, yOffset, index, isFirstInGroup)
         local frameName = UI.FrameName
         if not frameName then
             return nil
@@ -438,7 +436,7 @@ do
         local headerIndex = 0
         local seenSources = {}
         local firstRenderedRowBySource = {}
-        local displayList = Reserves and Reserves.GetDisplayList and Reserves:GetDisplayList() or {}
+        local displayList = Reserves:GetDisplayList()
 
         for i = 1, #displayList do
             local entry = displayList[i]
@@ -447,16 +445,16 @@ do
             if not seenSources[source] then
                 seenSources[source] = true
                 headerIndex = headerIndex + 1
-                local header = module:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
+                local header = createReserveHeader(scrollChild, source, yOffset, headerIndex)
                 reserveHeaders[#reserveHeaders + 1] = header
                 yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
             end
 
-            local collapsed = Reserves and Reserves.IsSourceCollapsed and Reserves:IsSourceCollapsed(source)
+            local collapsed = Reserves:IsSourceCollapsed(source)
             if not collapsed then
                 rowIndex = rowIndex + 1
                 local isFirstInGroup = not firstRenderedRowBySource[source]
-                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
+                local row = createReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
                 firstRenderedRowBySource[source] = true
                 reserveItemRows[#reserveItemRows + 1] = row
                 yOffset = yOffset + rowHeight
@@ -469,7 +467,7 @@ do
         end
     end
 
-    function module:PrimeItemInfoQuery(itemId)
+    local function primeItemInfoQuery(itemId)
         if not itemId then
             return
         end
@@ -478,20 +476,13 @@ do
         GameTooltip:Hide()
     end
 
-    function module:QueryItemInfo(itemId)
-        if not (Reserves and Reserves.QueryItemInfo) then
-            return false
-        end
+    local function queryItemInfo(itemId)
         return Reserves:QueryItemInfo(itemId)
     end
 
-    function module:QueryMissingItems(silent)
-        if not (Reserves and Reserves.QueryMissingItems) then
-            return false, 0
-        end
-
+    local function queryMissingItems(silent)
         local updated, count = Reserves:QueryMissingItems(silent, function(itemId)
-            module:PrimeItemInfoQuery(itemId)
+            primeItemInfoQuery(itemId)
         end)
 
         if updated then
@@ -522,6 +513,8 @@ do
         module:RequestRefresh("reset_saved")
         return out
     end
+
+    -- ----- Public methods ----- --
 
     function module:RefreshUI()
         if not UI.Localized then
@@ -563,7 +556,7 @@ do
                     addon:info(L.MsgReserveItemsQueryCooldown, queryCooldownSeconds)
                     return
                 end
-                module:QueryMissingItems(false)
+                queryMissingItems(false)
             end)
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
@@ -606,9 +599,9 @@ do
                 return
             end
 
-            local resolved = module:QueryItemInfo(itemId)
+            local resolved = queryItemInfo(itemId)
             if not resolved then
-                module:PrimeItemInfoQuery(itemId)
+                primeItemInfoQuery(itemId)
             end
         end)
     end
@@ -651,7 +644,7 @@ do
             cancelButton = _G["KRTImportCancelButton"],
             confirmButton = _G["KRTImportConfirmButton"],
             editBox = _G["KRTImportEditBox"],
-            modeSlider = _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"],
+            modeSlider = _G["KRTImportWindowModeSlider"],
             status = _G["KRTImportWindowStatus"],
             frame = frame,
         }
@@ -673,7 +666,7 @@ do
     end
 
     local function getModeSlider()
-        return _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"]
+        return _G["KRTImportWindowModeSlider"]
     end
 
     local function setImportStatus(text, r, g, b)
@@ -961,19 +954,17 @@ do
         return true, nPlayersOrErr
     end
 
-    if UIFacade and UIFacade.Register then
-        UIFacade:Register(
-            "Reserves",
-            UIScaffold.MakeStandardWidgetApi(module, {
-                ToggleImport = function()
-                    Import:Toggle()
-                end,
-                HideImport = function()
-                    Import:Hide()
-                end,
-            })
-        )
-    end
+    UIFacade:Register(
+        "Reserves",
+        UIScaffold.MakeStandardWidgetApi(module, {
+            ToggleImport = function()
+                Import:Toggle()
+            end,
+            HideImport = function()
+                Import:Hide()
+            end,
+        })
+    )
 
     Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
         module:RequestRefresh()

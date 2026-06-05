@@ -72,7 +72,9 @@
     "LOOT_ROLL_YOU_WON_NO_SPAM_DE",
     "LOOT_ROLL_ROLLED_NEED",
     "LOOT_ROLL_ROLLED_GREED",
-    "LOOT_ROLL_ROLLED_DE"
+    "LOOT_ROLL_ROLLED_DE",
+    "YES",
+    "NO"
   ],
   "Lua.runtime.version": "Lua 5.1",
   "Lua.runtime.builtin": {

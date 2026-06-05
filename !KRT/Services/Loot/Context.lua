@@ -15,7 +15,7 @@ local LootContext = module._Context
 
 -- ----- Private helpers ----- --
 local function isValidLootSourceKind(kind)
-    return kind == "boss" or kind == "trash" or kind == "object"
+    return kind == "boss" or kind == "trash" or kind == "shared" or kind == "object"
 end
 
 local function hasActiveLootSource(context)

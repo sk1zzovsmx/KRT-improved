@@ -166,19 +166,6 @@ do
         module:SetPlayerLootCountByNid(playerNid, lootType, nextVal, raidNum)
     end
 
-    -- MS-specific aliases kept for backward compatibility.
-    function module:GetPlayerCountByNid(playerNid, raidNum)
-        return module:GetPlayerLootCountByNid(playerNid, "ms", raidNum)
-    end
-
-    function module:SetPlayerCountByNid(playerNid, value, raidNum)
-        module:SetPlayerLootCountByNid(playerNid, "ms", value, raidNum)
-    end
-
-    function module:AddPlayerCountByNid(playerNid, delta, raidNum)
-        module:AddPlayerLootCountByNid(playerNid, "ms", delta, raidNum)
-    end
-
     function module:AddPlayerLootCount(name, lootType, delta, raidNum)
         raidNum = raidNum or Core.GetCurrentRaid()
         if not raidNum or not name then
@@ -227,11 +214,6 @@ do
         module:AddPlayerLootCount(name, lootType, delta, raidNum)
     end
 
-    -- MS alias kept for backward compatibility.
-    function module:AddPlayerCount(name, delta, raidNum)
-        module:AddPlayerLootCount(name, "ms", delta, raidNum)
-    end
-
     function module:GetPlayerCount(name, raidNum)
         raidNum = raidNum or Core.GetCurrentRaid()
         if not raidNum then
@@ -241,18 +223,6 @@ do
         if playerNid <= 0 then
             return 0
         end
-        return module:GetPlayerCountByNid(playerNid, raidNum)
-    end
-
-    function module:SetPlayerCount(name, value, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        if not raidNum then
-            return
-        end
-        local playerNid = module:GetPlayerID(name, raidNum)
-        if playerNid <= 0 then
-            return
-        end
-        module:SetPlayerCountByNid(playerNid, value, raidNum)
+        return module:GetPlayerLootCountByNid(playerNid, "ms", raidNum)
     end
 end

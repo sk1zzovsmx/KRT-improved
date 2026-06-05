@@ -519,14 +519,8 @@ function Frames.InitModuleFrame(module, frame, opts)
     if opts.hookOnShow then
         frame:HookScript("OnShow", opts.hookOnShow)
     end
-    if opts.setOnShow then
-        frame:SetScript("OnShow", opts.setOnShow)
-    end
     if opts.hookOnHide then
         frame:HookScript("OnHide", opts.hookOnHide)
-    end
-    if opts.setOnHide then
-        frame:SetScript("OnHide", opts.setOnHide)
     end
 
     return frameName
@@ -806,8 +800,6 @@ function UIScaffold.CreateListPanelScaffold(cfg)
     local frameInitOpts = {
         enableDrag = (initOpts.enableDrag ~= false),
         dragButton = initOpts.dragButton,
-        setOnShow = initOpts.setOnShow,
-        setOnHide = initOpts.setOnHide,
         hookOnShow = function(...)
             markDirty()
             if cfg.onShow then

@@ -4,6 +4,12 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Tooling:** Release ZIP packaging now omits standalone embedded-library
+  metadata files that KRT does not load at runtime, while keeping the vendored
+  source tree intact.
+- **Master Loot:** Master now keeps a compact loot distribution session and
+  syncs item, roll-start, winner, and done state through addon messages for a
+  read-only raider queue without changing award policy.
 - **UI:** Master now summarizes current-item SoftRes coverage in status and
   tooltips, including in-raid reservers and imported reserve names outside
   the raid.

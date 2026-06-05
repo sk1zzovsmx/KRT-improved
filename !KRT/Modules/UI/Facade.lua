@@ -7,7 +7,6 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Bus = feature.Bus
 local type = type
 
 addon.UI = addon.UI or {}
@@ -76,12 +75,4 @@ function UI:Call(widgetId, methodName, ...)
         return nil
     end
     return fn(...)
-end
-
-function UI:Emit(eventName, ...)
-    if not (Bus and Bus.TriggerEvent) then
-        return nil
-    end
-    Bus.TriggerEvent(eventName, ...)
-    return true
 end

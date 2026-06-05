@@ -89,6 +89,7 @@
 |   |   |   \\-- View.lua
 |   |   |-- Loot
 |   |   |   |-- Context.lua
+|   |   |   |-- DistributionSession.lua
 |   |   |   |-- PassiveGroupLoot.lua
 |   |   |   |-- PendingAwards.lua
 |   |   |   |-- Rules.lua
@@ -193,10 +194,14 @@
 |-- docs
 |   |-- superpowers
 |   |   |-- plans
-|   |   |   \\-- 2026-05-08-raid-loot-source-resolver.md
+|   |   |   |-- 2026-05-08-raid-loot-source-resolver.md
+|   |   |   |-- 2026-05-18-passive-group-loot-rollid-first.md
+|   |   |   \\-- 2026-05-23-logger-list-visual-refresh.md
 |   |   \\-- specs
 |   |       |-- 2026-04-28-options-timer-refactor-design.md
-|   |       \\-- 2026-05-08-raid-loot-source-resolver-design.md
+|   |       |-- 2026-05-08-raid-loot-source-resolver-design.md
+|   |       |-- 2026-05-18-passive-group-loot-rollid-first-design.md
+|   |       \\-- 2026-05-23-logger-list-visual-refresh-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY.csv
@@ -225,6 +230,7 @@
 |   |       |-- legacy-duplicates-03.lua
 |   |       |-- legacy-mixed-01.lua
 |   |       \\-- legacy-mixed-02.lua
+|   |-- logger_visual_refresh_spec.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json

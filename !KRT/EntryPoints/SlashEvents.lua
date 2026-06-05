@@ -12,7 +12,6 @@ local Options = feature.Options
 local Frames = feature.Frames
 local Colors = feature.Colors
 local Strings = feature.Strings
-local Bus = feature.Bus
 local Core = feature.Core
 local Services = feature.Services
 local Comms = feature.Comms
@@ -32,8 +31,6 @@ local _G = _G
 local UI = addon.UI
 
 -- =========== Slash Commands  =========== --
-local module = {}
-
 local function getCoreService(getterName)
     local getter = Core and Core[getterName]
     if type(getter) == "function" then
@@ -99,7 +96,7 @@ local function formatValidateRaidDetail(entry)
 end
 
 -- ----- Internal state ----- --
-module.sub = module.sub or {}
+local slashHandlers = {}
 
 local cmdAchiev, cmdLFM, cmdConfig = { "ach", "achi", "achiev", "achievement" }, { "pug", "lfm", "group", "grouper" }, { "config", "conf", "options", "opt" }
 local cmdChanges, cmdWarnings, cmdLogger = { "ms", "changes", "mschanges" }, { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
@@ -118,9 +115,7 @@ local function markLootOnlyCommands(list)
     end
 end
 
-for _, commandList in ipairs({ cmdReserves }) do
-    markLootOnlyCommands(commandList)
-end
+markLootOnlyCommands(cmdReserves)
 
 -- ----- Private helpers ----- --
 local helpString = "%s: %s"
@@ -333,7 +328,7 @@ end
 
 local function registerAliases(list, fn)
     for _, cmd in ipairs(list) do
-        module.sub[cmd] = fn
+        slashHandlers[cmd] = fn
     end
 end
 
@@ -378,8 +373,8 @@ local function getVersionInfo()
     }
 end
 
-local function getLogLevelName()
-    local level = addon.GetLogLevel and addon:GetLogLevel() or nil
+local function getLogLevelName(level)
+    level = level or (addon.GetLogLevel and addon:GetLogLevel() or nil)
     for name, value in pairs(addon.logLevels or {}) do
         if value == level then
             return tostring(name)
@@ -481,14 +476,7 @@ local function handleDebugCommand(rest)
     if subCmd == "level" or subCmd == "lvl" then
         if not arg or arg == "" then
             local lvl = addon.GetLogLevel and addon:GetLogLevel()
-            local name
-            for k, v in pairs(addon.logLevels or {}) do
-                if v == lvl then
-                    name = k
-                    break
-                end
-            end
-            addon:info(L.MsgLogLevelCurrent, name or tostring(lvl))
+            addon:info(L.MsgLogLevelCurrent, getLogLevelName(lvl))
             addon:info(L.MsgLogLevelList)
             return
         end
@@ -502,22 +490,6 @@ local function handleDebugCommand(rest)
             addon:info(L.MsgLogLevelSet, arg)
         else
             addon:warn(L.MsgLogLevelUnknown, arg)
-        end
-        return
-    end
-
-    if subCmd == "callbacks" or subCmd == "cb" or subCmd == "bus" then
-        if arg == "reset" then
-            if Bus.ResetInternalCallbackStats then
-                Bus.ResetInternalCallbackStats()
-            end
-            addon:info("Internal callback stats reset.")
-        else
-            if Bus.DumpInternalCallbackStats then
-                Bus.DumpInternalCallbackStats(arg)
-            else
-                addon:warn("Callback stats not available in this build.")
-            end
         end
         return
     end
@@ -567,23 +539,18 @@ local function formatPerfThreshold(value)
 end
 
 local function getPerfThreshold()
-    if addon.GetPerfThresholdMs then
-        return addon:GetPerfThresholdMs()
+    local threshold = tonumber(addon.State and addon.State.perfThresholdMs) or 5
+    if threshold < 0 then
+        return 5
     end
-    return 5
+    return threshold
 end
 
 local function isPerfEnabled()
-    if addon.IsPerfModeEnabled then
-        return addon:IsPerfModeEnabled()
-    end
     return addon.State and addon.State.perfEnabled == true
 end
 
 local function setPerfEnabled(enabled)
-    if addon.SetPerfMode then
-        return addon:SetPerfMode(enabled)
-    end
     addon.State = addon.State or {}
     addon.State.perfEnabled = enabled and true or false
     addon.hasPerf = addon.State.perfEnabled and true or nil
@@ -591,9 +558,6 @@ local function setPerfEnabled(enabled)
 end
 
 local function setPerfThreshold(value)
-    if addon.SetPerfThresholdMs then
-        return addon:SetPerfThresholdMs(value)
-    end
     local threshold = tonumber(value)
     if not threshold or threshold < 0 then
         return nil
@@ -1090,12 +1054,7 @@ local function handleVersionCommand(rest)
     end
 end
 
--- ----- Public methods ----- --
-function module:Register(cmd, fn)
-    self.sub[cmd] = fn
-end
-
-function module:Handle(msg)
+local function handleSlashCommand(msg)
     if isBlank(msg) then
         showHelp()
         return
@@ -1117,7 +1076,7 @@ function module:Handle(msg)
         Core.RequestControllerMethod("Master", "Toggle")
         return
     end
-    local fn = self.sub[cmd]
+    local fn = slashHandlers[cmd]
     if fn then
         return fn(rest, cmd, msg)
     end
@@ -1141,8 +1100,10 @@ registerAliases(cmdReserves, handleReservesCommand)
 registerAliases(cmdValidate, handleValidateCommand)
 registerAliases(cmdLFM, handleLfmCommand)
 
+-- ----- Public methods ----- --
+
 -- Register slash commands
 SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
 SlashCmdList["KRT"] = function(msg)
-    module:Handle(msg)
+    handleSlashCommand(msg)
 end

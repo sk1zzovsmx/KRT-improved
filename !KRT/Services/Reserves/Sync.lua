@@ -309,18 +309,6 @@ function Sync:RequestMetadata()
     return true
 end
 
-function Sync:RequestData(checksum)
-    self:EnsurePrefix()
-    local requestId = nextRequestId()
-    local ok = Comms and Comms.Sync and Comms.Sync(PREFIX, packFields(MSG_DATA_REQ, requestId, checksum or ""))
-    if ok == false then
-        addon:warn(L.MsgReservesSyncNotInGroup)
-        return false
-    end
-    addon:info(L.MsgReservesSyncDataRequested)
-    return true
-end
-
 function Sync:RequestMessageHandling(prefix, msg, channel, sender)
     if prefix ~= PREFIX then
         return false

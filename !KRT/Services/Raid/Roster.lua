@@ -19,6 +19,7 @@ local InternalEvents = Events.Internal
 local tinsert, twipe = table.insert, table.wipe
 local pairs, ipairs, type = pairs, ipairs, type
 local strlen = string.len
+local strsub = string.sub
 local strmatch = string.match
 local tostring, tonumber = tostring, tonumber
 local getRaidRosterInfo = GetRaidRosterInfo
@@ -561,7 +562,7 @@ do
                 if name == p.name then
                     found = true
                     break
-                elseif strlen(name) >= 5 and p.name:startsWith(name) then
+                elseif strlen(name) >= 5 and type(p.name) == "string" and strsub(p.name, 1, strlen(name)) == name then
                     name = p.name
                     found = true
                     break

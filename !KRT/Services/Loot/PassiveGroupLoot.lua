@@ -32,7 +32,8 @@ local type, pairs, select = type, pairs, select
 local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
 local GROUP_LOOT_ROLL_GRACE_SECONDS = tonumber(C.GROUP_LOOT_ROLL_GRACE_SECONDS) or 10
 
-local Services = feature.Services
+local buildParsedGroupLootResult
+local rememberParsedGroupLootResult
 
 -- ----- Private helpers ----- --
 local function isDebugEnabled()
@@ -507,6 +508,35 @@ local function parseGroupLootWinner(msg)
     return nil
 end
 
+local lastWinnerParse = {
+    msg = nil,
+    parsed = false,
+    playerName = nil,
+    itemLink = nil,
+    rollType = nil,
+    rollValue = nil,
+    rollId = nil,
+}
+
+local function parseGroupLootWinnerCached(msg)
+    if lastWinnerParse.msg == msg then
+        if lastWinnerParse.parsed then
+            return lastWinnerParse.playerName, lastWinnerParse.itemLink, lastWinnerParse.rollType, lastWinnerParse.rollValue, lastWinnerParse.rollId
+        end
+        return nil
+    end
+
+    local playerName, itemLink, rollType, rollValue, rollId = parseGroupLootWinner(msg)
+    lastWinnerParse.msg = msg
+    lastWinnerParse.parsed = itemLink ~= nil
+    lastWinnerParse.playerName = playerName
+    lastWinnerParse.itemLink = itemLink
+    lastWinnerParse.rollType = rollType
+    lastWinnerParse.rollValue = rollValue
+    lastWinnerParse.rollId = rollId
+    return playerName, itemLink, rollType, rollValue, rollId
+end
+
 local function queuePendingPassiveAward(owner, itemLink, looter, rollType, rollValue, rollId, refreshLogged)
     local rollSessionId, expiresAt = PassiveGroupLoot.ResolvePassivePendingAwardContext(itemLink, rollId)
     local upgraded = owner:UpgradeLoggedPassiveLootRoll(itemLink, looter, rollType, rollValue, rollSessionId)
@@ -518,16 +548,108 @@ local function queuePendingPassiveAward(owner, itemLink, looter, rollType, rollV
     return upgraded
 end
 
-local function capturePassiveRollBossContext(raidService, raidNum, sessionId, ttlSeconds, now)
-    if not (raidService and raidService.FindAndRememberBossContextForLootSession) then
-        return 0
+local function observeGroupLootWinnerMessage(owner, msg)
+    if type(msg) ~= "string" or msg == "" or not PassiveGroupLoot.IsPassiveGroupLootMethod() then
+        return nil
     end
 
-    return tonumber(raidService:FindAndRememberBossContextForLootSession(raidNum, sessionId, {
-        ttlSeconds = ttlSeconds,
-        now = now,
-        allowContextRecovery = true,
-    })) or 0
+    local playerName, itemLink, winnerRollType, winnerRollValue, winnerRollId = parseGroupLootWinnerCached(msg)
+    if not (playerName and itemLink) then
+        return nil
+    end
+
+    local canQueuePendingAward = owner and type(owner.AddPendingAward) == "function"
+    local rule = getGroupLootRule(winnerRollType)
+    local winnerTypeLabel = (rule and rule.label) or "msg-generic"
+    local winnerRollLabel = (winnerRollValue ~= nil) and tostring(winnerRollValue) or "msg-none"
+    if canQueuePendingAward and (winnerRollType ~= nil or winnerRollValue ~= nil) then
+        queuePendingPassiveAward(owner, itemLink, playerName, winnerRollType, winnerRollValue, winnerRollId, true)
+    end
+    if isDebugEnabled() then
+        addon:debug(Diag.D.LogLootGroupWinnerDetected:format(tostring(playerName), winnerTypeLabel, winnerRollLabel, tostring(itemLink)))
+    end
+    local parsed = buildParsedGroupLootResult("winner", msg, playerName, itemLink, winnerRollType, winnerRollValue, winnerRollId)
+    rememberParsedGroupLootResult(parsed)
+    return "winner", parsed
+end
+
+local function getLootRollItemInfo(rollId)
+    local getInfo = _G.GetLootRollItemInfo
+    if type(getInfo) ~= "function" then
+        return nil, nil, nil, nil
+    end
+
+    local texture, name, count, quality = getInfo(rollId)
+    return name, quality, texture, count
+end
+
+local function resolvePassiveLootRollEntry(itemLink, rollId)
+    return PassiveGroupLoot.GetPassiveLootRollEntryByRollId(rollId) or PassiveGroupLoot.GetPassiveLootRollEntry(itemLink)
+end
+
+buildParsedGroupLootResult = function(kind, msg, playerName, itemLink, rollType, rollValue, rollId)
+    local entry = resolvePassiveLootRollEntry(itemLink, rollId)
+    local resolvedItemLink = (entry and entry.itemLink) or itemLink
+    return {
+        kind = kind,
+        msg = msg,
+        playerName = playerName,
+        itemLink = resolvedItemLink,
+        itemKey = (entry and entry.itemKey) or PassiveGroupLoot.GetPassiveLootRollItemKey(resolvedItemLink),
+        rollType = rollType,
+        rollValue = rollValue,
+        rollId = (entry and entry.rollId) or rollId,
+        sessionId = entry and entry.sessionId or nil,
+        expiresAt = entry and entry.expiresAt or nil,
+        bossNid = entry and entry.bossNid or nil,
+        itemName = entry and entry.itemName or nil,
+        itemRarity = entry and entry.itemRarity or nil,
+        itemTexture = entry and entry.itemTexture or nil,
+        itemCount = entry and entry.itemCount or nil,
+        isPassiveWinner = kind == "winner",
+    }
+end
+
+rememberParsedGroupLootResult = function(result)
+    if type(result) ~= "table" then
+        return
+    end
+
+    local entry = resolvePassiveLootRollEntry(result.itemLink, result.rollId)
+    if not entry then
+        return
+    end
+
+    local playerName = result.playerName
+    if type(playerName) ~= "string" or playerName == "" then
+        return
+    end
+
+    if result.kind == "winner" then
+        entry.winner = {
+            playerName = playerName,
+            rollType = result.rollType,
+            rollValue = result.rollValue,
+            rollId = result.rollId,
+        }
+        return
+    end
+
+    if (tonumber(result.rollValue) or 0) > 0 then
+        entry.rollsByPlayer = entry.rollsByPlayer or {}
+        entry.rollsByPlayer[playerName] = {
+            rollType = result.rollType,
+            rollValue = result.rollValue,
+            rollId = result.rollId,
+        }
+        return
+    end
+
+    entry.choicesByPlayer = entry.choicesByPlayer or {}
+    entry.choicesByPlayer[playerName] = {
+        rollType = result.rollType,
+        rollId = result.rollId,
+    }
 end
 
 -- ----- Public methods ----- --
@@ -656,11 +778,11 @@ function PassiveGroupLoot.HasLoggedPassiveLoot(itemLink, looter, rollSessionId)
 end
 
 function PassiveGroupLoot.ParseGroupLootWinner(msg)
-    return parseGroupLootWinner(msg)
+    return parseGroupLootWinnerCached(msg)
 end
 
 function PassiveGroupLoot.IsPassiveLootWinnerMessage(msg)
-    local _, itemLink = parseGroupLootWinner(msg)
+    local _, itemLink = parseGroupLootWinnerCached(msg)
     return itemLink ~= nil
 end
 
@@ -701,22 +823,22 @@ function PassiveGroupLoot.AddPassiveLootRoll(owner, rollId, rollTime)
         durationSeconds = 0
     end
     local expiresAt = GetTime() + durationSeconds + GROUP_LOOT_ROLL_GRACE_SECONDS
-    local currentTime = feature.Time.GetCurrentTime()
-    local raidService = Services.Raid
-    local contextTtl = durationSeconds + GROUP_LOOT_ROLL_GRACE_SECONDS
 
     if existing then
         existing.itemLink = itemLink
         existing.itemKey = PassiveGroupLoot.GetPassiveLootRollItemKey(itemLink)
+        local itemName, itemRarity, itemTexture, itemCount = getLootRollItemInfo(resolvedRollId)
+        existing.itemName = itemName or existing.itemName
+        existing.itemRarity = itemRarity or existing.itemRarity
+        existing.itemTexture = itemTexture or existing.itemTexture
+        existing.itemCount = tonumber(itemCount) or existing.itemCount
+        existing.startedAt = tonumber(existing.startedAt) or GetTime()
         existing.expiresAt = expiresAt
-        local capturedBossNid = capturePassiveRollBossContext(raidService, currentRaidId, existing.sessionId, contextTtl, currentTime)
-        if capturedBossNid > 0 then
-            existing.bossNid = capturedBossNid
-        end
         return existing
     end
 
     local itemKey = PassiveGroupLoot.GetPassiveLootRollItemKey(itemLink)
+    local itemName, itemRarity, itemTexture, itemCount = getLootRollItemInfo(resolvedRollId)
     local list = state.byItemKey[itemKey]
     if type(list) ~= "table" then
         list = {}
@@ -727,22 +849,26 @@ function PassiveGroupLoot.AddPassiveLootRoll(owner, rollId, rollTime)
         rollId = resolvedRollId,
         itemLink = itemLink,
         itemKey = itemKey,
+        itemName = itemName,
+        itemRarity = itemRarity,
+        itemTexture = itemTexture,
+        itemCount = tonumber(itemCount) or nil,
         sessionId = "GL:" .. tostring(state.nextSessionId),
+        startedAt = GetTime(),
         expiresAt = expiresAt,
         bossNid = nil,
+        choicesByPlayer = {},
+        rollsByPlayer = {},
+        winner = nil,
     }
     state.nextSessionId = state.nextSessionId + 1
     list[#list + 1] = entry
     state.bySessionId[entry.sessionId] = entry
     state.byRollId[resolvedRollId] = entry
-    local capturedBossNid = capturePassiveRollBossContext(raidService, currentRaidId, entry.sessionId, contextTtl, currentTime)
-    if capturedBossNid > 0 then
-        entry.bossNid = capturedBossNid
-    end
     return entry
 end
 
-function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
+function PassiveGroupLoot.ObserveGroupLootMessage(owner, msg)
     if type(msg) ~= "string" or msg == "" or not PassiveGroupLoot.IsPassiveGroupLootMethod() then
         return nil
     end
@@ -758,7 +884,9 @@ function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
                 if isDebugEnabled() then
                     addon:debug(Diag.D.LogLootGroupSelectionQueued:format(rule.label, tostring(playerName), tostring(itemLink)))
                 end
-                return "selection"
+                local parsed = buildParsedGroupLootResult("selection", msg, playerName, itemLink, rule.rollType, 0, rollId)
+                rememberParsedGroupLootResult(parsed)
+                return "selection", parsed
             end
         end
 
@@ -769,23 +897,20 @@ function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogLootGroupSelectionQueued:format((rule and rule.label) or "?", tostring(rollPlayer), tostring(rollItemLink)))
             end
-            return "selection"
+            local parsed = buildParsedGroupLootResult("selection", msg, rollPlayer, rollItemLink, rollType, rollValue, rollId)
+            rememberParsedGroupLootResult(parsed)
+            return "selection", parsed
         end
     end
 
-    local playerName, itemLink, winnerRollType, winnerRollValue, winnerRollId = parseGroupLootWinner(msg)
-    if playerName and itemLink then
-        local rule = getGroupLootRule(winnerRollType)
-        local winnerTypeLabel = (rule and rule.label) or "msg-generic"
-        local winnerRollLabel = (winnerRollValue ~= nil) and tostring(winnerRollValue) or "msg-none"
-        if canQueuePendingAward and (winnerRollType ~= nil or winnerRollValue ~= nil) then
-            queuePendingPassiveAward(owner, itemLink, playerName, winnerRollType, winnerRollValue, winnerRollId, true)
-        end
-        if isDebugEnabled() then
-            addon:debug(Diag.D.LogLootGroupWinnerDetected:format(tostring(playerName), winnerTypeLabel, winnerRollLabel, tostring(itemLink)))
-        end
-        return "winner"
-    end
+    return observeGroupLootWinnerMessage(owner, msg)
+end
 
-    return nil
+function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
+    local observedType = PassiveGroupLoot.ObserveGroupLootMessage(owner, msg)
+    return observedType
+end
+
+function PassiveGroupLoot.ObserveGroupLootWinnerMessage(owner, msg)
+    return observeGroupLootWinnerMessage(owner, msg)
 end

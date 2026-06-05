@@ -360,38 +360,4 @@ do
         end
         return rows
     end
-
-    function module:GetLootByBoss(raid, bossNid, out)
-        return self:GetLoot(raid, bossNid, nil, out)
-    end
-
-    function module:GetPlayerCounts(raid, out)
-        raid = normalizeRaid(raid)
-        local rows = {}
-        local seenByName = {}
-        local players = raid and raid.players or {}
-
-        for i = #players, 1, -1 do
-            local player = players[i]
-            if type(player) == "table" and player.name and not seenByName[player.name] then
-                seenByName[player.name] = true
-                rows[#rows + 1] = {
-                    playerNid = tonumber(player.playerNid),
-                    name = player.name,
-                    class = player.class,
-                    count = tonumber(player.countMS) or 0,
-                }
-            end
-        end
-
-        table.sort(rows, function(a, b)
-            return tostring(a.name or "") < tostring(b.name or "")
-        end)
-
-        if out then
-            appendRows(out, rows)
-            return out
-        end
-        return rows
-    end
 end

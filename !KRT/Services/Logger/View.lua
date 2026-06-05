@@ -154,6 +154,41 @@ function View:FillBossAttendeesList(out, raid, bossNid)
     end
 end
 
+function View:GetPlayerBossParticipationList(out, raid, playerNid)
+    if not out then
+        return
+    end
+    twipe(out)
+    local selectedPlayerNid = tonumber(playerNid)
+    if not (raid and selectedPlayerNid) then
+        return
+    end
+
+    local bosses = raid.bossKills or {}
+    local n = 0
+    for i = 1, #bosses do
+        local boss = bosses[i]
+        local players = boss and boss.players
+        if type(players) == "table" then
+            for j = 1, #players do
+                if tonumber(players[j]) == selectedPlayerNid then
+                    n = n + 1
+                    local it = {}
+                    local killTime = tonumber(boss.time) or 0
+                    it.id = tonumber(boss.bossNid)
+                    it.seq = i
+                    it.name = boss.name or ""
+                    it.time = killTime
+                    it.timeFmt = (killTime > 0) and date("%H:%M", killTime) or ""
+                    it.mode = self:GetBossModeLabel(boss)
+                    out[n] = it
+                    break
+                end
+            end
+        end
+    end
+end
+
 function View:FillLootList(out, raid, bossNid, playerName)
     local queries = getRaidQueries()
     if queries and queries.GetLoot then

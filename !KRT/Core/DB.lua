@@ -73,12 +73,8 @@ function DB.GetManager()
     return ensureManager()
 end
 
-function Core.GetRaidStore()
-    return getManagerStore("GetRaidStore")
-end
-
 function Core.GetRaidStoreOrNil(contextTag, requiredMethods)
-    local raidStore = Core.GetRaidStore()
+    local raidStore = getManagerStore("GetRaidStore")
     local ctx = tostring(contextTag or "?")
 
     if type(raidStore) ~= "table" then
@@ -117,8 +113,4 @@ end
 
 function Core.GetSyncer()
     return getManagerStore("GetSyncer")
-end
-
-function Core.GetDB()
-    return DB
 end

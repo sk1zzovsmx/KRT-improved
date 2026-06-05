@@ -8,23 +8,11 @@ local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Core = feature.Core
+local IgnoredMobs = feature.IgnoredMobs
 
 local pairs, type, tonumber = pairs, type, tonumber
 local tostring = tostring
-
-local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
-local function resolveTrashMobName()
-    local localizedName = L and L.StrTrashMobName
-    if type(localizedName) ~= "string" or localizedName == "" then
-        return LEGACY_TRASH_MOB_NAME
-    end
-    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
-        return LEGACY_TRASH_MOB_NAME
-    end
-    return localizedName
-end
-
-local TRASH_MOB_NAME = resolveTrashMobName()
+local IsTrashMobName = IgnoredMobs.IsTrashMobName
 
 -- Read-only raid validation service.
 do
@@ -104,10 +92,6 @@ do
         end
     end
 
-    local function isTrashMobName(name)
-        return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
-    end
-
     local function validateRaidSourceKeys(result, raid)
         local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidValidator.ValidateRaid", { "IsLegacyRuntimeKey" }) or nil
         for key in pairs(raid) do
@@ -182,7 +166,7 @@ do
                 if bossNid > 0 then
                     bossByNid[bossNid] = true
                 end
-                if isTrashMobName(boss.name) then
+                if IsTrashMobName(boss.name) then
                     hasTrashBoss = true
                 end
 

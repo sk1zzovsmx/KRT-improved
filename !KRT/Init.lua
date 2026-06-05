@@ -31,29 +31,13 @@ addon.Bus = addon.Bus or {}
 addon.Frames = addon.Frames or {}
 addon.Time = addon.Time or {}
 
-addon.Events.Internal.RaidRosterDelta = addon.Events.Internal.RaidRosterDelta or "RaidRosterDelta"
-
--- Canonical forwarded WoW-event names are PascalCase.
-addon.Events.Wow.LootOpened = addon.Events.Wow.LootOpened or "wow.LOOT_OPENED"
-addon.Events.Wow.LootClosed = addon.Events.Wow.LootClosed or "wow.LOOT_CLOSED"
-addon.Events.Wow.LootSlotCleared = addon.Events.Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
-addon.Events.Wow.UiErrorMessage = addon.Events.Wow.UiErrorMessage or "wow.UI_ERROR_MESSAGE"
-addon.Events.Wow.ChatMsgWhisper = addon.Events.Wow.ChatMsgWhisper or "wow.CHAT_MSG_WHISPER"
-addon.Events.Wow.TradeAcceptUpdate = addon.Events.Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
-addon.Events.Wow.TradeRequestCancel = addon.Events.Wow.TradeRequestCancel or "wow.TRADE_REQUEST_CANCEL"
-addon.Events.Wow.TradeClosed = addon.Events.Wow.TradeClosed or "wow.TRADE_CLOSED"
-
 local _G = _G
 local pairs, select, type = pairs, select, type
-local rawget, rawset = rawget, rawset
-local getmetatable, setmetatable = getmetatable, setmetatable
+local setmetatable = setmetatable
 local tostring, tonumber = tostring, tonumber
 local GetRealmName = _G.GetRealmName
 local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
 local UnitIsGroupLeader = _G.UnitIsGroupLeader
-local random = math.random
-local gsub = string.gsub
-local strsub, strlen = string.sub, string.len
 
 local Core = addon.Core
 local Diagnose = addon.Diagnose
@@ -66,10 +50,31 @@ local Diag = setmetatable({}, {
     end,
 })
 
-local legacyAliasMap = addon.LegacyAliases or {}
-addon.LegacyAliases = legacyAliasMap
-
 -- ----- Private helpers ----- --
+local function seedBootstrapEvents()
+    addon.Events = addon.Events or {}
+    addon.Events.Internal = addon.Events.Internal or {}
+    addon.Events.Wow = addon.Events.Wow or {}
+
+    local Internal = addon.Events.Internal
+    local Wow = addon.Events.Wow
+
+    Internal.RaidRosterDelta = Internal.RaidRosterDelta or "RaidRosterDelta"
+    Internal.LootDistributionSessionChanged = Internal.LootDistributionSessionChanged or "LootDistributionSessionChanged"
+
+    -- Canonical forwarded WoW-event names are PascalCase.
+    Wow.LootOpened = Wow.LootOpened or "wow.LOOT_OPENED"
+    Wow.LootClosed = Wow.LootClosed or "wow.LOOT_CLOSED"
+    Wow.LootSlotCleared = Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
+    Wow.UiErrorMessage = Wow.UiErrorMessage or "wow.UI_ERROR_MESSAGE"
+    Wow.ChatMsgWhisper = Wow.ChatMsgWhisper or "wow.CHAT_MSG_WHISPER"
+    Wow.TradeAcceptUpdate = Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
+    Wow.TradeRequestCancel = Wow.TradeRequestCancel or "wow.TRADE_REQUEST_CANCEL"
+    Wow.TradeClosed = Wow.TradeClosed or "wow.TRADE_CLOSED"
+
+    return addon.Events
+end
+
 local function isDebugEnabled()
     local state = addon.State
     return state and state.debugEnabled == true
@@ -87,187 +92,12 @@ local function getPerfThresholdMs()
     return threshold
 end
 
-local function getLegacyAliasWarnCache()
-    local state = addon.State
-    state.legacyAliasWarned = state.legacyAliasWarned or {}
-    return state.legacyAliasWarned
-end
-
-local function getLegacyAliasWarnSite()
-    local stackFn = _G.debugstack
-    if type(stackFn) ~= "function" then
-        return "unknown"
-    end
-
-    local stack = stackFn(4, 1, 0)
-    if type(stack) ~= "string" then
-        return tostring(stack or "unknown")
-    end
-
-    return stack:match("^[^\n]+") or stack
-end
-
-local function warnLegacyAliasAccess(aliasKey, targetPath)
-    if not isDebugEnabled() then
-        return
-    end
-
-    local site = getLegacyAliasWarnSite()
-    local cacheKey = tostring(aliasKey) .. "|" .. tostring(site)
-    local warned = getLegacyAliasWarnCache()
-    if warned[cacheKey] then
-        return
-    end
-    warned[cacheKey] = true
-
-    if addon.warn then
-        local template = (Diag.W and Diag.W.LogLegacyAliasAccess) or "[Compat] Legacy alias used alias=%s target=%s site=%s"
-        addon:warn(template:format(tostring(aliasKey), tostring(targetPath or "?"), tostring(site)))
-    end
-end
-
-local function callMetaIndex(indexMeta, tbl, key)
-    if indexMeta == nil then
-        return nil
-    end
-    if type(indexMeta) == "function" then
-        return indexMeta(tbl, key)
-    end
-    return indexMeta[key]
-end
-
-local function callMetaNewIndex(newIndexMeta, tbl, key, value)
-    if newIndexMeta == nil then
-        rawset(tbl, key, value)
-        return
-    end
-    if type(newIndexMeta) == "function" then
-        newIndexMeta(tbl, key, value)
-        return
-    end
-    newIndexMeta[key] = value
-end
-
-local function installLegacyAliasProxy()
-    if addon._legacyAliasProxyInstalled then
-        return
-    end
-
-    local existingMeta = getmetatable(addon)
-    local meta = type(existingMeta) == "table" and existingMeta or {}
-    local oldIndex = meta.__index
-    local oldNewIndex = meta.__newindex
-
-    meta.__index = function(tbl, key)
-        local aliasEntry = legacyAliasMap[key]
-        if aliasEntry and type(aliasEntry.get) == "function" then
-            local value = aliasEntry.get()
-            warnLegacyAliasAccess(key, aliasEntry.targetPath)
-            if value ~= nil then
-                return value
-            end
-        end
-        return callMetaIndex(oldIndex, tbl, key)
-    end
-
-    meta.__newindex = function(tbl, key, value)
-        local aliasEntry = legacyAliasMap[key]
-        if aliasEntry and type(aliasEntry.set) == "function" then
-            aliasEntry.set(value)
-            -- Keep legacy aliases virtual so reads pass through __index and can be warned.
-            rawset(tbl, key, nil)
-            return
-        end
-        callMetaNewIndex(oldNewIndex, tbl, key, value)
-    end
-
-    local ok = pcall(setmetatable, addon, meta)
-    if ok then
-        addon._legacyAliasProxyInstalled = true
-    end
-end
-
 -- ----- Public methods ----- --
-function Core.RegisterLegacyAlias(aliasKey, cfg)
-    if type(aliasKey) ~= "string" or aliasKey == "" then
-        return
-    end
-
-    local entry = legacyAliasMap[aliasKey]
-    if not entry then
-        entry = {}
-        legacyAliasMap[aliasKey] = entry
-    end
-
-    if type(cfg) == "table" then
-        if type(cfg.get) == "function" then
-            entry.get = cfg.get
-        end
-        if type(cfg.set) == "function" then
-            entry.set = cfg.set
-        end
-        entry.targetPath = cfg.targetPath or entry.targetPath
-    end
-
-    rawset(addon, aliasKey, nil)
+function Core.EnsureBootstrapEvents()
+    return seedBootstrapEvents()
 end
 
-function Core.RegisterLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
-    if type(aliasKey) ~= "string" or aliasKey == "" then
-        return
-    end
-    if type(namespaceKey) ~= "string" or namespaceKey == "" then
-        return
-    end
-    if type(moduleKey) ~= "string" or moduleKey == "" then
-        return
-    end
-
-    Core.RegisterLegacyAlias(aliasKey, {
-        targetPath = namespaceKey .. "." .. moduleKey,
-        get = function()
-            local ns = rawget(addon, namespaceKey)
-            return ns and ns[moduleKey] or nil
-        end,
-        set = function(value)
-            local ns = rawget(addon, namespaceKey)
-            if type(ns) ~= "table" then
-                ns = {}
-                rawset(addon, namespaceKey, ns)
-            end
-            ns[moduleKey] = value
-        end,
-    })
-end
-
-installLegacyAliasProxy()
-
-function addon:IsPerfModeEnabled()
-    return self.State and self.State.perfEnabled == true
-end
-
-function addon:SetPerfMode(enabled)
-    local state = self.State or {}
-    self.State = state
-    state.perfEnabled = enabled and true or false
-    self.hasPerf = state.perfEnabled and true or nil
-    return state.perfEnabled
-end
-
-function addon:GetPerfThresholdMs()
-    return getPerfThresholdMs()
-end
-
-function addon:SetPerfThresholdMs(value)
-    local threshold = tonumber(value)
-    if not threshold or threshold < 0 then
-        return nil
-    end
-    local state = self.State or {}
-    self.State = state
-    state.perfThresholdMs = threshold
-    return threshold
-end
+Core.EnsureBootstrapEvents()
 
 addon._PerfStart = function(self)
     if not self.hasPerf then
@@ -305,102 +135,7 @@ addon._PerfFinish = function(self, label, startedAt, details)
     return elapsedMs
 end
 
-local LEGACY_ALIAS_PATHS = {
-    { "Master", "Controllers", "Master" },
-    { "Logger", "Controllers", "Logger" },
-    { "Warnings", "Controllers", "Warnings" },
-    { "Changes", "Controllers", "Changes" },
-    { "Spammer", "Controllers", "Spammer" },
-
-    { "Raid", "Services", "Raid" },
-    { "Loot", "Services", "Loot" },
-    { "Rolls", "Services", "Rolls" },
-    { "Chat", "Services", "Chat" },
-    { "Syncer", "DB", "Syncer" },
-    { "Reserves", "Services", "Reserves" },
-
-    { "LootCounter", "Widgets", "LootCounter" },
-    { "ReservesUI", "Widgets", "ReservesUI" },
-    { "Config", "Widgets", "Config" },
-}
-
-for i = 1, #LEGACY_ALIAS_PATHS do
-    local entry = LEGACY_ALIAS_PATHS[i]
-    Core.RegisterLegacyAliasPath(entry[1], entry[2], entry[3])
-end
-
-local function installCompatGlobalFunctions()
-    if addon._globalCompatInstalled then
-        return
-    end
-
-    _G.table.shuffle = function(t)
-        if type(t) ~= "table" then
-            return t
-        end
-
-        local n = #t
-        while n > 1 do
-            local k = random(1, n)
-            t[n], t[k] = t[k], t[n]
-            n = n - 1
-        end
-        return t
-    end
-
-    _G.table.reverse = function(t, count)
-        if type(t) ~= "table" then
-            return t
-        end
-
-        local maxIndex = tonumber(count) or #t
-        if maxIndex < 2 then
-            return t
-        end
-        if maxIndex > #t then
-            maxIndex = #t
-        end
-
-        local i, j = 1, maxIndex
-        while i < j do
-            t[i], t[j] = t[j], t[i]
-            i = i + 1
-            j = j - 1
-        end
-        return t
-    end
-
-    _G.string.trim = function(str)
-        if str == nil then
-            return ""
-        end
-        return gsub(tostring(str), "^%s*(.-)%s*$", "%1")
-    end
-
-    _G.string.startsWith = function(str, piece)
-        if type(str) ~= "string" or type(piece) ~= "string" then
-            return false
-        end
-        return strsub(str, 1, strlen(piece)) == piece
-    end
-
-    _G.string.endsWith = function(str, piece)
-        if type(str) ~= "string" or type(piece) ~= "string" then
-            return false
-        end
-        local lenPiece = strlen(piece)
-        if #str < lenPiece then
-            return false
-        end
-        return strsub(str, -lenPiece) == piece
-    end
-
-    addon._globalCompatInstalled = true
-end
-
-installCompatGlobalFunctions()
-
-function Core.GetController(name)
+local function getController(name)
     if type(name) ~= "string" or name == "" then
         return nil
     end
@@ -412,7 +147,7 @@ function Core.RequestControllerMethod(name, methodName, ...)
     if type(methodName) ~= "string" or methodName == "" then
         return nil
     end
-    local controller = Core.GetController(name)
+    local controller = getController(name)
     local method = controller and controller[methodName]
     if type(method) ~= "function" then
         return nil
@@ -420,13 +155,13 @@ function Core.RequestControllerMethod(name, methodName, ...)
     return method(controller, ...)
 end
 
-function Core.EnsureNamespace(root, ...)
-    assert(type(root) == "table", "Core.EnsureNamespace requires a root table")
+local function ensureNamespace(root, ...)
+    assert(type(root) == "table", "ensureNamespace requires a root table")
 
     local target = root
     for i = 1, select("#", ...) do
         local key = select(i, ...)
-        assert(type(key) == "string" and key ~= "", "Core.EnsureNamespace requires non-empty string keys")
+        assert(type(key) == "string" and key ~= "", "ensureNamespace requires non-empty string keys")
 
         local child = target[key]
         if type(child) ~= "table" then
@@ -439,12 +174,8 @@ function Core.EnsureNamespace(root, ...)
     return target
 end
 
-function Core.EnsureAddonNamespace(...)
-    return Core.EnsureNamespace(addon, ...)
-end
-
 function Core.EnsureServiceNamespace(...)
-    return Core.EnsureNamespace(addon.Services, ...)
+    return ensureNamespace(addon.Services, ...)
 end
 
 function Core.GetPlayerName()
@@ -675,8 +406,6 @@ function Core.GetFeatureShared()
         Controllers = addon.Controllers,
         Widgets = addon.Widgets,
 
-        EnsureNamespace = core.EnsureNamespace,
-        EnsureAddonNamespace = core.EnsureAddonNamespace,
         EnsureServiceNamespace = core.EnsureServiceNamespace,
         BindModuleRequestRefresh = core.BindModuleRequestRefresh,
         BindModuleToggleHide = core.BindModuleToggleHide,
@@ -891,28 +620,8 @@ do
             addListener(self, eventName)
         end
 
-        function addon:RegisterEvents(...)
-            for i = 1, select("#", ...) do
-                addListener(self, select(i, ...))
-            end
-        end
-
         function addon:UnregisterEvent(eventName)
             removeListener(self, eventName)
-        end
-
-        function addon:UnregisterEvents()
-            local keys = {}
-            for eventName in pairs(listeners) do
-                keys[#keys + 1] = eventName
-            end
-            for i = 1, #keys do
-                removeListener(self, keys[i])
-            end
-        end
-
-        function addon:UnregisterAllEvents()
-            self:UnregisterEvents()
         end
 
         mainFrame:SetScript("OnEvent", handleEvent)
@@ -1297,12 +1006,17 @@ do
         end, 3)
     end
 
-    local function observePassiveLootMessage(msg)
+    local function observePassiveLootMessage(msg, winnerOnly)
         local currentRaid = Core.GetCurrentRaid()
         local raidService = getRaidService()
         local lootService = getService("Loot")
         if not currentRaid then
             return raidService, nil
+        end
+
+        if lootService and lootService.ObservePassiveLootMessage then
+            local observedType, parsedLoot = lootService:ObservePassiveLootMessage(msg, winnerOnly)
+            return raidService, observedType, parsedLoot
         end
 
         if lootService and lootService.AddGroupLootMessage then
@@ -1319,7 +1033,7 @@ do
             addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
         end
         local currentRaid = Core.GetCurrentRaid()
-        local raidService, observedType = observePassiveLootMessage(msg)
+        local raidService, observedType, parsedLoot = observePassiveLootMessage(msg, true)
         local lootService = getService("Loot")
         if not (currentRaid and raidService) then
             if perfStart then
@@ -1331,7 +1045,7 @@ do
         local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot()
         if canObservePassiveLoot and (observedType == nil or observedType == "winner") then
             if lootService and lootService.AddLoot then
-                lootService:AddLoot(msg)
+                lootService:AddLoot(msg, nil, nil, parsedLoot)
             end
         end
         if perfStart then
@@ -1343,13 +1057,13 @@ do
     function addon:CHAT_MSG_SYSTEM(msg)
         local perfStart = addon.hasPerf and addon:_PerfStart() or nil
         local currentRaid = Core.GetCurrentRaid()
-        local raidService, observedType = observePassiveLootMessage(msg)
+        local raidService, observedType, parsedLoot = observePassiveLootMessage(msg)
         local lootService = getService("Loot")
         if currentRaid and raidService then
             local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot()
             if canObservePassiveLoot and observedType == "winner" then
                 if lootService and lootService.AddLoot then
-                    lootService:AddLoot(msg)
+                    lootService:AddLoot(msg, nil, nil, parsedLoot)
                 end
             end
         end
@@ -1381,7 +1095,7 @@ do
         end
     end
 
-    -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.
+    -- CHAT_MSG_ADDON: Forwards addon communication messages to service-specific handlers, then Syncer.
     function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
         if addon.Comms and addon.Comms.RequestVersionMessageHandling and addon.Comms:RequestVersionMessageHandling(prefix, msg, channel, sender) then
             return
@@ -1389,6 +1103,10 @@ do
         local reservesService = getService("Reserves")
         local reservesSync = reservesService and reservesService._Sync or nil
         if reservesSync and reservesSync.RequestMessageHandling and reservesSync:RequestMessageHandling(prefix, msg, channel, sender) then
+            return
+        end
+        local lootService = getService("Loot")
+        if lootService and lootService.RequestDistributionMessageHandling and lootService:RequestDistributionMessageHandling(prefix, msg, channel, sender) then
             return
         end
         local syncer = Core.GetSyncer and Core.GetSyncer() or nil

@@ -16,7 +16,7 @@ module._Countdown = module._Countdown or {}
 
 local Countdown = module._Countdown
 
--- Timer ownership: i due timer del countdown (ticker per gli annunci, end timer per la chiusura).
+-- Countdown owns both runtime timers: the announcement ticker and the close timer.
 addon.Timer.BindMixin(Countdown, "Rolls.Countdown")
 
 local Chat = Services.Chat
@@ -40,10 +40,6 @@ local function shouldAnnounceTick(remaining, duration)
 end
 
 -- ----- Public methods ----- --
-function Countdown.ShouldAnnounceTick(remaining, duration)
-    return shouldAnnounceTick(remaining, duration)
-end
-
 function Countdown.Stop(state)
     if state.countdownTicker then
         Countdown:CancelTimer(state.countdownTicker)

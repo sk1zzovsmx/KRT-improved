@@ -149,15 +149,6 @@ local function resolveMethod(methodName, options)
 end
 
 -- ----- Public methods ----- --
-function UIEffects.GetGlowMethods()
-    return UIEffects.GlowMethods
-end
-
-function UIEffects.GetGlowTypeDefaults(glowType)
-    local methodKey = resolveMethodKey(glowType)
-    return buildMethodDefaults(methodKey)
-end
-
 local function setFrameLayer(frame, button, levelOffset)
     frame:SetFrameStrata(button:GetFrameStrata())
     frame:SetFrameLevel((button:GetFrameLevel() or 1) + levelOffset)

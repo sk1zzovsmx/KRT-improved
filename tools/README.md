@@ -50,6 +50,8 @@ control.
 - `tools/krt.py run-release-targeted-tests`: wraps `run-release-targeted-tests.ps1`
 - `tools/krt.py run-krt-mcp`: starts the local KRT MCP server wrapper
 - `tools/krt.py release-prepare`: builds the canonical release notes plus ZIP/checksum bundle
+- `tools/krt.py build-release-zip`: builds the addon ZIP and omits standalone embedded-library
+  metadata files that KRT does not load at runtime
 - `run-raid-validator.ps1`: runs `validate-raid-schema.lua` against a SavedVariables file
 - `run-sv-inspector.ps1`: runs `sv-inspector.lua` with table or CSV output
 - `run-sv-roundtrip.ps1`: runs `sv-roundtrip.lua` on one file or a fixture directory

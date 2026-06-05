@@ -711,6 +711,31 @@ do
         return self:BuildRuntimeIndexes(raid)
     end
 
+    function module:UpsertLootIndex(raid, loot, index)
+        raid = self:NormalizeRaidRecord(raid)
+        if not raid then
+            return nil
+        end
+
+        local runtime = raid._runtime
+        if not isRuntimeIndexReady(runtime) then
+            return nil
+        end
+
+        local lootRows = raid.loot or {}
+        local resolvedIndex = tonumber(index) or #lootRows
+        local row = loot or lootRows[resolvedIndex]
+        local lootNid = tonumber(row and row.lootNid)
+        if not lootNid or resolvedIndex < 1 then
+            return nil
+        end
+
+        runtime.lootIdxByNid[lootNid] = resolvedIndex
+        runtime.lootByNid[lootNid] = row
+        runtime.signature = buildRuntimeSignature(raid, raid.players or {}, raid.bossKills or {}, lootRows)
+        return runtime
+    end
+
     function module:StripRuntime(raid)
         if type(raid) ~= "table" then
             return

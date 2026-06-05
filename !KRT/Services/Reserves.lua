@@ -630,14 +630,6 @@ do
         return entries
     end
 
-    -- Get all reserves:
-    function Service:GetAllReserves()
-        if isDebugEnabled() then
-            addon:debug(Diag.D.LogReservesFetchAll:format(addon.tLength(reservesData)))
-        end
-        return reservesData
-    end
-
     -- Parse imported text (SoftRes CSV)
     -- mode: "multi" (multi-reserve enabled; Plus ignored) or "plus" (priority; requires 1 item per player)
     function Service:GetImportMode()
@@ -946,21 +938,6 @@ do
         return (r and tonumber(r.plus)) or 0
     end
 
-    -- Returns true if the item has any multi-reserve entry (quantity > 1).
-    -- When true, SR "Plus priority" should be disabled for this item.
-    function Service:HasMultiReserveForItem(itemId)
-        if self:GetImportMode() ~= "multi" then
-            return false
-        end
-        if not itemId then
-            return false
-        end
-        return visitReserveEntriesByItemId(itemId, function(reserveEntry)
-            local quantity = tonumber(reserveEntry.quantity) or 1
-            return quantity > 1
-        end)
-    end
-
     -- Returns true when at least one reserve player for the item is present in
     -- the current raid (or in raidNum when provided).
     -- If raid context is unavailable, keeps backward-compatible behavior and
@@ -971,14 +948,6 @@ do
 
     function Service:GetItemReserveContext(itemId, raidNum)
         return DisplayHelpers.GetItemReserveContext(getDisplayContext(), itemId, raidNum)
-    end
-
-    function Service:GetRosterReserveMatchReport(raidNum)
-        return DisplayHelpers.GetRosterReserveMatchReport(getDisplayContext(), raidNum)
-    end
-
-    function Service:GetNameMatchReport(raidNum)
-        return DisplayHelpers.GetNameMatchReport(getDisplayContext(), raidNum)
     end
 
     function Service:GetReadinessReport(itemId, raidNum)

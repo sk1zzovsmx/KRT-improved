@@ -8,11 +8,15 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local tonumber = tonumber
+local type = type
 
 addon.IgnoredMobs = addon.IgnoredMobs or feature.IgnoredMobs or {}
 local IgnoredMobs = addon.IgnoredMobs
+local L = feature.L
 
 -- ----- Internal state ----- --
+local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
+
 IgnoredMobs.Ids = {
     -- Classic raids
     [12557] = true, -- Grethok the Controller (Razorgore event)
@@ -124,6 +128,21 @@ IgnoredMobs.Ids = {
 -- ----- Private helpers ----- --
 
 -- ----- Public methods ----- --
+function IgnoredMobs.GetTrashMobName()
+    local localizedName = L and L.StrTrashMobName
+    if type(localizedName) ~= "string" or localizedName == "" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    return localizedName
+end
+
+function IgnoredMobs.IsTrashMobName(name)
+    return name == IgnoredMobs.GetTrashMobName() or name == LEGACY_TRASH_MOB_NAME
+end
+
 function IgnoredMobs.Contains(npcId)
     return IgnoredMobs.Ids[tonumber(npcId)] == true
 end

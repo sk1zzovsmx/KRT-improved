@@ -16,8 +16,6 @@ local Services = feature.Services
 local find = string.find
 local len = string.len
 local upper = string.upper
-local tinsert = table.insert
-local tconcat = table.concat
 local tostring = tostring
 local tonumber = tonumber
 local type = type
@@ -157,6 +155,59 @@ do
         }
     end
 
+    local function normalizeSpamDuration(durationValue, fallbackValue)
+        local durationSeconds = tonumber(durationValue)
+        if not durationSeconds or durationSeconds <= 0 then
+            durationSeconds = tonumber(fallbackValue)
+        end
+        if not durationSeconds or durationSeconds <= 0 then
+            durationSeconds = DEFAULT_SPAM_DURATION_SECONDS
+        end
+        return math.floor(durationSeconds)
+    end
+
+    local function normalizeWarningMessage(content)
+        if type(content) ~= "string" then
+            return nil
+        end
+
+        local message = Strings.TrimText(content)
+        if message == "" then
+            return nil
+        end
+        return message
+    end
+
+    local function sendSpamOutput(output, channels)
+        local text = tostring(output or "")
+        if len(text) > 255 then
+            return false, "too_long"
+        end
+
+        local channelList = cloneChannels(channels)
+        if #channelList <= 0 then
+            local groupType = addon.GetGroupTypeAndCount()
+            if groupType == "raid" then
+                Comms.Chat(text, "RAID", nil, nil, true)
+            elseif groupType == "party" then
+                Comms.Chat(text, "PARTY", nil, nil, true)
+            else
+                module:Print(text)
+            end
+            return true
+        end
+
+        for _, channel in ipairs(channelList) do
+            if type(channel) == "number" then
+                Comms.Chat(text, "CHANNEL", nil, channel, true)
+            else
+                Comms.Chat(text, upper(channel), nil, nil, true)
+            end
+        end
+
+        return true
+    end
+
     local function fireSpamTick()
         local onTick = spamRuntime.onTick
         if type(onTick) == "function" then
@@ -191,7 +242,7 @@ do
             if type(sendFn) == "function" then
                 ok = sendFn(spamRuntime.output, spamRuntime.channels)
             else
-                ok = module:SendSpamOutput(spamRuntime.output, spamRuntime.channels)
+                ok = sendSpamOutput(spamRuntime.output, spamRuntime.channels)
             end
 
             if ok == false then
@@ -206,7 +257,7 @@ do
                 return
             end
 
-            spamRuntime.countdownRemaining = module:NormalizeSpamDuration(spamRuntime.durationSeconds)
+            spamRuntime.countdownRemaining = normalizeSpamDuration(spamRuntime.durationSeconds)
         end
 
         fireSpamTick()
@@ -231,20 +282,8 @@ do
         addon:warn(L.WarnMLOnlyMode or L.WarnMLNoPermission)
     end
 
-    function module:NormalizeWarningMessage(content)
-        if type(content) ~= "string" then
-            return nil
-        end
-
-        local message = Strings.TrimText(content)
-        if message == "" then
-            return nil
-        end
-        return message
-    end
-
     function module:AnnounceWarningMessage(content)
-        local message = module:NormalizeWarningMessage(content)
+        local message = normalizeWarningMessage(content)
         if not message then
             return false, "empty"
         end
@@ -260,101 +299,6 @@ do
         return true
     end
 
-    function module:NormalizeSpamDuration(durationValue, fallbackValue)
-        local durationSeconds = tonumber(durationValue)
-        if not durationSeconds or durationSeconds <= 0 then
-            durationSeconds = tonumber(fallbackValue)
-        end
-        if not durationSeconds or durationSeconds <= 0 then
-            durationSeconds = DEFAULT_SPAM_DURATION_SECONDS
-        end
-        return math.floor(durationSeconds)
-    end
-
-    function module:BuildSpammerOutput(state, defaultOutput)
-        local baseOutput = defaultOutput or DEFAULT_SPAM_OUTPUT
-        local source = (type(state) == "table") and state or {}
-        local outBuf = { baseOutput }
-
-        local name = source.name or ""
-        if name ~= "" then
-            tinsert(outBuf, " ")
-            tinsert(outBuf, name)
-        end
-
-        local needParts = {}
-        local function addNeed(count, label, class)
-            count = tonumber(count) or 0
-            if count <= 0 then
-                return
-            end
-
-            local text = count .. " " .. label
-            if class and class ~= "" then
-                text = text .. " (" .. class .. ")"
-            end
-            needParts[#needParts + 1] = text
-        end
-
-        addNeed(source.tank, L.StrTank, source.tankClass)
-        addNeed(source.healer, L.StrHealer, source.healerClass)
-        addNeed(source.melee, L.StrMelee, source.meleeClass)
-        addNeed(source.ranged, L.StrRanged, source.rangedClass)
-
-        if #needParts > 0 then
-            tinsert(outBuf, " - ")
-            tinsert(outBuf, L.StrSpammerNeedStr)
-            tinsert(outBuf, " ")
-            tinsert(outBuf, tconcat(needParts, ", "))
-        end
-
-        if source.message and source.message ~= "" then
-            tinsert(outBuf, " - ")
-            tinsert(outBuf, Strings.FindAchievement(source.message))
-        end
-
-        local output = tconcat(outBuf)
-        if output == baseOutput then
-            return output
-        end
-
-        local total = (tonumber(source.tank) or 0) + (tonumber(source.healer) or 0) + (tonumber(source.melee) or 0) + (tonumber(source.ranged) or 0)
-
-        local is25 = (name ~= "" and name:match("%f[%d]25%f[%D]")) ~= nil
-        local maxSize = is25 and 25 or 10
-        return output .. " (" .. (maxSize - total) .. "/" .. maxSize .. ")"
-    end
-
-    function module:SendSpamOutput(output, channels)
-        local text = tostring(output or "")
-        if len(text) > 255 then
-            return false, "too_long"
-        end
-
-        local channelList = cloneChannels(channels)
-        if #channelList <= 0 then
-            local groupType = addon.GetGroupTypeAndCount()
-            if groupType == "raid" then
-                Comms.Chat(text, "RAID", nil, nil, true)
-            elseif groupType == "party" then
-                Comms.Chat(text, "PARTY", nil, nil, true)
-            else
-                module:Print(text)
-            end
-            return true
-        end
-
-        for _, channel in ipairs(channelList) do
-            if type(channel) == "number" then
-                Comms.Chat(text, "CHANNEL", nil, channel, true)
-            else
-                Comms.Chat(text, upper(channel), nil, nil, true)
-            end
-        end
-
-        return true
-    end
-
     function module:GetSpamRuntimeState()
         return getSpamRuntimeSnapshot()
     end
@@ -364,7 +308,7 @@ do
 
         cancelSpamTicker()
 
-        spamRuntime.durationSeconds = module:NormalizeSpamDuration(config.duration, spamRuntime.durationSeconds)
+        spamRuntime.durationSeconds = normalizeSpamDuration(config.duration, spamRuntime.durationSeconds)
         if config.resetRun then
             spamRuntime.runElapsedSeconds = 0
             spamRuntime.messagesSent = 0

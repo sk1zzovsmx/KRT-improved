@@ -67,6 +67,8 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   Own reusable infra only, not parent feature logic.
   `Modules/LootSourcesData.lua` owns static raid item-source data.
   `Modules/LootSources.lua` owns the itemId -> raid source resolver.
+  `Modules/IgnoredMobs.lua` owns raid add/phase-ignore lookup and the canonical generic trash-mob
+  name helpers consumed by Raid state, Logger, and raid validation.
 
 Compatibility aliases (`addon.Master`, `addon.Logger`, `addon.Raid`, ...) are legacy adapters.
 New call sites should use namespaced owners (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).

@@ -216,10 +216,6 @@ function Comms:EnsureVersionPrefix()
     end
 end
 
-function Comms.GetVersionPrefix()
-    return VERSION_PREFIX
-end
-
 function Comms.GetVersionInfo()
     return {
         addonVersion = getAddonMetadata("Version", getUnknownText()),

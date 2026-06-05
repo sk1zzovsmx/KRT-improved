@@ -68,6 +68,17 @@ TOOLS_DIR = REPO_ROOT / "tools"
 ADDON_DIR = REPO_ROOT / "!KRT"
 TOC_PATH = ADDON_DIR / "!KRT.toc"
 ADDON_CHANGELOG_PATH = ADDON_DIR / "CHANGELOG.md"
+RELEASE_ZIP_EXCLUDED_PATHS = {
+    "!KRT/Libs/CallbackHandler-1.0/CallbackHandler-1.0.xml",
+    "!KRT/Libs/LibBossIDs-1.0/LibBossIDs-1.0.toc",
+    "!KRT/Libs/LibCompat-1.0/LibCompat-1.0.toc",
+    "!KRT/Libs/LibCompat-1.0/Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua",
+    "!KRT/Libs/LibCompat-1.0/Libs/LibStub/LibStub.lua",
+    "!KRT/Libs/LibDeformat-3.0/LibDeformat-3.0.toc",
+    "!KRT/Libs/LibLogger-1.0/LibLogger-1.0.toc",
+    "!KRT/Libs/LibStub/LibStub.toc",
+    "!KRT/Libs/libs.json",
+}
 
 SEMVER_RELEASE_RE = re.compile(
     r"^(?P<major>0|[1-9]\d*)\."
@@ -787,6 +798,11 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
+def should_include_release_file(file_path: Path) -> bool:
+    relative_name = file_path.relative_to(REPO_ROOT).as_posix()
+    return relative_name not in RELEASE_ZIP_EXCLUDED_PATHS
+
+
 def build_release_zip(args: argparse.Namespace) -> int:
     if not ADDON_DIR.is_dir():
         raise CliError(f"Addon folder not found: {ADDON_DIR}")
@@ -804,9 +820,13 @@ def build_release_zip(args: argparse.Namespace) -> int:
         zip_path.unlink()
 
     print(f"Building release archive: {zip_path}")
+    excluded_count = 0
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for file_path in sorted(ADDON_DIR.rglob("*")):
             if file_path.is_file():
+                if not should_include_release_file(file_path):
+                    excluded_count += 1
+                    continue
                 archive.write(file_path, file_path.relative_to(REPO_ROOT).as_posix())
 
     with zipfile.ZipFile(zip_path, "r") as archive:
@@ -820,6 +840,8 @@ def build_release_zip(args: argparse.Namespace) -> int:
 
     print(f"Archive ready: {zip_path}")
     print("Contents root: !KRT/")
+    if excluded_count:
+        print(f"Excluded release-only metadata files: {excluded_count}")
 
     if args.write_checksum:
         digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()

@@ -34,7 +34,7 @@ local GetItem
 
 local GetItemIndex = feature.GetItemIndex
 
-local tconcat, twipe = table.concat, table.wipe
+local tconcat = table.concat
 
 local tostring, tonumber = tostring, tonumber
 
@@ -513,12 +513,6 @@ do
         return History.GetRolls(getHistoryContext())
     end
 
-    function module:SetRolled()
-        local itemId = self:GetCurrentRollItemID()
-        local name = Core.GetPlayerName()
-        updateLocalRollState(itemId, name)
-    end
-
     function module:DidRoll(itemId, name)
         return History.DidRoll(getHistoryContext(), itemId, name)
     end
@@ -643,20 +637,8 @@ do
         return true
     end
 
-    function module:ClearManualExclusions()
-        twipe(state.manualExclusions)
-    end
-
     function module:IsManuallyExcluded(name)
         return getManualExclusionEntry(name) ~= nil
-    end
-
-    function module:IsValidRoll(itemId, name)
-        local eligibility = buildCandidateEligibility(name, itemId, nil, getActiveRollType(), {
-            mode = "submission",
-            requireOpenSession = true,
-        })
-        return eligibility.ok == true
     end
 
     -- Checks if a player has reserved the specified item.
@@ -669,20 +651,10 @@ do
         return History.GetUsedReserveCount(getHistoryContext(), itemId, name)
     end
 
-    -- Gets the total number of reserves a player has for an item.
-    function module:GetAllowedReserves(itemId, name)
-        return getReserveCountForItem(itemId, name)
-    end
-
     -- Public display-model contract for controller/UI consumers. The returned
     -- `resolution` table is a stable part of this API, not an internal detail.
     function module:GetDisplayModel()
         return Display.BuildModel(getDisplayContext())
-    end
-
-    -- Legacy alias retained for compatibility while consumers migrate to GetDisplayModel().
-    function module:FetchRolls()
-        return module:GetDisplayModel()
     end
 
     function module:GetRollSession()

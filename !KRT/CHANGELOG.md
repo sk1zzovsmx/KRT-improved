@@ -8,6 +8,10 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **Master Loot distribution session** - Master Loot now maintains a compact
+  loot distribution session and syncs item, roll-start, winner, and done state
+  through addon messages so raiders can consume a read-only corpse/session
+  queue without changing KRT award policy.
 - **SoftRes roll eligibility** - SR rolls now accept only in-raid players
   who reserved the current item, keep out-of-raid reservers visible as
   ineligible context, and expose SR reserve counts through the roll display
@@ -42,9 +46,57 @@ Release-Version: 0.7.1-beta.3
 - **Raid loot-source database** - Added a static item-to-NPC loot source
   resolver for Vanilla, The Burning Crusade, and Wrath raid boss/encounter
   drops so passive Group Loot and Need Before Greed logging can attribute
-  items by item ID before timing-based fallbacks run. Shared or ambiguous
-  item sources stay conservative and fall back to TrashMob instead of
-  guessing a single NPC from recent combat context.
+  items by item ID before timing-based fallbacks run. Shared boss items now
+  use matching recent boss context when available, otherwise they stay visible
+  as `Shared: Boss A / Boss B` instead of falling back to TrashMob.
+- **Group Loot parsing performance** - Passive Group Loot winner messages now
+  reuse the parsed result when materializing logger entries, avoiding repeated
+  winner-pattern parsing during loot-chat bursts. Burst roll metadata now
+  reuses the first captured boss context for nearby `START_LOOT_ROLL` events,
+  stores native roll session metadata by `rollId`, and passive
+  Need/Greed/Disenchant entries skip unnecessary LootCounter count calls.
+  Repeated winner checks for the same loot-chat message now reuse the previous
+  parse result, and append-only loot logging patches the runtime loot index
+  instead of dropping the whole raid runtime cache. `CHAT_MSG_LOOT` now uses a
+  winner-only passive parser path, and Logger loot refreshes are filtered by
+  selected raid and debounced during loot bursts.
+- **Group Loot loot-window fetch** - Passive Group Loot observers now skip the
+  repeated `LOOT_SLOT_CLEARED` loot-window refetch path when they are not the
+  master looter, keeping the chat-driven logging flow intact while cutting the
+  hottest refresh loop that was causing the lag.
+- **Group Loot lightweight logger** - Passive Group Loot and Need Before Greed
+  logger rows now skip corpse/source attribution and keep only the item,
+  winner, roll type, and roll score in the hot chat path to reduce loot-burst
+  lag while leaving non-passive source tracking intact.
+- **Logger tabs** - Reworked Logger history into focused `Loot` and
+  `Attendance` tabs. The Loot tab now shows the raid list with raid loot,
+  while the Attendance tab shows raid attendees and the selected player's boss
+  participation.
+- **Logger list visuals** - Refreshed Logger table rows, headers, selection
+  highlights, and loot column spacing while preserving the current Loot and
+  Attendance tab layout.
+- **Logger Attendance spacing** - Tuned the Attendance tab player and boss
+  columns to reduce name truncation without changing the current tab layout.
+- **Logger dynamic columns** - Logger table columns now derive their widths
+  from the visible list frame so Loot and Attendance panels use available
+  space more evenly and reduce clipped values.
+- **Logger header alignment** - Logger table headers now include the same
+  visual spacing used by row columns so labels align with Loot, Attendance,
+  Boss, and Raid list content.
+- **Logger row striping** - Logger zebra striping now follows the visible row
+  position after sorting instead of moving with the underlying record.
+- **Logger header tabs** - Logger column headers now render as distinct dark
+  Wrath-style tabs with subtle metallic edges for clearer table separation.
+- **Logger header geometry** - Logger header tabs are now positioned from the
+  same row geometry used by visible list content so columns stay aligned.
+- **Logger Attendance columns** - Raid Attendance rows now reserve more space
+  for Join/Leave timestamps to avoid clipping full `HH:MM` values.
+- **Logger row width** - Logger list rows now resync to the current scroll
+  frame width on refresh so row striping spans the full visible table.
+- **API surface cleanup** - Removed unused internal compatibility aliases,
+  obsolete global helper injections, dead Bus/UI/Timer APIs, duplicate
+  LibCompat bootstrap includes, feature override hooks, unused Time helpers,
+  a redundant Bus registration helper, and the callback-statistics debug command.
 
 ## [0.7.1-beta.3] - 2026-05-03
 

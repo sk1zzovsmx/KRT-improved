@@ -24,86 +24,6 @@ local function getAddonDbStore(storeKey)
 end
 
 -- ----- Public methods ----- --
-function DBManager.CreateManager(stores)
-    stores = stores or {}
-
-    local manager = {}
-    local state = {
-        raidStore = stores.raidStore,
-        raidQueries = stores.raidQueries,
-        raidMigrations = stores.raidMigrations,
-        raidValidator = stores.raidValidator,
-        syncer = stores.syncer,
-        charStore = stores.charStore,
-        configStore = stores.configStore,
-    }
-
-    function manager:GetRaidStore()
-        return state.raidStore
-    end
-
-    function manager:GetRaidQueries()
-        return state.raidQueries
-    end
-
-    function manager:GetRaidMigrations()
-        return state.raidMigrations
-    end
-
-    function manager:GetRaidValidator()
-        return state.raidValidator
-    end
-
-    function manager:GetSyncer()
-        return state.syncer
-    end
-
-    function manager:GetCharStore()
-        return state.charStore
-    end
-
-    function manager:GetConfigStore()
-        return state.configStore
-    end
-
-    function manager:SetRaidStore(store)
-        state.raidStore = store
-        return state.raidStore
-    end
-
-    function manager:SetRaidQueries(store)
-        state.raidQueries = store
-        return state.raidQueries
-    end
-
-    function manager:SetRaidMigrations(store)
-        state.raidMigrations = store
-        return state.raidMigrations
-    end
-
-    function manager:SetRaidValidator(store)
-        state.raidValidator = store
-        return state.raidValidator
-    end
-
-    function manager:SetSyncer(store)
-        state.syncer = store
-        return state.syncer
-    end
-
-    function manager:SetCharStore(store)
-        state.charStore = store
-        return state.charStore
-    end
-
-    function manager:SetConfigStore(store)
-        state.configStore = store
-        return state.configStore
-    end
-
-    return manager
-end
-
 function SavedVariablesManager:GetRaidStore()
     return getAddonDbStore("RaidStore")
 end
@@ -122,14 +42,6 @@ end
 
 function SavedVariablesManager:GetSyncer()
     return getAddonDbStore("Syncer")
-end
-
-function SavedVariablesManager:GetCharStore()
-    return nil
-end
-
-function SavedVariablesManager:GetConfigStore()
-    return nil
 end
 
 function DBManager.GetDefaultManager()

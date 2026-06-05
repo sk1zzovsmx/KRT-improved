@@ -23,6 +23,7 @@ local Strings = feature.Strings
 local Colors = feature.Colors
 local Base64 = feature.Base64
 local Sort = feature.Sort
+local IgnoredMobs = feature.IgnoredMobs
 local Services = feature.Services
 
 local NormalizeName = Strings.NormalizeName
@@ -49,21 +50,10 @@ local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
+local max, floor = math.max, math.floor
 local strlower = string.lower
-
-local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
-local function resolveTrashMobName()
-    local localizedName = L and L.StrTrashMobName
-    if type(localizedName) ~= "string" or localizedName == "" then
-        return LEGACY_TRASH_MOB_NAME
-    end
-    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
-        return LEGACY_TRASH_MOB_NAME
-    end
-    return localizedName
-end
-
-local TRASH_MOB_NAME = resolveTrashMobName()
+local IsTrashMobName = IgnoredMobs.IsTrashMobName
+local GetTrashMobName = IgnoredMobs.GetTrashMobName
 
 local loggerPanelNames = {
     "KRTLoggerRaids",
@@ -90,15 +80,132 @@ local loggerHeaderSuffixes = {
     "HeaderRoll",
 }
 
+local LOGGER_COMPACT_ROW_HEIGHT = 22
+local LOGGER_LOOT_ROW_HEIGHT = 32
+
+local LOGGER_LIST_WIDTH_FALLBACK = 240
+local LOGGER_SCROLLBAR_GUTTER_WIDTH = 24
+local LOGGER_ROW_LEFT_INSET = 3
+local LOGGER_ROW_COLUMN_GAP = 6
+local LOGGER_HEADER_COLUMN_GAP = LOGGER_ROW_COLUMN_GAP
+local LOGGER_LOOT_NAME_LEFT_OFFSET = 34
+local LOGGER_HEADER_TAB_INSET = 1
+local LOGGER_PANEL_SCROLL_LEFT_OFFSET = 3
+local LOGGER_HEADER_TOP_OFFSET = -25
+local LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH = 56
+
+local LOGGER_LOOT_COLUMN_MIN_WIDTHS = {
+    icon = 30,
+    item = 165,
+    source = 105,
+    winner = 86,
+    type = 45,
+    roll = 38,
+    time = 48,
+}
+
+local LOGGER_LOOT_COLUMN_RATIOS = {
+    item = 0.34,
+    source = 0.22,
+    winner = 0.18,
+    type = 0.08,
+    roll = 0.07,
+    time = 0.11,
+}
+
+local LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS = {
+    name = 106,
+    join = LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH,
+    leave = LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH,
+}
+
+local LOGGER_ATTENDANCE_COLUMN_RATIOS = {
+    name = 0.56,
+    join = 0.22,
+    leave = 0.22,
+}
+
+local LOGGER_BOSS_COLUMN_MIN_WIDTHS = {
+    id = 28,
+    name = 150,
+    time = 44,
+    mode = 48,
+}
+
+local LOGGER_BOSS_COLUMN_RATIOS = {
+    name = 0.72,
+    time = 0.13,
+    mode = 0.15,
+}
+
+local function setTextureColor(texture, r, g, b, a)
+    if texture and texture.SetTexture then
+        texture:SetTexture(r, g, b, a)
+    end
+end
+
+local function ensureLoggerHeaderTab(header)
+    if not header or header._krtHeaderTab then
+        return
+    end
+
+    local fill = header:CreateTexture(nil, "BACKGROUND")
+    fill:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+    fill:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderFill = fill
+
+    local top = header:CreateTexture(nil, "BORDER")
+    top:SetHeight(1)
+    top:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+    top:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+    header._krtHeaderTop = top
+
+    local bottom = header:CreateTexture(nil, "BORDER")
+    bottom:SetHeight(1)
+    bottom:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+    bottom:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderBottom = bottom
+
+    local left = header:CreateTexture(nil, "BORDER")
+    left:SetWidth(1)
+    left:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+    left:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderLeft = left
+
+    local right = header:CreateTexture(nil, "BORDER")
+    right:SetWidth(1)
+    right:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+    right:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderRight = right
+
+    header._krtHeaderTab = true
+end
+
 local function styleLoggerHeader(header)
     if not header then
         return
     end
 
+    ensureLoggerHeaderTab(header)
+
     local text = header.GetFontString and header:GetFontString() or nil
     if text and text.SetTextColor then
-        text:SetTextColor(0.95, 0.95, 0.95)
+        text:SetTextColor(1.00, 0.86, 0.20)
     end
+    if text and text.SetJustifyH then
+        text:SetJustifyH("LEFT")
+    end
+
+    local bg = header.GetName and _G[header:GetName() .. "Bg"] or nil
+    if bg and bg.SetTexture then
+        bg:SetTexture(0.02, 0.02, 0.02, 0.00)
+    end
+
+    setTextureColor(header._krtHeaderFill, 0.015, 0.014, 0.012, 0.88)
+    setTextureColor(header._krtHeaderTop, 0.72, 0.62, 0.38, 0.92)
+    setTextureColor(header._krtHeaderBottom, 0.25, 0.22, 0.16, 0.95)
+    setTextureColor(header._krtHeaderLeft, 0.38, 0.34, 0.24, 0.72)
+    setTextureColor(header._krtHeaderRight, 0.38, 0.34, 0.24, 0.72)
 end
 
 local function styleLoggerPanel(frameName)
@@ -108,10 +215,10 @@ local function styleLoggerPanel(frameName)
     end
 
     if frame.SetBackdropColor then
-        frame:SetBackdropColor(0.01, 0.01, 0.01, 0.82)
+        frame:SetBackdropColor(0.01, 0.01, 0.01, 0.88)
     end
     if frame.SetBackdropBorderColor then
-        frame:SetBackdropBorderColor(0.48, 0.48, 0.48, 0.92)
+        frame:SetBackdropBorderColor(0.56, 0.52, 0.45, 0.95)
     end
 
     local title = _G[frameName .. "Title"]
@@ -140,15 +247,33 @@ local function styleLoggerRow(row)
     if not row._krtLoggerBg then
         local bg = row:CreateTexture(nil, "BACKGROUND")
         bg:SetAllPoints(row)
-        bg:SetTexture(0.01, 0.01, 0.01, 0.58)
         row._krtLoggerBg = bg
 
         local line = row:CreateTexture(nil, "BORDER")
         line:SetHeight(1)
         line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
         line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
-        line:SetTexture(0.35, 0.35, 0.35, 0.30)
         row._krtLoggerLine = line
+    end
+
+    if row._krtLoggerLine then
+        row._krtLoggerLine:SetTexture(0.32, 0.30, 0.25, 0.42)
+    end
+end
+
+local function setLoggerRowIndex(row, index)
+    if not row then
+        return
+    end
+
+    styleLoggerRow(row)
+    local isAlt = index and index % 2 == 0
+    if row._krtLoggerBg then
+        if isAlt then
+            row._krtLoggerBg:SetTexture(0.07, 0.07, 0.07, 0.74)
+        else
+            row._krtLoggerBg:SetTexture(0.025, 0.025, 0.025, 0.76)
+        end
     end
 end
 
@@ -171,10 +296,6 @@ local selectItem
 local onLootRowEnter
 local onLootRowLeave
 local fillBossBox
-local function isTrashMobName(name)
-    return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
-end
-
 local selectionEvents = {
     selectedRaid = InternalEvents.LoggerSelectRaid,
     selectedBoss = InternalEvents.LoggerSelectBoss,
@@ -197,6 +318,249 @@ local RAID_SORT_HEADERS = {
     { suffix = "HeaderZone", key = "zone" },
     { suffix = "HeaderSize", key = "size" },
 }
+
+local LOGGER_RAID_COLUMN_MIN_WIDTHS = {
+    id = 24,
+    date = 88,
+    zone = 128,
+    size = 36,
+}
+
+local LOGGER_RAID_COLUMN_RATIOS = {
+    date = 0.20,
+    zone = 0.66,
+    size = 0.14,
+}
+
+local function setWidgetWidth(widget, width)
+    if widget and widget.SetWidth then
+        widget:SetWidth(width)
+    end
+end
+
+local function setHeaderWidth(widget, width, includeTrailingGap)
+    local gap = includeTrailingGap and LOGGER_HEADER_COLUMN_GAP or 0
+    setWidgetWidth(widget, (tonumber(width) or 0) + gap)
+end
+
+local function positionLoggerHeader(header, frameName, offsetX, width, includeTrailingGap)
+    local frame = frameName and _G[frameName] or nil
+    if not (header and frame) then
+        return
+    end
+
+    header:ClearAllPoints()
+    header:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, LOGGER_HEADER_TOP_OFFSET)
+    setHeaderWidth(header, width, includeTrailingGap)
+end
+
+local function positionLoggerHeaderColumns(frameName, columns, startOffset)
+    local offset = tonumber(startOffset) or LOGGER_PANEL_SCROLL_LEFT_OFFSET
+    for i = 1, #columns do
+        local column = columns[i]
+        positionLoggerHeader(column.header, frameName, offset, column.width, column.trailingGap)
+        offset = offset + (tonumber(column.width) or 0)
+        if column.trailingGap then
+            offset = offset + LOGGER_HEADER_COLUMN_GAP
+        end
+    end
+end
+
+local function getLoggerListContentWidth(frameName)
+    if not frameName then
+        return LOGGER_LIST_WIDTH_FALLBACK
+    end
+
+    local scroll = _G[frameName .. "ScrollFrame"]
+    local width = scroll and scroll.GetWidth and scroll:GetWidth() or nil
+    if type(width) ~= "number" or width <= 0 then
+        local frame = _G[frameName]
+        width = frame and frame.GetWidth and frame:GetWidth() or nil
+        if type(width) == "number" and width > LOGGER_SCROLLBAR_GUTTER_WIDTH then
+            width = width - LOGGER_SCROLLBAR_GUTTER_WIDTH
+        end
+    end
+
+    width = tonumber(width) or LOGGER_LIST_WIDTH_FALLBACK
+    return max(LOGGER_LIST_WIDTH_FALLBACK, floor(width))
+end
+
+local function getLoggerListColumnBudget(frameName, leadOffset, gapCount, returnedWidthOffset)
+    local width = getLoggerListContentWidth(frameName)
+    local budget = width - (tonumber(leadOffset) or 0) - ((tonumber(gapCount) or 0) * LOGGER_ROW_COLUMN_GAP)
+    budget = budget + (tonumber(returnedWidthOffset) or 0)
+    return max(LOGGER_LIST_WIDTH_FALLBACK, floor(budget))
+end
+
+local function calculateLoggerColumnWidths(totalWidth, minWidths, ratios, fixedKeys)
+    local widths = {}
+    local variableKeys = {}
+    local fixed = {}
+    local usedWidth = 0
+    local ratioTotal = 0
+
+    if fixedKeys then
+        for i = 1, #fixedKeys do
+            fixed[fixedKeys[i]] = true
+        end
+    end
+
+    for key, minWidth in pairs(minWidths) do
+        local width = tonumber(minWidth) or 0
+        widths[key] = width
+        usedWidth = usedWidth + width
+        if not fixed[key] then
+            variableKeys[#variableKeys + 1] = key
+            ratioTotal = ratioTotal + (tonumber(ratios[key]) or 0)
+        end
+    end
+
+    local extraWidth = floor((tonumber(totalWidth) or 0) - usedWidth)
+    if extraWidth <= 0 or ratioTotal <= 0 then
+        return widths
+    end
+
+    local allocated = 0
+    for i = 1, #variableKeys do
+        local key = variableKeys[i]
+        local ratio = (tonumber(ratios[key]) or 0) / ratioTotal
+        local addition = floor(extraWidth * ratio)
+        widths[key] = widths[key] + addition
+        allocated = allocated + addition
+    end
+
+    local remainder = extraWidth - allocated
+    if remainder > 0 then
+        for i = 1, #variableKeys do
+            local key = variableKeys[i]
+            widths[key] = widths[key] + 1
+            remainder = remainder - 1
+            if remainder <= 0 then
+                break
+            end
+        end
+    end
+
+    return widths
+end
+
+local function getRaidColumnWidths(frameName)
+    local budget = getLoggerListColumnBudget(frameName, LOGGER_ROW_LEFT_INSET, 3)
+    return calculateLoggerColumnWidths(budget, LOGGER_RAID_COLUMN_MIN_WIDTHS, LOGGER_RAID_COLUMN_RATIOS, { "id" })
+end
+
+local function getLootColumnWidths(frameName)
+    local budget = getLoggerListColumnBudget(frameName, LOGGER_LOOT_NAME_LEFT_OFFSET, 5, LOGGER_LOOT_COLUMN_MIN_WIDTHS.icon)
+    return calculateLoggerColumnWidths(budget, LOGGER_LOOT_COLUMN_MIN_WIDTHS, LOGGER_LOOT_COLUMN_RATIOS, { "icon" })
+end
+
+local function getAttendanceColumnWidths(frameName)
+    local budget = getLoggerListColumnBudget(frameName, LOGGER_ROW_LEFT_INSET, 2)
+    return calculateLoggerColumnWidths(budget, LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS, LOGGER_ATTENDANCE_COLUMN_RATIOS)
+end
+
+local function getBossColumnWidths(frameName)
+    local budget = getLoggerListColumnBudget(frameName, LOGGER_ROW_LEFT_INSET, 3)
+    return calculateLoggerColumnWidths(budget, LOGGER_BOSS_COLUMN_MIN_WIDTHS, LOGGER_BOSS_COLUMN_RATIOS, { "id" })
+end
+
+local function applyRaidListColumnWidths(frameName)
+    if not frameName then
+        return
+    end
+    local widths = getRaidColumnWidths(frameName)
+    positionLoggerHeaderColumns(frameName, {
+        { header = _G[frameName .. "HeaderNum"], width = widths.id, trailingGap = true },
+        { header = _G[frameName .. "HeaderDate"], width = widths.date, trailingGap = true },
+        { header = _G[frameName .. "HeaderZone"], width = widths.zone, trailingGap = true },
+        { header = _G[frameName .. "HeaderSize"], width = widths.size, trailingGap = false },
+    }, LOGGER_PANEL_SCROLL_LEFT_OFFSET + LOGGER_ROW_LEFT_INSET)
+end
+
+local function applyRaidRowColumnWidths(ui, frameName)
+    if not ui then
+        return
+    end
+    local widths = getRaidColumnWidths(frameName)
+    setWidgetWidth(ui.ID, widths.id)
+    setWidgetWidth(ui.Date, widths.date)
+    setWidgetWidth(ui.Zone, widths.zone)
+    setWidgetWidth(ui.Size, widths.size)
+end
+
+local function applyLootListColumnWidths(frameName)
+    if not frameName then
+        return
+    end
+    local widths = getLootColumnWidths(frameName)
+    positionLoggerHeaderColumns(frameName, {
+        { header = _G[frameName .. "HeaderItem"], width = widths.icon + widths.item, trailingGap = true },
+        { header = _G[frameName .. "HeaderSource"], width = widths.source, trailingGap = true },
+        { header = _G[frameName .. "HeaderWinner"], width = widths.winner, trailingGap = true },
+        { header = _G[frameName .. "HeaderType"], width = widths.type, trailingGap = true },
+        { header = _G[frameName .. "HeaderRoll"], width = widths.roll, trailingGap = true },
+        { header = _G[frameName .. "HeaderTime"], width = widths.time, trailingGap = false },
+    }, LOGGER_PANEL_SCROLL_LEFT_OFFSET)
+end
+
+local function applyLootRowColumnWidths(ui, frameName)
+    if not ui then
+        return
+    end
+    local widths = getLootColumnWidths(frameName)
+    setWidgetWidth(ui.Name, widths.item)
+    setWidgetWidth(ui.Source, widths.source)
+    setWidgetWidth(ui.Winner, widths.winner)
+    setWidgetWidth(ui.Type, widths.type)
+    setWidgetWidth(ui.Roll, widths.roll)
+    setWidgetWidth(ui.Time, widths.time)
+end
+
+local function applyAttendanceListColumnWidths(frameName)
+    if not frameName then
+        return
+    end
+    local widths = getAttendanceColumnWidths(frameName)
+    positionLoggerHeaderColumns(frameName, {
+        { header = _G[frameName .. "HeaderName"], width = widths.name, trailingGap = true },
+        { header = _G[frameName .. "HeaderJoin"], width = widths.join, trailingGap = true },
+        { header = _G[frameName .. "HeaderLeave"], width = widths.leave, trailingGap = false },
+    }, LOGGER_PANEL_SCROLL_LEFT_OFFSET + LOGGER_ROW_LEFT_INSET)
+end
+
+local function applyAttendanceRowColumnWidths(ui, frameName)
+    if not ui then
+        return
+    end
+    local widths = getAttendanceColumnWidths(frameName)
+    setWidgetWidth(ui.Name, widths.name)
+    setWidgetWidth(ui.Join, widths.join)
+    setWidgetWidth(ui.Leave, widths.leave)
+end
+
+local function applyBossListColumnWidths(frameName)
+    if not frameName then
+        return
+    end
+    local widths = getBossColumnWidths(frameName)
+    positionLoggerHeaderColumns(frameName, {
+        { header = _G[frameName .. "HeaderNum"], width = widths.id, trailingGap = true },
+        { header = _G[frameName .. "HeaderName"], width = widths.name, trailingGap = true },
+        { header = _G[frameName .. "HeaderTime"], width = widths.time, trailingGap = true },
+        { header = _G[frameName .. "HeaderMode"], width = widths.mode, trailingGap = false },
+    }, LOGGER_PANEL_SCROLL_LEFT_OFFSET + LOGGER_ROW_LEFT_INSET)
+end
+
+local function applyBossRowColumnWidths(ui, frameName)
+    if not ui then
+        return
+    end
+    local widths = getBossColumnWidths(frameName)
+    setWidgetWidth(ui.ID, widths.id)
+    setWidgetWidth(ui.Name, widths.name)
+    setWidgetWidth(ui.Time, widths.time)
+    setWidgetWidth(ui.Mode, widths.mode)
+end
 
 local function bindRaidSortHeaders(frameName, listRef)
     local frame = frameName and _G[frameName] or nil
@@ -233,7 +597,7 @@ local function buildRaidListRow(raid, seq, queries)
     local mode = row.difficulty and ((row.difficulty == 3 or row.difficulty == 4) and "H" or "N") or "?"
     row.sizeLabel = tostring(row.size or "") .. mode
     row.date = (summary and summary.startTime) or raid.startTime
-    row.dateFmt = date("%d/%m/%Y %H:%M", row.date)
+    row.dateFmt = date("%d/%m/%y %H:%M", row.date)
     return row
 end
 
@@ -284,6 +648,7 @@ do
     function UI.AcquireRefs(frame)
         return {
             historyTabBtn = Frames.Ref(frame, "Tab1"),
+            attendanceTabBtn = Frames.Ref(frame, "Tab2"),
             history = Frames.Ref(frame, "History"),
             raids = Frames.Ref(frame, "KRTLoggerRaids"),
             bosses = Frames.Ref(frame, "KRTLoggerBosses"),
@@ -408,6 +773,7 @@ do
     module.selectedPlayer = nil
     module.selectedBossPlayer = nil
     module.selectedItem = nil
+    module.activeTab = module.activeTab or "loot"
     SetSelectedRaid = function(raidId)
         if raidId == nil then
             module.selectedRaid = nil
@@ -461,6 +827,87 @@ do
         clearSelection(module, "selectedItem", MS_CTX_LOOT)
     end
 
+    local function setPanelVisible(frame, visible)
+        if not frame then
+            return
+        end
+        UIPrimitives.ShowHide(frame, visible)
+    end
+
+    local function placePanel(frame, point, relativeTo, relativePoint, x, y, width, height)
+        if not frame then
+            return
+        end
+        if frame.ClearAllPoints then
+            frame:ClearAllPoints()
+        end
+        if frame.SetPoint then
+            frame:SetPoint(point, relativeTo, relativePoint, x, y)
+        end
+        if frame.SetSize then
+            frame:SetSize(width, height)
+        elseif frame.SetWidth and frame.SetHeight then
+            frame:SetWidth(width)
+            frame:SetHeight(height)
+        end
+    end
+
+    local function refreshLoggerTabLayout()
+        local refs = module.refs or {}
+        local activeTab = module.activeTab or "loot"
+        local isLootTab = activeTab == "loot"
+        local isAttendanceTab = activeTab == "attendance"
+        local history = refs.history
+
+        setPanelVisible(refs.raids, true)
+        setPanelVisible(refs.loot, isLootTab)
+        setPanelVisible(refs.raidAttendees, isAttendanceTab)
+        setPanelVisible(refs.bosses, isAttendanceTab)
+        setPanelVisible(refs.bossAttendees, false)
+
+        if isLootTab then
+            placePanel(refs.raids, "TOPLEFT", history, "TOPLEFT", 0, 0, 335, 430)
+            placePanel(refs.loot, "TOPLEFT", refs.raids, "TOPRIGHT", 7, 0, 600, 430)
+        else
+            placePanel(refs.raids, "TOPLEFT", history, "TOPLEFT", 0, 0, 335, 430)
+            placePanel(refs.raidAttendees, "TOPLEFT", refs.raids, "TOPRIGHT", 7, 0, 265, 430)
+            placePanel(refs.bosses, "TOPLEFT", refs.raidAttendees, "TOPRIGHT", 7, 0, 335, 430)
+        end
+        applyRaidListColumnWidths("KRTLoggerRaids")
+        applyLootListColumnWidths("KRTLoggerLoot")
+        applyAttendanceListColumnWidths("KRTLoggerRaidAttendees")
+        applyBossListColumnWidths("KRTLoggerBosses")
+
+        if refs.historyTabBtn and refs.historyTabBtn.SetText then
+            refs.historyTabBtn:SetText(L.StrLootTab)
+        end
+        if refs.attendanceTabBtn and refs.attendanceTabBtn.SetText then
+            refs.attendanceTabBtn:SetText(L.StrAttendanceTab)
+        end
+        if PanelTemplates_SetTab then
+            PanelTemplates_SetTab(getFrame(), isLootTab and 1 or 2)
+        end
+    end
+
+    local function setActiveLoggerTab(tabName)
+        module.activeTab = tabName == "attendance" and "attendance" or "loot"
+        if module.activeTab == "loot" then
+            clearSelection(module, "selectedBoss", MS_CTX_BOSS)
+            clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
+            clearSelection(module, "selectedPlayer", MS_CTX_RAIDATT)
+        else
+            clearSelection(module, "selectedBoss", MS_CTX_BOSS)
+            clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
+            clearSelection(module, "selectedItem", MS_CTX_LOOT)
+        end
+        refreshLoggerTabLayout()
+        triggerSelectionEvent(module, "selectedBoss")
+        triggerSelectionEvent(module, "selectedBossPlayer")
+        triggerSelectionEvent(module, "selectedPlayer")
+        triggerSelectionEvent(module, "selectedItem")
+        triggerSelectionEvent(module, "selectedRaid", "ui")
+    end
+
     deleteSelectedAttendees = function(ctx, deleteFn, onRemoved)
         runWithSelectedRaid(function(_, rID)
             local ids = MultiSelect.MultiSelectGetSelected(ctx)
@@ -492,7 +939,7 @@ do
     end
 
     local function refreshRosterBoundLists()
-        local listModules = { module.RaidAttendees, module.BossAttendees, module.Loot }
+        local listModules = { module.RaidAttendees, module.BossAttendees, module.Boss, module.Loot }
         for i = 1, #listModules do
             local ctrl = listModules[i] and listModules[i]._ctrl
             if ctrl and ctrl.Dirty then
@@ -773,6 +1220,7 @@ do
                     SetSelectedRaid(Core.GetCurrentRaid())
                 end
                 clearSelections()
+                refreshLoggerTabLayout()
                 triggerSelectionEvent(module, "selectedRaid", "ui")
             end,
             hookOnHide = function()
@@ -792,16 +1240,22 @@ do
             if refs.historyTabBtn.SetID then
                 refs.historyTabBtn:SetID(1)
             end
-            refs.historyTabBtn:SetText(L.StrHistoryTab)
-            if refs.historyTabBtn.LockHighlight then
-                refs.historyTabBtn:LockHighlight()
+            refs.historyTabBtn:SetText(L.StrLootTab)
+            Frames.SafeSetScript(refs.historyTabBtn, "OnClick", function()
+                setActiveLoggerTab("loot")
+            end)
+        end
+        if refs.attendanceTabBtn then
+            if refs.attendanceTabBtn.SetID then
+                refs.attendanceTabBtn:SetID(2)
             end
+            refs.attendanceTabBtn:SetText(L.StrAttendanceTab)
+            Frames.SafeSetScript(refs.attendanceTabBtn, "OnClick", function()
+                setActiveLoggerTab("attendance")
+            end)
         end
         if PanelTemplates_SetNumTabs then
-            PanelTemplates_SetNumTabs(frame, 1)
-        end
-        if PanelTemplates_SetTab and refs.historyTabBtn then
-            PanelTemplates_SetTab(frame, 1)
+            PanelTemplates_SetNumTabs(frame, 2)
         end
 
         local onLoadPairs = {
@@ -818,6 +1272,7 @@ do
             ensureSubmoduleOnLoad(pair.moduleRef, pair.frameRef)
         end
         applyLoggerSkin()
+        refreshLoggerTabLayout()
     end
 
     local function OnLoadFrame(frame)
@@ -842,6 +1297,7 @@ do
             SetSelectedRaid(Core.GetCurrentRaid())
         end
         clearSelections()
+        refreshLoggerTabLayout()
         triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
@@ -1366,28 +1822,9 @@ do
         end
 
         Frames.MakeEditBoxPopup("KRTLOGGER_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp, function(self, text)
-            local rawText = TrimText(text)
-            local name = NormalizeLower(rawText)
-            if not name or name == "" then
-                addon:error(L.ErrLoggerWinnerEmpty)
-                return
-            end
-            local raid = Store:GetRaid(self.raidId)
-            if not raid then
-                addon:error(L.ErrLoggerInvalidRaid)
-                return
-            end
-
-            local loot = Store:GetLoot(raid, self.lootNid)
-            if not loot then
-                addon:error(L.ErrLoggerInvalidItem)
-                return
-            end
-
-            local bossKill = (loot.bossNid and raid) and Store:GetBoss(raid, loot.bossNid) or nil
-            local winner = Helpers.FindLoggerPlayer(name, raid, bossKill)
+            local winner, err = Actions:ResolveLootEditWinner(self.raidId, self.lootNid, text)
             if not winner then
-                addon:error(L.ErrLoggerWinnerNotFound:format(rawText))
+                addon:error(err or L.ErrLoggerWinnerEmpty)
                 return
             end
 
@@ -1418,9 +1855,14 @@ local function makeLoggerList(cfg, selField, msCtxField, hlOpts)
     end
     if cfg.drawRow then
         local drawRow = cfg.drawRow
-        cfg.drawRow = function(row, it)
-            styleLoggerRow(row)
-            return drawRow(row, it)
+        local rowHeight = cfg.rowHeight or (cfg.poolTag == "logger-loot" and LOGGER_LOOT_ROW_HEIGHT or LOGGER_COMPACT_ROW_HEIGHT)
+        cfg.drawRow = function(row, it, visibleIndex)
+            setLoggerRowIndex(row, visibleIndex)
+            if row.SetHeight then
+                row:SetHeight(rowHeight)
+            end
+            drawRow(row, it, visibleIndex)
+            return rowHeight
         end
     end
 
@@ -1479,6 +1921,7 @@ do
                 _G[n .. "HeaderDate"]:SetText(L.StrDate)
                 _G[n .. "HeaderZone"]:SetText(L.StrZone)
                 _G[n .. "HeaderSize"]:SetText(L.StrSize)
+                applyRaidListColumnWidths(n)
                 _G[n .. "CurrentBtn"]:SetText(L.StrSetCurrent)
                 local del = _G[n .. "DeleteBtn"]
                 if del then
@@ -1515,6 +1958,7 @@ do
                     row._krtBound = true
                 end
                 local ui = row._p
+                applyRaidRowColumnWidths(ui, "KRTLoggerRaids")
                 ui.ID:SetText(it.seq or it.id)
                 ui.Date:SetText(it.dateFmt)
                 ui.Zone:SetText(it.zone)
@@ -1522,6 +1966,8 @@ do
             end),
 
             postUpdate = function(n)
+                applyRaidListColumnWidths(n)
+
                 local sel = module.selectedRaid
                 local raid = sel and Core.EnsureRaidById(sel) or nil
                 local count = controller and controller.data and #controller.data or 0
@@ -1776,6 +2222,7 @@ do
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
             _G[n .. "HeaderMode"]:SetText(L.StrMode)
+            applyBossListColumnWidths(n)
             _G[n .. "AddBtn"]:SetText(L.BtnAdd)
             _G[n .. "EditBtn"]:SetText(L.BtnEdit)
             local del = _G[n .. "DeleteBtn"]
@@ -1816,6 +2263,10 @@ do
             if not raid then
                 return
             end
+            if module.activeTab == "attendance" then
+                View:GetPlayerBossParticipationList(out, raid, module.selectedPlayer)
+                return
+            end
             View:FillBossList(out, raid)
         end,
 
@@ -1827,11 +2278,14 @@ do
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    selectBoss(self, button)
+                    if module.activeTab ~= "attendance" then
+                        selectBoss(self, button)
+                    end
                 end)
                 row._krtBound = true
             end
             local ui = row._p
+            applyBossRowColumnWidths(ui, "KRTLoggerBosses")
             -- Display a sequential number that rescales after deletions.
             -- Keep it.id as the stable bossNid for selection/highlight.
             ui.ID:SetText(it.seq)
@@ -1841,17 +2295,35 @@ do
         end),
 
         postUpdate = function(n)
+            applyBossListColumnWidths(n)
+
             local hasRaid = module.selectedRaid
             local hasBoss = module.selectedBoss
             local count = controller and controller.data and #controller.data or 0
+            local isAttendanceTab = module.activeTab == "attendance"
+            UIPrimitives.ShowHide(_G[n .. "AddBtn"], not isAttendanceTab)
+            UIPrimitives.ShowHide(_G[n .. "EditBtn"], not isAttendanceTab)
+            UIPrimitives.ShowHide(_G[n .. "DeleteBtn"], not isAttendanceTab)
             UIPrimitives.EnableDisable(_G[n .. "AddBtn"], hasRaid ~= nil)
             UIPrimitives.EnableDisable(_G[n .. "EditBtn"], hasBoss ~= nil)
             local bossSelCount = MultiSelect.MultiSelectCount(module._msBossCtx)
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, bossSelCount)
             UIPrimitives.EnableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
-            setPanelTitle(n, Helpers.GetCountContextTitle(L.StrBosses, count, Helpers.GetRaidContextLabel(module.selectedRaid), nil))
-            setFrameHint(n, "EmptyState", Helpers.GetBossEmptyStateText(count, module.selectedRaid))
+            if isAttendanceTab then
+                local playerLabel = Helpers.GetPlayerContextLabel(module.selectedRaid, module.selectedPlayer)
+                setPanelTitle(n, Helpers.GetCountContextTitle(L.StrBossParticipation, count, playerLabel, nil))
+                if not module.selectedRaid then
+                    setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectRaid)
+                elseif not module.selectedPlayer then
+                    setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectPlayer)
+                else
+                    setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyBossParticipation or "")
+                end
+            else
+                setPanelTitle(n, Helpers.GetCountContextTitle(L.StrBosses, count, Helpers.GetRaidContextLabel(module.selectedRaid), nil))
+                setFrameHint(n, "EmptyState", Helpers.GetBossEmptyStateText(count, module.selectedRaid))
+            end
         end,
 
         sorters = {
@@ -1946,6 +2418,11 @@ do
     end)
     Bus.RegisterCallback(InternalEvents.LoggerSelectBoss, function()
         controller:Touch()
+    end)
+    Bus.RegisterCallback(InternalEvents.LoggerSelectPlayer, function()
+        if module.activeTab == "attendance" then
+            controller:Dirty()
+        end
     end)
 end
 
@@ -2080,12 +2557,15 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, deleteAttendees)
     end
 
-    Bus.RegisterCallbacks({
+    local refreshEvents = {
         InternalEvents.LoggerSelectRaid,
         InternalEvents.LoggerSelectBoss,
-    }, function()
-        controller:Dirty()
-    end)
+    }
+    for i = 1, #refreshEvents do
+        Bus.RegisterCallback(refreshEvents[i], function()
+            controller:Dirty()
+        end)
+    end
     Bus.RegisterCallback(InternalEvents.LoggerSelectBossPlayer, function()
         controller:Touch()
     end)
@@ -2113,6 +2593,7 @@ do
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
+            applyAttendanceListColumnWidths(n)
             local addBtn = _G[n .. "AddBtn"]
             if addBtn then
                 addBtn:SetText(L.BtnUpdate)
@@ -2165,6 +2646,7 @@ do
                 row._krtBound = true
             end
             local ui = row._p
+            applyAttendanceRowColumnWidths(ui, "KRTLoggerRaidAttendees")
             ui.Name:SetText(it.name)
             local r, g, b = Colors.GetClassColor(it.class)
             ui.Name:SetVertexColor(r, g, b)
@@ -2173,6 +2655,8 @@ do
         end),
 
         postUpdate = function(n)
+            applyAttendanceListColumnWidths(n)
+
             local deleteBtn = _G[n .. "DeleteBtn"]
             local count = controller and controller.data and #controller.data or 0
             setPanelTitle(n, Helpers.GetCountContextTitle(L.StrRaidAttendees, count, Helpers.GetRaidContextLabel(module.selectedRaid), nil))
@@ -2278,11 +2762,10 @@ do
     end)
 end
 
--- Loot list (filters by selected boss and player).
+-- Loot list.
 do
     module.Loot = module.Loot or {}
     local Loot = module.Loot
-    local Store = module.Store
     local View = module.View
     local Actions = module.Actions
     local Helpers = module.Helpers
@@ -2325,6 +2808,7 @@ do
             _G[n .. "HeaderType"]:SetText(L.StrType)
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
+            applyLootListColumnWidths(n)
 
             _G[n .. "ClearBtn"]:Disable()
             _G[n .. "AddBtn"]:Disable()
@@ -2372,12 +2856,7 @@ do
                 return
             end
 
-            local bID = module.selectedBoss
-            local pID = module.selectedBossPlayer or module.selectedPlayer
-            local p = pID and Store:GetPlayer(raid, pID) or nil
-            local pName = p and p.name or nil
-
-            View:FillLootList(out, raid, bID, pName)
+            View:FillLootList(out, raid, nil, nil)
         end,
 
         rowName = function(n, _, i)
@@ -2387,6 +2866,7 @@ do
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
             local ui = row._p
+            applyLootRowColumnWidths(ui, "KRTLoggerLoot")
             if not row._krtBound then
                 if row.RegisterForClicks then
                     row:RegisterForClicks("AnyUp")
@@ -2420,17 +2900,6 @@ do
                     end)
                 end
 
-                -- Compatibility cleanup: disable legacy shared hover hitbox if present.
-                local itemHover = row._itemHover
-                if itemHover then
-                    if itemHover.Hide then
-                        itemHover:Hide()
-                    end
-                    if itemHover.EnableMouse then
-                        itemHover:EnableMouse(false)
-                    end
-                end
-
                 -- Size the slot background to the button and the icon inset to reveal it.
                 if ui.ItemNormalTexture and ui.ItemNormalTexture.SetSize then
                     ui.ItemNormalTexture:SetSize(26, 26)
@@ -2446,16 +2915,6 @@ do
                 itemButton._krtRow = row
                 if itemButton.EnableMouse then
                     itemButton:EnableMouse(true)
-                end
-            end
-
-            local itemHover = row._itemHover
-            if itemHover then
-                if itemHover.Hide then
-                    itemHover:Hide()
-                end
-                if itemHover.EnableMouse then
-                    itemHover:EnableMouse(false)
                 end
             end
 
@@ -2503,6 +2962,7 @@ do
         end),
 
         postUpdate = function(n)
+            applyLootListColumnWidths(n)
             updateSourceHeaderState(n)
 
             local lootSelCount = MultiSelect.MultiSelectCount(module._msLootCtx)
@@ -2645,139 +3105,13 @@ do
         return Core.GetCurrentRaid() or module.selectedRaid
     end
 
-    local function resolveLoggerLootEntry(raidID, lootNid)
-        local raid = raidID and Core.EnsureRaidById(raidID) or nil
-        if not raid then
-            addon:error(Diag.E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(lootNid)))
-            return nil, nil
-        end
-
-        Store:EnsureRaid(raid)
-        local lootCount = raid.loot and #raid.loot or 0
-        local it = Store:GetLoot(raid, lootNid)
-        if not it then
-            local rawItemMatch, rawItemMatches = Helpers.FindLootByItemId(raid, lootNid)
-            if rawItemMatch and addon.error then
-                addon:error(Diag.E.LogLoggerLootNidExpected:format(tostring(raidID), tostring(lootNid), tostring(rawItemMatch.itemLink), tonumber(rawItemMatches) or 0))
-            end
-            addon:error(Diag.E.LogLoggerItemNotFound:format(raidID, tostring(lootNid), lootCount))
-            return nil, nil
-        end
-
-        return raid, it
-    end
-
-    local function applyLoggerLootMutation(raid, it, raidID, lootNid, looter, rollType, rollValue)
-        if not looter or looter == "" then
-            addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(lootNid), tostring(it.itemLink)))
-        end
-        if rollType == nil then
-            addon:warn(Diag.W.LogLoggerRollTypeNil:format(raidID, tostring(lootNid), tostring(looter)))
-        end
-
-        local currentLooterName = Store._ResolveLootLooterName(raid, it)
-        if addon.hasDebug then
-            addon:debug(
-                Diag.D.LogLoggerLootBefore:format(raidID, tostring(lootNid), tostring(it.itemLink), tostring(currentLooterName), tostring(it.rollType), tostring(it.rollValue))
-            )
-        end
-        if currentLooterName and currentLooterName ~= "" and looter and looter ~= "" and currentLooterName ~= looter then
-            addon:warn(Diag.W.LogLoggerLootOverwrite:format(raidID, tostring(lootNid), tostring(it.itemLink), tostring(currentLooterName), tostring(looter)))
-        end
-
-        local expectedLooterNid
-        local expectedRollType
-        local expectedRollValue
-        if looter and looter ~= "" then
-            local looterNid = Store._ResolveLootLooterNid(raid, looter)
-            if not looterNid then
-                addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(lootNid), tostring(it.itemLink)))
-                return false, nil, nil, nil
-            end
-            it.looterNid = looterNid
-            it.looter = nil
-            expectedLooterNid = looterNid
-        end
-        if tonumber(rollType) then
-            it.rollType = tonumber(rollType)
-            expectedRollType = tonumber(rollType)
-        end
-        if tonumber(rollValue) then
-            it.rollValue = tonumber(rollValue)
-            expectedRollValue = tonumber(rollValue)
-        end
-
-        return true, expectedLooterNid, expectedRollType, expectedRollValue
-    end
-
-    local function verifyLoggerLootMutation(raidID, lootNid, it, recordedLooterName, expectedLooterNid, expectedRollType, expectedRollValue)
-        local ok = true
-        if expectedLooterNid and tonumber(it.looterNid) ~= expectedLooterNid then
-            ok = false
-        end
-        if expectedRollType and it.rollType ~= expectedRollType then
-            ok = false
-        end
-        if expectedRollValue and it.rollValue ~= expectedRollValue then
-            ok = false
-        end
-        if not ok then
-            addon:error(Diag.E.LogLoggerVerifyFailed:format(raidID, tostring(lootNid), tostring(recordedLooterName), tostring(it.rollType), tostring(it.rollValue)))
-            return false
-        end
-
-        if addon.hasDebug then
-            addon:debug(Diag.D.LogLoggerVerified:format(raidID, tostring(lootNid)))
-            if not Core.GetLastBoss() then
-                addon:debug(Diag.D.LogLoggerRecordedNoBossContext:format(raidID, tostring(lootNid), tostring(it.itemLink)))
-            end
-        end
-        return true
-    end
-
     function Loot:SetLootEntry(lootNid, looter, rollType, rollValue, source, raidIDOverride)
         local raidID = resolveLoggerLootRaidId(source, raidIDOverride)
-        if addon.hasTrace then
-            addon:trace(
-                Diag.D.LogLoggerLootLogAttempt:format(
-                    tostring(source),
-                    tostring(raidID),
-                    tostring(lootNid),
-                    tostring(looter),
-                    tostring(rollType),
-                    tostring(rollValue),
-                    tostring(Core.GetLastBoss())
-                )
-            )
+        local ok = Actions:SetLootEntry(raidID, lootNid, looter, rollType, rollValue, source)
+        if ok then
+            controller:Dirty()
         end
-
-        local raid, it = resolveLoggerLootEntry(raidID, lootNid)
-        if not raid then
-            return false
-        end
-
-        local ok, expectedLooterNid, expectedRollType, expectedRollValue = applyLoggerLootMutation(raid, it, raidID, lootNid, looter, rollType, rollValue)
-        if not ok then
-            return false
-        end
-        controller:Dirty()
-
-        local recordedLooterName = Store._ResolveLootLooterName(raid, it)
-        if addon.hasDebug then
-            addon:debug(
-                Diag.D.LogLoggerLootRecorded:format(
-                    tostring(source),
-                    raidID,
-                    tostring(lootNid),
-                    tostring(it.itemLink),
-                    tostring(recordedLooterName),
-                    tostring(it.rollType),
-                    tostring(it.rollValue)
-                )
-            )
-        end
-
-        return verifyLoggerLootMutation(raidID, lootNid, it, recordedLooterName, expectedLooterNid, expectedRollType, expectedRollValue)
+        return ok
     end
 
     Bus.RegisterCallback(InternalEvents.LoggerLootLogRequest, function(_, request)
@@ -2790,16 +3124,39 @@ do
         request.ok = Loot:SetLootEntry(lootNid, request.looter, request.rollType, request.rollValue, request.source, raidId) == true
     end)
 
+    local lootUiRefreshDebounceSeconds = 0.10
+
     local function reset()
         controller:Dirty()
     end
-    Bus.RegisterCallbacks({
+
+    local function requestLootRefresh(_, raidId)
+        local selectedRaid = tonumber(module.selectedRaid)
+        local eventRaid = tonumber(raidId)
+        if eventRaid and selectedRaid and eventRaid ~= selectedRaid then
+            return
+        end
+
+        if module._lootUiHandle then
+            module:CancelTimer(module._lootUiHandle)
+            module._lootUiHandle = nil
+        end
+        module._lootUiHandle = module:ScheduleTimer(function()
+            module._lootUiHandle = nil
+            controller:Dirty()
+        end, lootUiRefreshDebounceSeconds)
+    end
+
+    local resetEvents = {
         InternalEvents.LoggerSelectRaid,
         InternalEvents.LoggerSelectBoss,
         InternalEvents.LoggerSelectPlayer,
         InternalEvents.LoggerSelectBossPlayer,
-        InternalEvents.RaidLootUpdate,
-    }, reset)
+    }
+    for i = 1, #resetEvents do
+        Bus.RegisterCallback(resetEvents[i], reset)
+    end
+    Bus.RegisterCallback(InternalEvents.RaidLootUpdate, requestLootRefresh)
     Bus.RegisterCallback(InternalEvents.LoggerSelectItem, function()
         controller:Touch()
     end)
@@ -3006,8 +3363,8 @@ do
         local modeT = NormalizeLower(difficultyBox:GetText())
         local bTime = TrimText(timeBox:GetText())
 
-        name = (name == "") and TRASH_MOB_NAME or name
-        if not isTrashMobName(name) and (modeT ~= "h" and modeT ~= "n") then
+        name = (name == "") and GetTrashMobName() or name
+        if not IsTrashMobName(name) and (modeT ~= "h" and modeT ~= "n") then
             addon:error(L.ErrBossDifficulty)
             return
         end

@@ -692,21 +692,6 @@ local function buildReadinessHealth(report)
 end
 
 -- ----- Public methods ----- --
-function Display.FormatReserveItemIdLabel(itemId)
-    return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
-end
-
-function Display.FormatReserveDroppedBy(source)
-    if not source or source == "" then
-        return nil
-    end
-    return format(L.StrReservesTooltipDroppedBy, source)
-end
-
-function Display.FormatReserveItemFallback(itemId)
-    return format(L.StrReservesItemFallback, tostring(itemId or "?"))
-end
-
 function Display.RebuildIndex(ctx)
     twipe(ctx.reservesByItemID)
     twipe(ctx.reservesByItemPlayer)

@@ -198,6 +198,11 @@ Durable preferences learned from recent conversations:
   (`addon.Raid`, `addon.Logger`, etc.) to prevent new call sites from regressing.
 - Prefer callsite guards for debug/trace logging (`if addon.hasDebug then ... end`) when message
   arguments need `format`/`tostring` work; do not rely on LibLogger level guards to skip evaluation.
+- Keep `Features:GetProfile()` while slash/debug feature-profile reporting depends on it.
+- Prefer the fixed `full` feature profile at runtime; do not add global feature/profile override hooks
+  unless explicitly requested.
+- Do not remove bundled LibGroupTalents/LibTalentQuery/LibBabble files unless `LibCompat` talent/spec
+  requirements are patched first.
 - Prefer fast architecture verification via focused `rg` checks (XML inline scripts, widget facade calls,
   namespacing coverage, and legacy top-level access scans) before closing refactor tasks.
 - Prefer gradual function/API deduplication: remove or consolidate similar helper functions to reduce drift,
@@ -370,44 +375,45 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 46) Services/Loot/PassiveGroupLoot.lua
 47) Services/Loot/Tracking.lua
 48) Services/Loot/Rules.lua
-49) Services/Raid/State.lua
-50) Services/Raid/Capabilities.lua
-51) Services/Raid/Counts.lua
-52) Services/Raid/Roster.lua
-53) Services/Raid/Attendance.lua
-54) Services/Raid/LootRecords.lua
-55) Services/Raid/Session.lua
-56) Services/Chat.lua
-57) EntryPoints/Minimap.lua
-58) EntryPoints/SlashEvents.lua
-59) Services/Rolls/Countdown.lua
-60) Services/Rolls/Sessions.lua
-61) Services/Rolls/History.lua
-62) Services/Rolls/Responses.lua
-63) Services/Rolls/Resolution.lua
-64) Services/Rolls/Display.lua
-65) Services/Rolls/Service.lua
-66) Services/Loot/Service.lua
-67) Services/Debug.lua
-68) Controllers/Master.lua
-69) Widgets/LootCounter.lua
-70) Services/Reserves/Import.lua
-71) Services/Reserves/Display.lua
-72) Services/Reserves/Sync.lua
-73) Services/Reserves.lua
-74) Services/Reserves/Chat.lua
-75) Widgets/ReservesUI.lua
-76) Services/Logger/Store.lua
-77) Services/Logger/View.lua
-78) Services/Logger/Export.lua
-79) Services/Logger/Helpers.lua
-80) Services/Logger/Actions.lua
-81) Controllers/Logger.lua
-82) Widgets/Config.lua
-83) Controllers/Warnings.lua
-84) Controllers/Changes.lua
-85) Controllers/Spammer.lua
-86) KRT.xml
+49) Services/Loot/DistributionSession.lua
+50) Services/Raid/State.lua
+51) Services/Raid/Capabilities.lua
+52) Services/Raid/Counts.lua
+53) Services/Raid/Roster.lua
+54) Services/Raid/Attendance.lua
+55) Services/Raid/LootRecords.lua
+56) Services/Raid/Session.lua
+57) Services/Chat.lua
+58) EntryPoints/Minimap.lua
+59) EntryPoints/SlashEvents.lua
+60) Services/Rolls/Countdown.lua
+61) Services/Rolls/Sessions.lua
+62) Services/Rolls/History.lua
+63) Services/Rolls/Responses.lua
+64) Services/Rolls/Resolution.lua
+65) Services/Rolls/Display.lua
+66) Services/Rolls/Service.lua
+67) Services/Loot/Service.lua
+68) Services/Debug.lua
+69) Controllers/Master.lua
+70) Widgets/LootCounter.lua
+71) Services/Reserves/Import.lua
+72) Services/Reserves/Display.lua
+73) Services/Reserves/Sync.lua
+74) Services/Reserves.lua
+75) Services/Reserves/Chat.lua
+76) Widgets/ReservesUI.lua
+77) Services/Logger/Store.lua
+78) Services/Logger/View.lua
+79) Services/Logger/Export.lua
+80) Services/Logger/Helpers.lua
+81) Services/Logger/Actions.lua
+82) Controllers/Logger.lua
+83) Widgets/Config.lua
+84) Controllers/Warnings.lua
+85) Controllers/Changes.lua
+86) Controllers/Spammer.lua
+87) KRT.xml
 
 ---
 
@@ -464,6 +470,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
       PassiveGroupLoot.lua # passive group-loot parser/state/winner helpers
       Tracking.lua         # runtime tracking/debug snapshot builders
       Rules.lua            # suggestion-only auto-loot rule classifier
+      DistributionSession.lua # Master-owned compact loot distribution session sync
     Debug.lua              # synthetic raid/roll test helpers for local addon testing
     Reserves/
       Import.lua           # import parser/strategy helpers (loaded before Reserves.lua)
@@ -512,7 +519,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Strings.lua            # text normalization and chat parsing helpers (addon.Strings)
     Item.lua               # item-link parsing + tooltip probe helpers (addon.Item)
     IgnoredItems.lua       # canonical item-ignore lookup used by loot logging
-    IgnoredMobs.lua        # canonical raid add/phase-ignore lookup used by boss filtering
+    IgnoredMobs.lua        # canonical raid add/phase-ignore lookup + generic trash-name helpers
     Comms.lua              # addon chat/whisper/sync helpers (addon.Comms)
     Time.lua               # time/difficulty helpers (addon.Time)
     Base64.lua             # base64 codec helpers (addon.Base64)
@@ -693,7 +700,7 @@ External modules:
 - `addon.Item` (Modules/Item.lua)
 - `addon.LootSources` (Modules/LootSources.lua)
 - `addon.IgnoredItems` (Modules/IgnoredItems.lua)
-- `addon.IgnoredMobs` (Modules/IgnoredMobs.lua)
+- `addon.IgnoredMobs` (Modules/IgnoredMobs.lua; add/phase-ignore lookup + generic trash-name helpers)
 - `addon.Comms` (Modules/Comms.lua)
 - `addon.Time` (Modules/Time.lua)
 - `addon.Base64` (Modules/Base64.lua)

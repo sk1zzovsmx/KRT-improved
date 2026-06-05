@@ -112,15 +112,6 @@ function UIPrimitives.Toggle(frame)
     end
 end
 
-function UIPrimitives.HideFrame(frame, onHide)
-    if frame and frame:IsShown() then
-        if onHide then
-            onHide()
-        end
-        frame:Hide()
-    end
-end
-
 function UIPrimitives.ShowHide(frame, cond)
     if not frame then
         return
@@ -291,7 +282,7 @@ function UIRowVisuals.SetRowSelected(row, cond)
     end
     if cond then
         if isLoggerRow(row) then
-            row._krtSelTex:SetVertexColor(0.08, 0.52, 0.10, 0.72)
+            row._krtSelTex:SetVertexColor(0.08, 0.52, 0.10, 0.76)
         else
             row._krtSelTex:SetVertexColor(0.20, 0.60, 1.00, 0.52)
         end
@@ -309,7 +300,7 @@ function UIRowVisuals.SetRowFocused(row, cond)
     end
     if cond then
         if isLoggerRow(row) then
-            texture:SetVertexColor(0.20, 0.85, 0.18, 0.34)
+            texture:SetVertexColor(0.95, 0.72, 0.20, 0.26)
         else
             texture:SetVertexColor(0.20, 0.60, 1.00, 0.72)
         end

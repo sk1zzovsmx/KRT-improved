@@ -18,7 +18,7 @@ local UIPrimitives = addon.UIPrimitives
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
-local tinsert, tremove = table.insert, table.remove
+local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 local find, strlen = string.find, string.len
 local gsub = string.gsub
@@ -32,7 +32,6 @@ local ChatApi = {
     StartSpamCycle = requireServiceMethod("Chat", Chat, "StartSpamCycle"),
     StopSpamCycle = requireServiceMethod("Chat", Chat, "StopSpamCycle"),
     PauseSpamCycle = requireServiceMethod("Chat", Chat, "PauseSpamCycle"),
-    BuildSpammerOutput = requireServiceMethod("Chat", Chat, "BuildSpammerOutput"),
 }
 
 -- =========== LFM Spam Module  =========== --
@@ -197,6 +196,60 @@ do
 
     local function getSpamRuntimeState()
         return ChatApi.GetSpamRuntimeState(Chat)
+    end
+
+    local function buildSpammerOutput(state, defaultOutput)
+        local baseOutput = defaultOutput or DEFAULT_OUTPUT
+        local source = (type(state) == "table") and state or {}
+        local outBuf = { baseOutput }
+
+        local name = source.name or ""
+        if name ~= "" then
+            tinsert(outBuf, " ")
+            tinsert(outBuf, name)
+        end
+
+        local needParts = {}
+        local function addNeed(count, label, class)
+            count = tonumber(count) or 0
+            if count <= 0 then
+                return
+            end
+
+            local text = count .. " " .. label
+            if class and class ~= "" then
+                text = text .. " (" .. class .. ")"
+            end
+            needParts[#needParts + 1] = text
+        end
+
+        addNeed(source.tank, L.StrTank, source.tankClass)
+        addNeed(source.healer, L.StrHealer, source.healerClass)
+        addNeed(source.melee, L.StrMelee, source.meleeClass)
+        addNeed(source.ranged, L.StrRanged, source.rangedClass)
+
+        if #needParts > 0 then
+            tinsert(outBuf, " - ")
+            tinsert(outBuf, L.StrSpammerNeedStr)
+            tinsert(outBuf, " ")
+            tinsert(outBuf, tconcat(needParts, ", "))
+        end
+
+        if source.message and source.message ~= "" then
+            tinsert(outBuf, " - ")
+            tinsert(outBuf, Strings.FindAchievement(source.message))
+        end
+
+        local output = tconcat(outBuf)
+        if output == baseOutput then
+            return output
+        end
+
+        local total = (tonumber(source.tank) or 0) + (tonumber(source.healer) or 0) + (tonumber(source.melee) or 0) + (tonumber(source.ranged) or 0)
+
+        local is25 = (name ~= "" and name:match("%f[%d]25%f[%D]")) ~= nil
+        local maxSize = is25 and 25 or 10
+        return output .. " (" .. (maxSize - total) .. "/" .. maxSize .. ")"
     end
 
     -- Deterministic: sync Duration immediately from UI/SV (no waiting for preview tick)
@@ -725,7 +778,7 @@ do
         end
 
         if changed then
-            finalOutput = ChatApi.BuildSpammerOutput(Chat, lastState, DEFAULT_OUTPUT)
+            finalOutput = buildSpammerOutput(lastState, DEFAULT_OUTPUT)
 
             local out = getNamedPart("Output")
             if out then

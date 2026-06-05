@@ -546,7 +546,7 @@
 	<!-- The Frame: Logger -->
 	<Frame name="KRTLogger" inherits="KRTFrameTemplate">
 		<Size>
-			<AbsDimension x="830" y="570" />
+			<AbsDimension x="980" y="515" />
 		</Size>
 		<Frames>
 			<Button name="$parentTab1" inherits="CharacterFrameTabButtonTemplate" id="1">
@@ -557,6 +557,18 @@
 					<Anchor point="CENTER" relativePoint="BOTTOMLEFT">
 						<Offset>
 							<AbsDimension x="64" y="-10" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentTab2" inherits="CharacterFrameTabButtonTemplate" id="2">
+				<Size>
+					<AbsDimension x="115" y="30" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTab1" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="-14" y="0" />
 						</Offset>
 					</Anchor>
 				</Anchors>

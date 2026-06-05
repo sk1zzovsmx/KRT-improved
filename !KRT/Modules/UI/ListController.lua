@@ -44,11 +44,11 @@ end
 -- ----- Public methods ----- --
 function ListController.CreateRowDrawer(fn)
     local rowHeight
-    return function(row, it)
+    return function(row, it, ...)
         if not rowHeight then
             rowHeight = (row and row:GetHeight()) or 20
         end
-        fn(row, it)
+        fn(row, it, ...)
         return rowHeight
     end
 end
@@ -197,6 +197,17 @@ function ListController.MakeListController(cfg)
             return 20
         end
         return height
+    end
+
+    local function syncScrollChildWidth(sc, scrollW)
+        if not (sc and sc.SetWidth) then
+            return
+        end
+
+        local width = scrollW or 0
+        if width >= 10 then
+            sc:SetWidth(width)
+        end
     end
 
     local function applyHighlight()
@@ -384,9 +395,7 @@ function ListController.MakeListController(cfg)
             defer:Show()
             return false
         end
-        if (sc:GetWidth() or 0) < 10 then
-            sc:SetWidth(scrollW)
-        end
+        syncScrollChildWidth(sc, scrollW)
 
         if not self._loggedFetch then
             self._loggedFetch = true
@@ -434,7 +443,7 @@ function ListController.MakeListController(cfg)
             row:SetPoint("TOPLEFT", 0, -totalH)
             row:SetPoint("TOPRIGHT", -rightInset, -totalH)
 
-            local rowHeight = cfg.drawRow(row, it)
+            local rowHeight = cfg.drawRow(row, it, i)
             local usedH = safeRowHeight(row, rowHeight)
             totalH = totalH + usedH
             row:Show()

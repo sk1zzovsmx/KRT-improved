@@ -82,6 +82,7 @@ Runtime data/model/service modules:
 - `Services/Loot/PassiveGroupLoot.lua` (passive group-loot parser/state/winner helpers)
 - `Services/Loot/Tracking.lua` (runtime tracking/debug snapshot builders)
 - `Services/Loot/Rules.lua` (suggestion-only auto-loot rule classifier)
+- `Services/Loot/DistributionSession.lua` (Master-owned compact item/roll/done session sync)
 
 `addon.Services.Rolls` internal runtime helpers are composed by:
 - `Services/Rolls/Countdown.lua` (countdown start/stop/tick runtime logic)
@@ -118,9 +119,10 @@ Entrypoints stay narrow:
 Common infra under `!KRT/Modules/`:
 
 - Data/utility: `Timer`, `Events`, `Strings`, `Item`, `LootSourcesData`, `LootSources`, `Time`,
-  `Sort`, `Comms`, `Base64`, `Colors`
+  `Sort`, `Comms`, `Base64`, `Colors`, `IgnoredItems`, `IgnoredMobs`
 - `Modules/LootSourcesData.lua` - static raid item-source data
 - `Modules/LootSources.lua` - itemId -> raid source resolver
+- `Modules/IgnoredMobs.lua` - raid add/phase-ignore lookup plus canonical trash-mob name helpers
 - UI infra: `Frames`, `UIScaffold`, `ListController`, `MultiSelect`, `UI` facade, `UIEffects`
 - Messaging: `Bus`
 - Feature toggles: `Features`

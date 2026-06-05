@@ -215,15 +215,6 @@ local function makeBus()
         list[#list + 1] = callback
     end
 
-    function bus.RegisterCallbacks(eventNames, callback)
-        if type(eventNames) ~= "table" then
-            return
-        end
-        for i = 1, #eventNames do
-            bus.RegisterCallback(eventNames[i], callback)
-        end
-    end
-
     function bus.TriggerEvent(eventName, ...)
         triggered[eventName] = (triggered[eventName] or 0) + 1
         local list = callbacks[eventName]
@@ -273,8 +264,6 @@ local function reservesApi(tbl)
     return wrapServiceMethods(tbl, {
         "GetReserveCountForItem",
         "GetItemReserveContext",
-        "GetRosterReserveMatchReport",
-        "GetNameMatchReport",
         "GetPlusForItem",
         "GetPlayersForItem",
         "HasCurrentRaidPlayersForItem",
@@ -545,18 +534,6 @@ local function chatApi(tbl)
             end
             runtime.paused = true
             return true, runtime
-        end
-    end
-
-    if type(tbl.SendSpamOutput) ~= "function" then
-        function tbl:SendSpamOutput(_output, _channels)
-            return true
-        end
-    end
-
-    if type(tbl.BuildSpammerOutput) ~= "function" then
-        function tbl:BuildSpammerOutput(_state, defaultOutput)
-            return defaultOutput or "LFM"
         end
     end
 
@@ -1017,8 +994,7 @@ local function newHarness()
     end
 
     -- Test stub for addon.Timer mixins: reuse the existing `timers` infrastructure.
-    -- Map ScheduleTimer/ScheduleRepeatingTimer/CancelTimer/CancelAllTimers so
-    -- _flushTimers continues to work.
+    -- Map ScheduleTimer/ScheduleRepeatingTimer/CancelTimer so _flushTimers continues to work.
     addon.Timer = {
         BindMixin = function(target)
             if target.ScheduleTimer then
@@ -1065,23 +1041,7 @@ local function newHarness()
                 end
                 return false
             end
-            target.CancelAllTimers = function(self)
-                for handle in pairs(self._timerActive) do
-                    addon.CancelTimer(handle)
-                end
-                self._timerActive = {}
-            end
-            target.GetActiveTimerCount = function(self)
-                local n = 0
-                for _ in pairs(self._timerActive) do
-                    n = n + 1
-                end
-                return n
-            end
             return target
-        end,
-        GetStats = function()
-            return { active = 0, created = 0 }
         end,
         RefreshStats = function() end,
         ShowStats = function() end,
@@ -1480,12 +1440,12 @@ local function newHarness()
     local Core = {}
 
     local function ensureNamespace(root, ...)
-        assert(type(root) == "table", "Core.EnsureNamespace requires a root table")
+        assert(type(root) == "table", "ensureNamespace requires a root table")
 
         local target = root
         for i = 1, select("#", ...) do
             local key = select(i, ...)
-            assert(type(key) == "string" and key ~= "", "Core.EnsureNamespace requires non-empty string keys")
+            assert(type(key) == "string" and key ~= "", "ensureNamespace requires non-empty string keys")
 
             local child = target[key]
             if type(child) ~= "table" then
@@ -1643,10 +1603,6 @@ local function newHarness()
         OptionsTable = {},
     }
 
-    Core.EnsureNamespace = ensureNamespace
-    Core.EnsureAddonNamespace = function(...)
-        return ensureNamespace(addon, ...)
-    end
     Core.EnsureServiceNamespace = function(...)
         return ensureNamespace(addon.Services, ...)
     end
@@ -1674,8 +1630,6 @@ local function newHarness()
         feature.Controllers = addon.Controllers or feature.Controllers
         feature.Widgets = addon.Widgets or feature.Widgets
         feature.Time = addon.Time or feature.Time
-        feature.EnsureNamespace = Core.EnsureNamespace
-        feature.EnsureAddonNamespace = Core.EnsureAddonNamespace
         feature.EnsureServiceNamespace = Core.EnsureServiceNamespace
         return feature
     end
@@ -2142,9 +2096,11 @@ local function newHarness()
                 "!KRT/Services/Loot/PassiveGroupLoot.lua",
                 "!KRT/Services/Loot/Tracking.lua",
                 "!KRT/Services/Loot/Rules.lua",
+                "!KRT/Services/Loot/DistributionSession.lua",
                 "!KRT/Services/Loot/Service.lua",
             }
             local lootSourceFiles = {
+                "!KRT/Modules/IgnoredMobs.lua",
                 "!KRT/Modules/LootSourcesData.lua",
                 "!KRT/Modules/LootSources.lua",
             }
@@ -2224,6 +2180,10 @@ local function newHarness()
                     "!KRT/Services/Reserves/Display.lua",
                     "!KRT/Services/Reserves/Sync.lua",
                 })
+            end
+
+            if path == "!KRT/Controllers/Logger.lua" or path == "!KRT/Core/DBRaidValidator.lua" then
+                loadFiles({ "!KRT/Modules/IgnoredMobs.lua" })
             end
 
             local chunk, err = loadfile(path)
@@ -2343,6 +2303,10 @@ local function setupLoggerExportHarness(seedRaids)
     return h, h.Core.EnsureRaidById(1), h.addon.Services.Logger.Export
 end
 
+local function loadMasterController(h)
+    h:load("!KRT/Controllers/Master.lua")
+end
+
 local function setupInventoryTradeHarness(order, rollsByName)
     local h = newHarness()
     local link = h.registerItem(9304, "Queueblade")
@@ -2454,6 +2418,95 @@ local function setupInventoryTradeHarness(order, rollsByName)
                 totalCount = totalCount,
             }
         end,
+        ResolveTradeAwardedCount = function()
+            local before = tonumber(h.feature.itemInfo.tradeStartCount)
+            local bag = tonumber(h.feature.itemInfo.tradeStartBag) or tonumber(h.feature.itemInfo.bagID)
+            local slot = tonumber(h.feature.itemInfo.tradeStartSlot) or tonumber(h.feature.itemInfo.slotID)
+            if not (before and bag and slot) then
+                return 1
+            end
+
+            local item = bagItems[bag] and bagItems[bag][slot] or nil
+            local after = item and (tonumber(item.count) or 1) or 0
+            local delta = before - after
+            if delta > 0 then
+                return delta
+            end
+            return 1
+        end,
+        ResolveInventoryAwardedCount = function()
+            local awardedCount = tonumber(h.feature.lootState.selectedItemCount) or 1
+            if awardedCount < 1 then
+                awardedCount = 1
+            end
+            if h.feature.lootState.fromInventory and awardedCount > 1 then
+                awardedCount = 1
+            end
+            return awardedCount
+        end,
+        BuildTradeNotificationPlan = function(_, args)
+            local keep = not (args and args.isAwardRoll)
+            local markerPlan
+            local output
+            if keep then
+                output = "keep-output"
+            elseif (tonumber(args and args.selectedItemCount) or 1) > 1 then
+                output = "multi-output"
+                markerPlan = {
+                    clearRaidIcons = true,
+                    raidTargets = {},
+                }
+            else
+                output = "award-output"
+            end
+            return {
+                keep = keep,
+                output = output,
+                whisper = keep and "keep-whisper" or nil,
+                markerPlan = markerPlan,
+            }
+        end,
+        BuildAwardTargetPlan = function(_, args)
+            local target = tonumber(args and args.selectedItemCount) or 1
+            if target < 1 then
+                target = 1
+            end
+            local available = tonumber(args and args.availableItemCount) or 1
+            if available < 1 then
+                available = 1
+            end
+            if target > available then
+                target = available
+            end
+            local rollsCount = tonumber(args and args.rollsCount)
+            if rollsCount and target > rollsCount then
+                target = rollsCount
+            end
+            return {
+                target = target,
+                available = available,
+            }
+        end,
+        ValidateInventoryTradeSelection = function(_, args)
+            local target = tonumber(args and args.target) or 1
+            local selectedCount = tonumber(args and args.selectedCount) or 0
+            local pickedCount = tonumber(args and args.pickedCount) or 0
+            if selectedCount <= 0 then
+                return {
+                    ok = false,
+                    errType = "empty_selection",
+                }
+            end
+            if pickedCount < target then
+                return {
+                    ok = false,
+                    errType = "not_enough_selection",
+                    wantedCount = target,
+                    pickedCount = pickedCount,
+                }
+            end
+            return { ok = true }
+        end,
     }
     h.addon.Services.Raid = {
         ClearRaidIcons = function()
@@ -2551,7 +2604,7 @@ local function setupInventoryTradeHarness(order, rollsByName)
         request.ok = true
     end)
 
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     Master.RequestRefresh = function() end
@@ -2694,6 +2747,104 @@ local function setupMasterAwardHarness(cfg)
                 options = options,
             }
         end,
+        BuildAwardTargetPlan = function(_, args)
+            local target = tonumber(args and args.selectedItemCount) or 1
+            if target < 1 then
+                target = 1
+            end
+            local available = tonumber(args and args.availableItemCount) or 1
+            if available < 1 then
+                available = 1
+            end
+            if target > available then
+                target = available
+            end
+            local rollsCount = tonumber(args and args.rollsCount)
+            if rollsCount and target > rollsCount then
+                target = rollsCount
+            end
+            return {
+                target = target,
+                available = available,
+            }
+        end,
+        ValidateInventoryTradeSelection = function(_, args)
+            local target = tonumber(args and args.target) or 1
+            local selectedCount = tonumber(args and args.selectedCount) or 0
+            local pickedCount = tonumber(args and args.pickedCount) or 0
+            if selectedCount <= 0 then
+                return {
+                    ok = false,
+                    errType = "empty_selection",
+                }
+            end
+            if pickedCount < target then
+                return {
+                    ok = false,
+                    errType = "not_enough_selection",
+                    wantedCount = target,
+                    pickedCount = pickedCount,
+                }
+            end
+            return { ok = true }
+        end,
+        BuildMultiAwardWinnersPlan = function(_, args)
+            local target = tonumber(args and args.target) or 1
+            local selectedCount = tonumber(args and args.selectedCount) or 0
+            local picked = (args and type(args.pickedWinners) == "table") and args.pickedWinners or {}
+            if selectedCount <= 0 then
+                return {
+                    errType = "empty_selection",
+                }
+            end
+            local awardCount = selectedCount
+            if awardCount > target then
+                awardCount = target
+            end
+            if #picked < awardCount then
+                return {
+                    errType = "not_enough_selection",
+                    wantedCount = awardCount,
+                    pickedCount = #picked,
+                }
+            end
+            local winners = {}
+            for i = 1, awardCount do
+                winners[#winners + 1] = {
+                    name = picked[i].name,
+                    roll = tonumber(picked[i].roll) or 0,
+                }
+            end
+            return {
+                winners = winners,
+                clearSelection = true,
+            }
+        end,
+        BuildMultiAwardState = function(_, args)
+            local winners = (args and type(args.winners) == "table") and args.winners or {}
+            return {
+                state = {
+                    active = true,
+                    itemLink = args and args.itemLink,
+                    itemKey = h.addon.Item.GetItemStringFromLink(args and args.itemLink) or (args and args.itemLink),
+                    lastCount = tonumber(args and args.available) or 1,
+                    rollType = args and args.rollType,
+                    winners = winners,
+                    currentWinner = winners[1] and winners[1].name or nil,
+                    pos = 2,
+                    total = #winners,
+                    slotCandidates = args and args.slotCandidates or {},
+                    slotCandidateMap = args and args.slotCandidateMap or {},
+                    lastClearedSlot = nil,
+                    waitingForDecrement = false,
+                    announceOnWin = args and args.announceOnWin and true or false,
+                    congratsSent = false,
+                },
+            }
+        end,
+        IsMasterLootAwardFailureMessage = function(_, message)
+            return tostring(message or ""):lower():find("inventory is full", 1, true) ~= nil
+        end,
     }
     h.addon.Services.Raid = {
         IsMasterLooter = function()
@@ -2790,7 +2941,7 @@ local function setupMasterAwardHarness(cfg)
     h.feature.Services = h.addon.Services
     h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
 
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     Master.RequestRefresh = function()
@@ -2861,6 +3012,40 @@ test("runtime cache reuses runtime until invalidated", function()
     local runtime3 = store:EnsureRaidRuntime(raid)
     assertTrue(runtime3 ~= runtime1, "expected invalidation to rebuild runtime table")
     assertEqual(runtime3.lootIdxByNid[2], 2, "expected rebuilt loot index to include new loot")
+end)
+
+test("runtime cache indexes appended loot without rebuilding runtime", function()
+    local h = newHarness()
+    h:load("!KRT/Core/DBRaidStore.lua")
+    local store = h.addon.DB.RaidStore
+    local raid = {
+        schemaVersion = 1,
+        raidNid = 1,
+        players = {
+            { playerNid = 1, name = "Alice", count = 0 },
+        },
+        bossKills = {
+            { bossNid = 1, boss = "Boss" },
+        },
+        loot = {
+            { lootNid = 1, itemId = 9001, looterNid = 1 },
+        },
+        nextPlayerNid = 2,
+        nextBossNid = 2,
+        nextLootNid = 2,
+    }
+
+    local runtime1 = store:EnsureRaidRuntime(raid)
+    local appended = { lootNid = 2, itemId = 9002, looterNid = 1 }
+    raid.loot[#raid.loot + 1] = appended
+
+    local runtime2 = store:UpsertLootIndex(raid, appended, #raid.loot)
+    local runtime3 = store:EnsureRaidRuntime(raid)
+
+    assertTrue(runtime2 == runtime1, "expected appended loot to update the existing runtime table")
+    assertTrue(runtime3 == runtime1, "expected runtime lookup to avoid a full rebuild after indexed append")
+    assertEqual(runtime1.lootIdxByNid[2], 2, "expected appended loot index to be patched")
+    assertTrue(runtime1.lootByNid[2] == appended, "expected appended loot row to be indexed by nid")
 end)
 
 test("feature shared hydrates addon dependencies and namespace helpers", function()
@@ -3454,6 +3639,47 @@ test("logger export returns header-only CSV when no rows match", function()
     )
 end)
 
+test("logger view lists only bosses attended by selected raid player", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 46,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 2,
+            startTime = 1700004000,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE" },
+                { playerNid = 2, name = "Bob", class = "WARRIOR" },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Anub'Rekhan", time = 1700004100, mode = "n", players = { 1, 2 } },
+                { bossNid = 11, name = "Grand Widow Faerlina", time = 1700004200, mode = "h", players = { 2 } },
+                { bossNid = 12, name = "Maexxna", time = 1700004300, mode = "n", players = { 1 } },
+            },
+            loot = {},
+            nextPlayerNid = 3,
+            nextBossNid = 13,
+            nextLootNid = 1,
+        },
+    })
+
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
+
+    local raid = h.Core.EnsureRaidById(1)
+    local rows = {}
+    h.addon.Services.Logger.View:GetPlayerBossParticipationList(rows, raid, 1)
+
+    assertEqual(#rows, 2, "expected only bosses attended by Alice")
+    assertEqual(rows[1].id, 10, "expected first attended boss nid")
+    assertEqual(rows[1].name, "Anub'Rekhan", "expected first attended boss name")
+    assertEqual(rows[1].mode, "N", "expected normal mode label")
+    assertEqual(rows[2].id, 12, "expected second attended boss nid")
+    assertEqual(rows[2].name, "Maexxna", "expected second attended boss name")
+end)
+
 test("logger updates duplicate item entries by lootNid only", function()
     local h = newHarness()
     local link = h.registerItem(9001, "Twinblade")
@@ -3522,6 +3748,44 @@ test("logger updates duplicate item entries by lootNid only", function()
     assertContains(h.logs.error, "expected lootNid but got raw itemId", "expected explicit raw itemId guard-rail log")
 end)
 
+test("logger actions resolve edit winner against boss attendees", function()
+    local h = newHarness()
+    local link = h.registerItem(9002, "Attendee Blade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE" },
+                { playerNid = 2, name = "Bob", class = "WARRIOR" },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", players = { 2 } },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    itemId = 9002,
+                    itemLink = link,
+                    bossNid = 10,
+                },
+            },
+            nextPlayerNid = 3,
+            nextBossNid = 11,
+            nextLootNid = 102,
+        },
+    })
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local winner = Actions:ResolveLootEditWinner(1, 101, " bob ")
+
+    assertEqual(winner, "Bob", "expected editor winner resolution to use boss attendees")
+end)
+
 test("loot context helpers stay service-owned without Core compatibility alias", function()
     local h = newHarness()
 
@@ -3578,6 +3842,39 @@ test("trade-only loot creates a reusable lootNid", function()
     assertEqual(raid.loot[1].rollValue, 77, "expected logger update to keep same entry")
 end)
 
+test("trade-only loot append patches runtime without full cache invalidation", function()
+    local h = newHarness()
+    local link = h.registerItem(9101, "Runtime Tradeblade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE" },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Sapphiron", time = 1000 },
+            },
+            loot = {},
+            nextPlayerNid = 2,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h:load("!KRT/Services/Raid.lua")
+    local raid = h.Core.EnsureRaidById(1)
+    local runtimeBefore = h.store:EnsureRaidRuntime(raid)
+
+    local lootNid = h.addon.Services.Loot:LogTradeOnlyLoot(link, "Alice", h.rollTypes.MAINSPEC, 98, 1, "TRADE_ONLY_TEST", 1, 10, "roll-session-1")
+    local runtimeAfter = h.store:EnsureRaidRuntime(raid)
+
+    assertTrue((tonumber(lootNid) or 0) > 0, "expected trade-only path to create a lootNid")
+    assertTrue(runtimeAfter == runtimeBefore, "expected trade-only append to preserve existing runtime table")
+    assertEqual(runtimeAfter.lootIdxByNid[lootNid], 1, "expected appended trade-only loot to patch runtime index")
+    assertTrue(runtimeAfter.lootByNid[lootNid] == raid.loot[1], "expected appended trade-only loot to patch runtime row lookup")
+end)
+
 test("loot source resolver filters candidates by raid and mode", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
@@ -3621,7 +3918,7 @@ test("loot source resolver filters candidates by raid and mode", function()
     assertEqual(resolved.confidence, "exact", "expected exact source confidence")
 end)
 
-test("loot source resolver refuses ambiguous candidates without context", function()
+test("loot source resolver returns shared candidates without context", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
@@ -3634,11 +3931,14 @@ test("loot source resolver refuses ambiguous candidates without context", functi
 
     local resolved = h.addon.LootSources.FindSource(91712)
 
-    assertEqual(resolved.reason, "ambiguous", "expected shared boss item to stay ambiguous")
+    assertEqual(resolved.reason, "shared", "expected shared boss item to return structured shared context")
+    assertEqual(resolved.kind, "shared", "expected shared boss item kind")
+    assertEqual(resolved.npcName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected shared display label")
+    assertTrue(resolved.shared == true, "expected shared marker")
     assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")
 end)
 
-test("loot source resolver refuses recent context disambiguation for shared boss items", function()
+test("loot source resolver uses recent context for shared boss items", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
@@ -3655,7 +3955,12 @@ test("loot source resolver refuses recent context disambiguation for shared boss
         recentSourceName = "Grand Widow Faerlina",
     })
 
-    assertEqual(resolved.reason, "ambiguous", "expected recent context not to pick one boss from shared loot")
+    assertEqual(resolved.reason, nil, "expected recent context to resolve shared loot")
+    assertEqual(resolved.npcId, 15953, "expected recent source npc id to select Faerlina")
+    assertEqual(resolved.npcName, "Grand Widow Faerlina", "expected recent source name to select Faerlina")
+    assertEqual(resolved.kind, "boss", "expected resolved shared loot to bind to a boss")
+    assertEqual(resolved.confidence, "shared-context", "expected shared context confidence")
+    assertTrue(resolved.shared == true, "expected shared marker to stay visible")
     assertEqual(#resolved.candidates, 2, "expected all shared boss candidates to remain visible")
 end)
 
@@ -5033,7 +5338,7 @@ test("loot receipts do not recover boss context from the current target", functi
     assertEqual(raid.loot[1].bossNid, 1, "expected loot without scoped context to attach to TrashMob")
 end)
 
-test("group loot sessions keep boss association without relying on lastBoss", function()
+test("group loot sessions skip boss association without relying on lastBoss", function()
     local h = newHarness()
     local link = h.registerItem(9158, "Scoped Context Blade")
 
@@ -5091,8 +5396,269 @@ test("group loot sessions keep boss association without relying on lastBoss", fu
     Raid:AddLoot("greed-win-self")
 
     local raid = h.Core.EnsureRaidById(1)
-    assertEqual(#raid.bossKills, 1, "expected scoped session association to avoid creating TrashMob")
-    assertEqual(raid.loot[1].bossNid, 10, "expected scoped session association to preserve original boss context")
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating TrashMob")
+    assertEqual(raid.loot[1].bossNid, 0, "expected passive group loot to avoid source binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected passive group loot to avoid source provenance")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.GREED, "expected passive group loot to keep roll type")
+    assertEqual(raid.loot[1].rollValue, 88, "expected passive group loot to keep roll score")
+end)
+
+test("passive group loot parsed winner result is reused when logging loot", function()
+    local h = newHarness()
+    local link = h.registerItem(91581, "Parsed Winner Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    local winnerPatternCalls = 0
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "greed-win-self" then
+            winnerPatternCalls = winnerPatternCalls + 1
+            return 91, 88, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Loot = h.addon.Services.Loot
+
+    local observedType, parsedLoot = Loot:GetGroupLootMessageResult("greed-win-self")
+    assertEqual(observedType, "winner", "expected passive winner message to be recognized")
+    Loot:AddLoot("greed-win-self", nil, nil, parsedLoot)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected parsed winner message to be logged")
+    assertEqual(raid.loot[1].rollValue, 88, "expected parsed winner roll value to be reused")
+    assertEqual(winnerPatternCalls, 1, "expected winner message to be parsed once across observe and log")
+end)
+
+test("loot service observes passive winner messages through one facade", function()
+    local h = newHarness()
+    local link = h.registerItem(915812, "Facade Winner Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "greed-win-self" then
+            return 91, 88, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    local observedType, parsedLoot = Loot:ObservePassiveLootMessage("greed-win-self", true)
+
+    assertEqual(observedType, "winner", "expected passive winner message to be observed through facade")
+    assertEqual(parsedLoot.itemLink, link, "expected facade to return parsed passive loot payload")
+    assertEqual(parsedLoot.rollValue, 88, "expected facade to preserve parsed roll value")
+end)
+
+test("passive group loot failed winner parse is reused when logging normal loot", function()
+    local h = newHarness()
+    local link = h.registerItem(915811, "Receipt Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    local winnerPatternCalls = 0
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "loot-receive-self" then
+            winnerPatternCalls = winnerPatternCalls + 1
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Loot = h.addon.Services.Loot
+
+    local observedType = Loot:GetGroupLootMessageResult("loot-receive-self")
+    assertEqual(observedType, nil, "expected normal loot receipt to avoid passive winner classification")
+    Loot:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected normal receipt to be logged")
+    assertEqual(winnerPatternCalls, 1, "expected failed passive winner parse to be reused by AddLoot")
+end)
+
+test("passive group loot roll burst skips boss context capture", function()
+    local h = newHarness()
+    local firstLink = h.registerItem(91582, "Burst Context Blade")
+    local secondLink = h.registerItem(91583, "Burst Context Ring")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, name = "Sapphiron", time = 990 },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 91 then
+            return firstLink
+        elseif rollId == 92 then
+            return secondLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+    local Loot = h.addon.Services.Loot
+
+    local contextResolves = 0
+    local sessionContexts = {}
+    Raid.FindAndRememberBossContextForLootSession = function(_, raidNum, sessionId, options)
+        contextResolves = contextResolves + 1
+        sessionContexts[sessionId] = {
+            raidNum = raidNum,
+            bossNid = 10,
+            ttlSeconds = options and options.ttlSeconds,
+        }
+        return 10
+    end
+    Raid.SetBossContextForLootSession = function(_, raidNum, sessionId, bossNid, ttlSeconds)
+        sessionContexts[sessionId] = {
+            raidNum = raidNum,
+            bossNid = bossNid,
+            ttlSeconds = ttlSeconds,
+        }
+        return bossNid
+    end
+
+    local first = Loot:AddPassiveLootRoll(91, 45000)
+    local second = Loot:AddPassiveLootRoll(92, 45000)
+
+    assertEqual(contextResolves, 0, "expected passive rolls to avoid boss-context resolution")
+    assertEqual(first.bossNid, nil, "expected first passive roll to stay source-light")
+    assertEqual(second.bossNid, nil, "expected second passive roll to stay source-light")
+    assertEqual(sessionContexts[first.sessionId], nil, "expected first roll session to avoid remembered boss context")
+    assertEqual(sessionContexts[second.sessionId], nil, "expected second roll session to avoid remembered boss context")
+end)
+
+test("passive group loot need greed and disenchant skip loot counter count calls", function()
+    local h = newHarness()
+    local link = h.registerItem(91584, "Counter Skip Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED and msg == "need-win-self" then
+            return 91, 88, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+    local Loot = h.addon.Services.Loot
+
+    local countCalls = 0
+    local ensureRaidPlayerNid = Raid.EnsureRaidPlayerNid
+    Raid.EnsureRaidPlayerNid = function(...)
+        return ensureRaidPlayerNid(...)
+    end
+    Raid.AddPlayerCountForRollType = function()
+        countCalls = countCalls + 1
+    end
+
+    local observedType, parsedLoot = Loot:GetGroupLootMessageResult("need-win-self")
+    assertEqual(observedType, "winner", "expected passive need winner to be observed")
+    Loot:AddLoot("need-win-self", nil, nil, parsedLoot)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected passive need winner to still be logged")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected passive need winner to keep NE roll type")
+    assertEqual(countCalls, 0, "expected uncounted passive group-loot roll types to avoid LootCounter count calls")
 end)
 
 local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, message, sourceData)
@@ -5154,7 +5720,7 @@ local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, messa
     return h, h.addon.Services.Raid, h.addon.Services.Loot, resolverCalls
 end
 
-test("group loot source resolver assigns boss item without timing context", function()
+test("group loot source resolver is skipped for passive boss item", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91730, "Resolver Boss Blade", 301, "resolver-boss-win", {
         {
             npcId = 15953,
@@ -5169,25 +5735,16 @@ test("group loot source resolver assigns boss item without timing context", func
     Raid:AddLoot("resolver-boss-win")
 
     local raid = h.Core.EnsureRaidById(1)
-    local resolverCall = resolverCalls[1]
-    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked once")
-    assertEqual(resolverCall.itemId, 91730, "expected resolver to receive the boss item id")
-    assertEqual(resolverCall.context.raid, "Naxxramas", "expected resolver to receive raid context")
-    assertEqual(resolverCall.bossKillCountBeforeResolver, 0, "expected resolver to run before source creation")
-    assertEqual(#raid.bossKills, 1, "expected item source resolver to create one boss source record")
-    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected boss item to bind to Faerlina")
-    assertEqual(raid.bossKills[1].sourceNpcId, 15953, "expected boss item to preserve the source npc id")
+    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
+    assertEqual(#raid.bossKills, 0, "expected passive group loot to avoid source boss creation")
     assertEqual(#raid.loot, 1, "expected boss item to create one loot row")
-    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to boss source")
-    local lootSource = raid.loot[1].lootSource
-    assertTrue(lootSource ~= nil, "expected boss item to persist loot source provenance")
-    assertEqual(lootSource.kind, "boss", "expected boss item provenance kind")
-    assertEqual(lootSource.bossNid, raid.bossKills[1].bossNid, "expected boss item provenance boss nid")
-    assertEqual(lootSource.sourceNpcId, 15953, "expected boss item provenance npc id")
-    assertEqual(lootSource.sourceName, "Grand Widow Faerlina", "expected boss item provenance source name")
+    assertEqual(raid.loot[1].bossNid, 0, "expected passive loot row to avoid boss binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected passive loot row to avoid source provenance")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.GREED, "expected passive loot row to keep roll type")
+    assertEqual(raid.loot[1].rollValue, 88, "expected passive loot row to keep roll score")
 end)
 
-test("group loot source resolver exact item beats recent boss context", function()
+test("group loot source resolver is skipped despite recent boss context", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91734, "Resolver Conflict Blade", 305, "resolver-conflict-win", {
         {
             npcId = 15953,
@@ -5223,17 +5780,14 @@ test("group loot source resolver exact item beats recent boss context", function
     Raid:AddLoot("resolver-conflict-win")
 
     raid = h.Core.EnsureRaidById(1)
-    local resolverCall = resolverCalls[1]
-    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked despite recent context")
-    assertEqual(resolverCall.itemId, 91734, "expected resolver to receive the exact item id")
-    assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run before creating the static source boss")
-    assertEqual(#raid.bossKills, 2, "expected exact item source to create a second boss source record")
+    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver despite recent context")
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating a static source boss")
     assertEqual(raid.bossKills[1].name, "Sapphiron", "expected stale context boss to stay intact")
-    assertEqual(raid.bossKills[2].name, "Grand Widow Faerlina", "expected exact item source to beat recent Sapphiron context")
-    assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected loot row to bind to static item source")
+    assertEqual(raid.loot[1].bossNid, 0, "expected passive loot row to avoid recent boss binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected passive loot row to avoid source provenance")
 end)
 
-test("group loot source resolver assigns named trash without timing context", function()
+test("group loot source resolver is skipped for passive trash item", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91731, "Resolver Trash Relic", 302, "resolver-trash-win", {
         {
             npcId = 15989,
@@ -5248,27 +5802,15 @@ test("group loot source resolver assigns named trash without timing context", fu
     Raid:AddLoot("resolver-trash-win")
 
     local raid = h.Core.EnsureRaidById(1)
-    local resolverCall = resolverCalls[1]
-    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked once")
-    assertEqual(resolverCall.itemId, 91731, "expected resolver to receive the trash item id")
-    assertEqual(resolverCall.context.raid, "Naxxramas", "expected resolver to receive raid context")
-    assertEqual(resolverCall.bossKillCountBeforeResolver, 0, "expected resolver to run before source creation")
-    assertEqual(#raid.bossKills, 1, "expected item source resolver to create one trash source record")
-    assertEqual(raid.bossKills[1].name, "Naxxramas Cultist", "expected trash item to bind to named source")
-    assertEqual(raid.bossKills[1].sourceNpcId, 15989, "expected trash item to preserve the source npc id")
-    assertEqual(raid.bossKills[1].sourceKind, "trash", "expected trash item to preserve source kind")
+    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
+    assertEqual(#raid.bossKills, 0, "expected passive group loot to avoid trash source creation")
     assertEqual(h.Core.GetLastBoss(), nil, "expected named trash source not to become lastBoss")
     assertEqual(#raid.loot, 1, "expected trash item to create one loot row")
-    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to trash source")
-    local lootSource = raid.loot[1].lootSource
-    assertTrue(lootSource ~= nil, "expected trash item to persist loot source provenance")
-    assertEqual(lootSource.kind, "trash", "expected trash item provenance kind")
-    assertEqual(lootSource.bossNid, raid.bossKills[1].bossNid, "expected trash item provenance boss nid")
-    assertEqual(lootSource.sourceNpcId, 15989, "expected trash item provenance npc id")
-    assertEqual(lootSource.sourceName, "Naxxramas Cultist", "expected trash item provenance source name")
+    assertEqual(raid.loot[1].bossNid, 0, "expected passive loot row to avoid trash binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected passive loot row to avoid source provenance")
 end)
 
-test("group loot source resolver falls back when item source is ambiguous", function()
+test("group loot source resolver skips shared source for passive item", function()
     local ambiguousSourceData = {
         {
             npcId = 15953,
@@ -5331,25 +5873,14 @@ test("group loot source resolver falls back when item source is ambiguous", func
     Raid:AddLoot("resolver-ambiguous-win")
 
     local raid = h.Core.EnsureRaidById(1)
-    local resolverCall = resolverCalls[2]
-    assertEqual(#resolverCalls, 2, "expected item source resolver to be invoked once for the seed and once before fallback")
-    assertEqual(resolverCall.itemId, 91732, "expected resolver to receive the ambiguous item id")
-    assertEqual(resolverCall.context.raid, "Naxxramas", "expected resolver to receive raid context")
-    assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run after the stale boss seed but before fallback source creation")
-    assertEqual(#raid.bossKills, 2, "expected ambiguous item source to create one fallback record after the seeded boss")
-    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected stale boss seed to stay intact")
-    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
+    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
+    assertEqual(#raid.bossKills, 0, "expected passive group loot to avoid shared source creation")
     assertEqual(#raid.loot, 2, "expected seed and ambiguous item sources to create loot rows")
-    assertEqual(raid.loot[2].bossNid, raid.bossKills[2].bossNid, "expected ambiguous loot row to bind to fallback source")
-    local lootSource = raid.loot[2].lootSource
-    assertTrue(lootSource ~= nil, "expected ambiguous item source to persist fallback provenance")
-    assertEqual(lootSource.kind, "trash", "expected ambiguous item provenance to stay on fallback trash")
-    assertEqual(lootSource.bossNid, raid.bossKills[2].bossNid, "expected fallback provenance boss nid")
-    assertEqual(lootSource.sourceName, "_TrashMob_", "expected fallback provenance source name")
-    assertTrue(lootSource.sourceName ~= "Grand Widow Faerlina", "expected fallback provenance not to retain stale boss source name")
+    assertEqual(raid.loot[2].bossNid, 0, "expected passive shared loot row to avoid source binding")
+    assertEqual(raid.loot[2].lootSource, nil, "expected passive shared loot row to avoid source provenance")
 end)
 
-test("group loot source resolver ambiguous source blocks recent context fallback", function()
+test("group loot source resolver skips shared source despite recent context match", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91735, "Resolver Ambiguous Context Charm", 306, "resolver-ambiguous-context-win", {
         {
             npcId = 15953,
@@ -5391,14 +5922,11 @@ test("group loot source resolver ambiguous source blocks recent context fallback
     Raid:AddLoot("resolver-ambiguous-context-win")
 
     raid = h.Core.EnsureRaidById(1)
-    local resolverCall = resolverCalls[1]
-    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked before context fallback")
-    assertEqual(resolverCall.itemId, 91735, "expected resolver to receive the ambiguous item id")
-    assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run before fallback creation")
-    assertEqual(#raid.bossKills, 2, "expected ambiguous item source to create one fallback record")
+    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating source records")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected recent context boss to stay intact")
-    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
-    assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected ambiguous loot row not to bind to recent context")
+    assertEqual(raid.loot[1].bossNid, 0, "expected passive shared loot row to avoid recent context binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected passive shared loot row to avoid source provenance")
 end)
 
 test("group loot trash rolls do not inherit previous boss death context", function()
@@ -5494,10 +6022,12 @@ test("group loot trash rolls do not inherit previous boss death context", functi
 
     local raid = h.Core.EnsureRaidById(1)
     assertEqual(#raid.loot, 2, "expected boss and trash group loot rows")
-    assertEqual(raid.loot[1].bossNid, 1, "expected first group loot row to bind to the boss")
-    assertEqual(#raid.bossKills, 2, "expected trash group loot to create a TrashMob bucket")
-    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected trash group loot to avoid the previous boss bucket")
-    assertEqual(raid.loot[2].bossNid, 2, "expected trash group loot row to bind to TrashMob")
+    assertEqual(raid.loot[1].bossNid, 0, "expected first group loot row to avoid source binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected first group loot row to avoid source provenance")
+    assertEqual(#raid.bossKills, 1, "expected passive trash group loot to avoid creating a TrashMob bucket")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected boss death record to stay intact")
+    assertEqual(raid.loot[2].bossNid, 0, "expected trash group loot row to avoid source binding")
+    assertEqual(raid.loot[2].lootSource, nil, "expected trash group loot row to avoid source provenance")
 end)
 
 test("trash UNIT_DIED context throttles repeated trash updates", function()
@@ -5691,7 +6221,7 @@ test("trash UNIT_DIED after expired boss context is ignored", function()
     assertEqual(#ctx.h.Core.EnsureRaidById(1).bossKills, 1, "expected expired boss context check to avoid creating TrashMob")
 end)
 
-test("recent trash death blocks boss context within the short ttl", function()
+test("recent trash death is ignored by lightweight passive group loot", function()
     local ctx = newRecentDeathContextHarness()
     local Raid = ctx.Raid
 
@@ -5702,18 +6232,18 @@ test("recent trash death blocks boss context within the short ttl", function()
 
     Raid:AddPassiveLootRoll(240, 45000)
     local windowContext = ctx.h.feature.raidState.lootWindowBossContext
-    assertEqual(windowContext and windowContext.expiresAt, 1018, "expected recent trash blocked context to use the short ttl")
+    assertEqual(windowContext, nil, "expected passive group loot to avoid creating loot-window context")
     assertEqual(Raid:AddGroupLootMessage("recent-trash-greed-win-self"), "winner", "expected trash group loot winner to be recognized")
     Raid:AddLoot("recent-trash-greed-win-self")
 
     local raid = ctx.h.Core.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected one recent trash group-loot row")
-    assertEqual(#raid.bossKills, 2, "expected recent trash context to create a TrashMob bucket")
-    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected recent trash context to block the boss context")
-    assertEqual(raid.loot[1].bossNid, 2, "expected recent trash loot to avoid the prior boss")
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating a TrashMob bucket")
+    assertEqual(raid.loot[1].bossNid, 0, "expected recent trash passive loot to avoid source binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected recent trash passive loot to avoid source provenance")
 end)
 
-test("trash burst ttl follows the latest throttled death", function()
+test("trash burst context is ignored by lightweight passive group loot", function()
     local ctx = newRecentDeathContextHarness()
     local Raid = ctx.Raid
 
@@ -5730,12 +6260,12 @@ test("trash burst ttl follows the latest throttled death", function()
 
     local raid = ctx.h.Core.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected one throttled burst group-loot row")
-    assertEqual(#raid.bossKills, 2, "expected latest throttled trash death to keep trash context alive")
-    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected throttled burst loot to stay classified as trash")
-    assertEqual(raid.loot[1].bossNid, 2, "expected throttled burst loot to avoid the prior boss")
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating a TrashMob bucket")
+    assertEqual(raid.loot[1].bossNid, 0, "expected throttled burst passive loot to avoid source binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected throttled burst passive loot to avoid source provenance")
 end)
 
-test("recent trash death expires before boss event context", function()
+test("recent trash expiry does not restore source binding for lightweight passive group loot", function()
     local ctx = newRecentDeathContextHarness()
     local Raid = ctx.Raid
 
@@ -5751,8 +6281,8 @@ test("recent trash death expires before boss event context", function()
     local raid = ctx.h.Core.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected one delayed group-loot row")
     assertEqual(#raid.bossKills, 1, "expected expired recent trash context to avoid creating TrashMob")
-    assertEqual(raid.loot[1].bossNid, 1, "expected boss event context to remain recoverable within 30 seconds")
-    assertEqual(ctx.h.feature.raidState.recentLootDeathContext, nil, "expected expired recent trash context to be cleared")
+    assertEqual(raid.loot[1].bossNid, 0, "expected delayed passive loot to avoid source binding")
+    assertEqual(raid.loot[1].lootSource, nil, "expected delayed passive loot to avoid source provenance")
 end)
 
 test("group loot winner messages log passive GR history directly", function()
@@ -6594,6 +7124,237 @@ test("master loot award failure error cancels pending loot counter credit", func
     assertEqual(#ctx.addCounts, 0, "expected failed award to avoid LootCounter credit even if a later slot event appears")
 end)
 
+test("loot service classifies master loot award failure messages", function()
+    local h = newHarness()
+
+    _G.ERR_INV_FULL = "Inventory is full."
+    _G.ERR_ITEM_MAX_COUNT = "You can't carry any more of those items."
+    _G.ERR_LOOT_LOCKED = "Loot is locked."
+    _G.ERR_LOOT_GONE = "Loot is gone."
+
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    assertTrue(Loot:IsMasterLootAwardFailureMessage("Inventory is full.") == true, "expected exact inventory error to match")
+    assertTrue(Loot:IsMasterLootAwardFailureMessage("Your bags are full.") == true, "expected bag-full text to match")
+    assertTrue(Loot:IsMasterLootAwardFailureMessage("Player not found") == true, "expected missing player text to match")
+    assertTrue(Loot:IsMasterLootAwardFailureMessage("Some unrelated message") == false, "expected unrelated text to be ignored")
+    assertTrue(Loot:IsMasterLootAwardFailureMessage(nil) == false, "expected nil text to be ignored")
+end)
+
+test("loot service resolves trade awarded count from inventory stack delta", function()
+    local h = newHarness()
+    local link = h.registerItem(9315, "Stacked Tradeblade")
+    local otherLink = h.registerItem(9316, "Other Tradeblade")
+    local bagItems = {
+        [0] = {
+            [1] = { link = link, count = 2 },
+        },
+    }
+
+    _G.GetContainerItemLink = function(bag, slot)
+        local item = bagItems[bag] and bagItems[bag][slot] or nil
+        return item and item.link or nil
+    end
+    _G.GetContainerItemInfo = function(bag, slot)
+        local item = bagItems[bag] and bagItems[bag][slot] or nil
+        return nil, item and item.count or 0
+    end
+
+    h.feature.lootState.selectedItemCount = 3
+    h.feature.lootState.tradeItemLink = link
+    h.feature.itemInfo = h.feature.itemInfo or {}
+    h.feature.itemInfo.tradeStartCount = 5
+    h.feature.itemInfo.tradeStartBag = 0
+    h.feature.itemInfo.tradeStartSlot = 1
+    h.feature.itemInfo.tradeStartItemLink = link
+
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    assertEqual(Loot:ResolveTradeAwardedCount(), 3, "expected stack delta to drive awarded trade count")
+
+    bagItems[0][1] = { link = otherLink, count = 2 }
+    assertEqual(Loot:ResolveTradeAwardedCount(), 5, "expected replaced source slot to count the full original stack")
+
+    h.feature.itemInfo.tradeStartCount = nil
+    assertEqual(Loot:ResolveTradeAwardedCount(), 1, "expected missing trade snapshot to fall back to one item")
+end)
+
+test("loot service resolves inventory awarded count for direct keep flows", function()
+    local h = newHarness()
+
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    h.feature.lootState.selectedItemCount = 3
+    h.feature.lootState.fromInventory = false
+    assertEqual(Loot:ResolveInventoryAwardedCount(), 3, "expected loot-window direct awards to use selected count")
+
+    h.feature.lootState.fromInventory = true
+    assertEqual(Loot:ResolveInventoryAwardedCount(), 1, "expected inventory multi awards to consume one copy")
+
+    h.feature.lootState.selectedItemCount = 0
+    assertEqual(Loot:ResolveInventoryAwardedCount(), 1, "expected invalid selected counts to fall back to one")
+end)
+
+test("loot service builds trade notification plans without WoW side effects", function()
+    local h = newHarness()
+    local link = h.registerItem(9317, "Planning Tradeblade")
+    local setRaidTargetCalls = 0
+
+    _G.SetRaidTarget = function()
+        setRaidTargetCalls = setRaidTargetCalls + 1
+        error("service plan must not call SetRaidTarget")
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    local keepPlan = Loot:BuildTradeNotificationPlan({
+        itemLink = link,
+        playerName = "Tester",
+        rollType = h.rollTypes.HOLD,
+        isAwardRoll = false,
+        selectedItemCount = 1,
+        traderName = "Tester",
+        options = {
+            announceOnHold = true,
+        },
+    })
+
+    assertEqual(keepPlan.keep, true, "expected non-award trade plan to be a keep plan")
+    assertEqual(keepPlan.output, h.addon.L.ChatNoneRolledHold:format(link, "Tester"), "expected hold announce text")
+    assertEqual(keepPlan.whisper, h.addon.L.WhisperHoldTrade:format(link), "expected hold whisper text")
+    assertEqual(keepPlan.markerPlan, nil, "expected keep plan to avoid marker planning")
+
+    local awardPlan = Loot:BuildTradeNotificationPlan({
+        itemLink = link,
+        playerName = "Alice",
+        winnerName = "Alice",
+        rollType = h.rollTypes.MAINSPEC,
+        isAwardRoll = true,
+        selectedItemCount = 1,
+        traderName = "Tester",
+        options = {
+            announceOnWin = true,
+        },
+    })
+
+    assertEqual(awardPlan.keep, false, "expected award trade plan to require external trade")
+    assertEqual(awardPlan.output, h.addon.L.ChatAward:format("Alice", link), "expected award announce text")
+    assertEqual(awardPlan.whisper, nil, "expected award plan to avoid keep whisper")
+    assertEqual(awardPlan.markerPlan, nil, "expected single award to avoid marker planning")
+
+    local multiPlan = Loot:BuildTradeNotificationPlan({
+        itemLink = link,
+        playerName = "Alice",
+        winnerName = "Alice",
+        rollType = h.rollTypes.MAINSPEC,
+        isAwardRoll = true,
+        selectedItemCount = 2,
+        traderName = "Tester",
+        selectedWinners = {
+            { name = "Alice", roll = 98 },
+            { name = "Tester", roll = 77 },
+        },
+        raidTargetMarkers = {
+            "{rt1}",
+            "{rt2}",
+        },
+        options = {
+            announceOnWin = true,
+        },
+    })
+
+    assertEqual(multiPlan.keep, false, "expected multi plan to remain an award flow")
+    assertEqual(multiPlan.markerPlan.clearRaidIcons, true, "expected marker plan to request icon cleanup")
+    assertEqual(multiPlan.markerPlan.raidTargets[1].name, "Tester", "expected trader marker instruction")
+    assertEqual(multiPlan.markerPlan.raidTargets[1].icon, 1, "expected trader marker icon")
+    assertEqual(multiPlan.markerPlan.raidTargets[2].name, "Alice", "expected winner marker instruction")
+    assertEqual(multiPlan.markerPlan.raidTargets[2].icon, 2, "expected winner marker icon")
+    assertTrue(type(multiPlan.output) == "string" and multiPlan.output ~= "", "expected multi-winner announce text")
+    assertEqual(multiPlan.markerPlan.winnersText, "{rt1} Alice(98), {star} Tester(77)", "expected pure winners text")
+    assertEqual(setRaidTargetCalls, 0, "expected service planning to avoid SetRaidTarget")
+end)
+
+test("loot service builds pure master award planning models", function()
+    local h = newHarness()
+    local link = h.registerItem(9318, "Award Planning Blade")
+
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    local targetPlan = Loot:BuildAwardTargetPlan({
+        selectedItemCount = 4,
+        availableItemCount = 3,
+        rollsCount = 2,
+    })
+    assertEqual(targetPlan.target, 2, "expected award target to clamp to rolls count")
+    assertEqual(targetPlan.available, 3, "expected available count to clamp independently")
+
+    local fallbackPlan = Loot:BuildAwardTargetPlan({
+        selectedItemCount = 0,
+        availableItemCount = 0,
+    })
+    assertEqual(fallbackPlan.target, 1, "expected invalid target to fall back to one")
+    assertEqual(fallbackPlan.available, 1, "expected invalid available count to fall back to one")
+
+    local invalidSelection = Loot:ValidateInventoryTradeSelection({
+        target = 2,
+        selectedCount = 1,
+        pickedCount = 1,
+    })
+    assertEqual(invalidSelection.ok, false, "expected too few picked winners to fail validation")
+    assertEqual(invalidSelection.errType, "not_enough_selection", "expected exact inventory validation reason")
+    assertEqual(invalidSelection.wantedCount, 2, "expected target count in validation result")
+    assertEqual(invalidSelection.pickedCount, 1, "expected picked count in validation result")
+
+    local winnersPlan = Loot:BuildMultiAwardWinnersPlan({
+        target = 2,
+        selectedCount = 3,
+        pickedWinners = {
+            { name = "Alice", roll = 98 },
+            { name = "Bob", roll = "77" },
+            { name = "Cara", roll = 55 },
+        },
+    })
+    assertEqual(winnersPlan.errType, nil, "expected selected winners to produce a plan")
+    assertEqual(winnersPlan.clearSelection, true, "expected service plan to request selection cleanup")
+    assertEqual(#winnersPlan.winners, 2, "expected winners to clamp to requested target")
+    assertEqual(winnersPlan.winners[1].name, "Alice", "expected winner order to be preserved")
+    assertEqual(winnersPlan.winners[2].roll, 77, "expected winner rolls to normalize numerically")
+
+    local emptyPlan = Loot:BuildMultiAwardWinnersPlan({
+        target = 2,
+        selectedCount = 0,
+        pickedWinners = {},
+    })
+    assertEqual(emptyPlan.errType, "empty_selection", "expected empty selection reason")
+    assertEqual(emptyPlan.winners, nil, "expected failed winner plan to avoid winner output")
+
+    local statePlan = Loot:BuildMultiAwardState({
+        itemLink = link,
+        available = 3,
+        rollType = h.rollTypes.MAINSPEC,
+        winners = winnersPlan.winners,
+        slotCandidates = { 1, 2 },
+        slotCandidateMap = {
+            [1] = true,
+            [2] = true,
+        },
+        announceOnWin = true,
+    })
+    assertEqual(statePlan.state.active, true, "expected multi-award state to be active")
+    assertEqual(statePlan.state.itemLink, link, "expected state to preserve item link")
+    assertEqual(statePlan.state.lastCount, 3, "expected state to preserve available count")
+    assertEqual(statePlan.state.currentWinner, "Alice", "expected first winner to become current")
+    assertEqual(statePlan.state.pos, 2, "expected first award to remain immediate")
+    assertEqual(statePlan.state.total, 2, "expected total to match planned winners")
+    assertEqual(statePlan.state.announceOnWin, true, "expected state to preserve announce flag")
+    assertEqual(statePlan.state.congratsSent, false, "expected new multi-award state to start unsent")
+end)
+
 test("master loot award timeout leaves unconfirmed loot counter credit unapplied", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice" },
@@ -7005,15 +7766,33 @@ test("loot winner dispatch forwards passive winners immediately", function()
             return true
         end,
     }
+    local winnerOnlyCalls = 0
+    local broadParserCalls = 0
     h.addon.Services.Loot = {
-        AddGroupLootMessage = function(_, msg)
-            if msg == "winner-loot" or msg == "winner-system" then
-                return "winner"
+        ObservePassiveLootMessage = function(_, msg, winnerOnly)
+            if winnerOnly then
+                winnerOnlyCalls = winnerOnlyCalls + 1
+            else
+                broadParserCalls = broadParserCalls + 1
+            end
+            if (winnerOnly and msg == "winner-loot") or ((not winnerOnly) and msg == "winner-system") then
+                return "winner",
+                    {
+                        kind = "winner",
+                        msg = msg,
+                        itemLink = "item-link",
+                        sessionId = "GL:test",
+                    }
             end
             return nil
         end,
-        AddLoot = function(_, msg)
-            addLootCalls[#addLootCalls + 1] = msg
+        AddLoot = function(_, msg, rollType, rollValue, parsedLoot)
+            addLootCalls[#addLootCalls + 1] = {
+                msg = msg,
+                rollType = rollType,
+                rollValue = rollValue,
+                parsedLoot = parsedLoot,
+            }
         end,
     }
     h.addon.Services.Rolls = {
@@ -7029,8 +7808,12 @@ test("loot winner dispatch forwards passive winners immediately", function()
     _G.LibStub = oldLibStub
 
     assertEqual(#addLootCalls, 2, "expected passive winner messages on loot and system channels to reach the loot service")
-    assertEqual(addLootCalls[1], "winner-loot", "expected loot winner messages to materialize immediately")
-    assertEqual(addLootCalls[2], "winner-system", "expected system winner messages to materialize immediately")
+    assertEqual(addLootCalls[1].msg, "winner-loot", "expected loot winner messages to materialize immediately")
+    assertEqual(addLootCalls[2].msg, "winner-system", "expected system winner messages to materialize immediately")
+    assertEqual(addLootCalls[1].parsedLoot.sessionId, "GL:test", "expected loot winner parsed context to reach AddLoot")
+    assertEqual(addLootCalls[2].parsedLoot.sessionId, "GL:test", "expected system winner parsed context to reach AddLoot")
+    assertEqual(winnerOnlyCalls, 1, "expected CHAT_MSG_LOOT to use the winner-only passive parser")
+    assertEqual(broadParserCalls, 2, "expected CHAT_MSG_SYSTEM to keep using the full passive parser")
     assertEqual(#rollsMessages, 2, "expected system messages to keep flowing to the rolls service")
     assertEqual(rollsMessages[1], "winner-system", "expected winner system messages to keep flowing to the rolls service")
     assertEqual(rollsMessages[2], "roll-system", "expected the rolls service to receive unrelated system messages")
@@ -7101,6 +7884,86 @@ test("start loot roll dispatch forwards to the loot service", function()
 
     assertEqual(observed.rollId, 44, "expected START_LOOT_ROLL to forward the roll id to the loot service")
     assertEqual(observed.rollTime, 65000, "expected START_LOOT_ROLL to forward the roll time to the loot service")
+end)
+
+test("chat msg addon dispatch gives loot distribution messages to the loot service first", function()
+    local h = newHarness()
+    local observed = {}
+    local syncerCalls = 0
+    local oldLibStub = _G.LibStub
+    local mainFrame = h.makeFrame(true, "KRTMainTestFrame")
+
+    function mainFrame:RegisterEvent(eventName)
+        self._events = self._events or {}
+        self._events[eventName] = true
+    end
+
+    function mainFrame:UnregisterEvent(eventName)
+        if self._events then
+            self._events[eventName] = nil
+        end
+    end
+
+    function mainFrame:UnregisterAllEvents()
+        self._events = {}
+    end
+
+    _G.LibStub = function(name)
+        if name == "LibCompat-1.0" then
+            return {
+                Embed = function() end,
+                Print = function() end,
+            }
+        end
+        if name == "LibBossIDs-1.0" then
+            return {}
+        end
+        if name == "LibLogger-1.0" then
+            return {
+                logLevels = {
+                    INFO = 1,
+                    DEBUG = 2,
+                },
+                Embed = function(_, target)
+                    target.SetLogLevel = target.SetLogLevel or function() end
+                end,
+            }
+        end
+        if name == "LibDeformat-3.0" then
+            return function()
+                return nil
+            end
+        end
+        error("unexpected LibStub request: " .. tostring(name), 0)
+    end
+
+    h.addon.State.frames = { main = mainFrame }
+    h:load("!KRT/Init.lua")
+    h.addon.Services.Loot = {
+        RequestDistributionMessageHandling = function(_, prefix, msg, channel, sender)
+            observed.prefix = prefix
+            observed.msg = msg
+            observed.channel = channel
+            observed.sender = sender
+            return prefix == "KRTDist"
+        end,
+    }
+    h.Core.GetSyncer = function()
+        return {
+            OnAddonMessage = function()
+                syncerCalls = syncerCalls + 1
+            end,
+        }
+    end
+
+    h.addon:CHAT_MSG_ADDON("KRTDist", "ITEM|1", "RAID", "Alice")
+    _G.LibStub = oldLibStub
+
+    assertEqual(observed.prefix, "KRTDist", "expected distribution prefix to reach loot service")
+    assertEqual(observed.msg, "ITEM|1", "expected distribution payload to reach loot service")
+    assertEqual(observed.channel, "RAID", "expected distribution channel to reach loot service")
+    assertEqual(observed.sender, "Alice", "expected distribution sender to reach loot service")
+    assertEqual(syncerCalls, 0, "expected handled distribution messages to skip logger syncer fallback")
 end)
 
 test("chat msg whisper dispatch forwards to the bus", function()
@@ -7225,8 +8088,9 @@ test("runtime perf logger reports only slow measured blocks", function()
     h:load("!KRT/Localization/DiagnoseLog.en.lua")
     h:load("!KRT/Init.lua")
 
-    h.addon:SetPerfMode(true)
-    h.addon:SetPerfThresholdMs(5)
+    h.addon.State.perfEnabled = true
+    h.addon.State.perfThresholdMs = 5
+    h.addon.hasPerf = true
 
     local start = h.addon:_PerfStart()
     currentTime = 1000.004
@@ -7401,7 +8265,7 @@ test("master loot receipt does not double credit a pre-counted pending award", f
     local raid = h.Core.EnsureRaidById(1)
     local playerNid = Raid:GetPlayerID("Tester", 1)
     assertEqual(#raid.loot, 1, "expected master loot receipt to still create a loot entry")
-    assertEqual(Raid:GetPlayerCountByNid(playerNid, 1), 1, "expected observed loot chat to avoid double-crediting the pre-counted award")
+    assertEqual(Raid:GetPlayerLootCountByNid(playerNid, "ms", 1), 1, "expected observed loot chat to avoid double-crediting the pre-counted award")
 end)
 
 test("loot pending awards upgrade the next FIFO duplicate entry", function()
@@ -7492,6 +8356,99 @@ test("passive group loot selections keep duplicate item sessions separate by rol
     assertTrue(second ~= nil, "expected second passive duplicate session to remain consumable")
     assertEqual(first.rollSessionId, "GL:1", "expected first duplicate passive selection to keep the first roll session id")
     assertEqual(second.rollSessionId, "GL:2", "expected second duplicate passive selection to keep the second roll session id")
+end)
+
+test("passive roll sessions keep native roll metadata", function()
+    local h = newHarness()
+    local link = h.registerItem(91865, "Native Roll Sigil", 4, "Interface\\Icons\\INV_Misc_Rune_01")
+    local now = 1000
+
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetTime = function()
+        return now
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 81 then
+            return link
+        end
+        return nil
+    end
+    _G.GetLootRollItemInfo = function(rollId)
+        if rollId == 81 then
+            return "Interface\\Icons\\INV_Misc_Rune_01", "Native Roll Sigil", 2, 4
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    local entry = Raid:AddPassiveLootRoll(81, 65000)
+
+    assertEqual(entry.rollId, 81, "expected passive roll session to keep native roll id")
+    assertEqual(entry.sessionId, "GL:1", "expected passive roll session id to be assigned")
+    assertEqual(entry.itemLink, link, "expected passive roll session to keep native item link")
+    assertEqual(entry.itemName, "Native Roll Sigil", "expected passive roll session to keep native item name")
+    assertEqual(entry.itemRarity, 4, "expected passive roll session to keep native item rarity")
+    assertEqual(entry.itemTexture, "Interface\\Icons\\INV_Misc_Rune_01", "expected passive roll session to keep native item texture")
+    assertEqual(entry.itemCount, 2, "expected passive roll session to keep native item count")
+    assertTrue(type(entry.startedAt) == "number", "expected passive roll session to record start time")
+    assertTrue(type(entry.expiresAt) == "number" and entry.expiresAt > entry.startedAt, "expected passive roll session to record expiry")
+end)
+
+test("passive winner context includes roll session details", function()
+    local h = newHarness()
+    local link = h.registerItem(91866, "Context Sigil")
+    local now = 1000
+
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetTime = function()
+        return now
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 82 then
+            return link
+        end
+        return nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED and msg == "need-win-self-context" then
+            return 82, 98, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Loot = h.addon.Services.Loot
+    local Raid = h.addon.Services.Raid
+    Raid:AddPassiveLootRoll(82, 65000)
+
+    local observedType, parsed = Loot:GetGroupLootMessageResult("need-win-self-context")
+
+    assertEqual(observedType, "winner", "expected winner message to be classified")
+    assertEqual(parsed.kind, "winner", "expected parsed context to identify winner kind")
+    assertEqual(parsed.rollId, 82, "expected parsed context to keep native roll id")
+    assertEqual(parsed.sessionId, "GL:1", "expected parsed context to keep passive roll session id")
+    assertEqual(parsed.itemLink, link, "expected parsed context to keep item link")
+    assertEqual(parsed.itemKey, h.addon.Item.GetItemStringFromLink(link), "expected parsed context to keep item key")
+    assertEqual(parsed.rollType, h.rollTypes.NEED, "expected parsed context to keep roll type")
+    assertEqual(parsed.rollValue, 98, "expected parsed context to keep roll value")
+    assertTrue(parsed.isPassiveWinner == true, "expected parsed context to mark passive winner")
 end)
 
 test("ambiguous duplicate passive rolls stay sessionless without roll ids", function()
@@ -8039,7 +8996,7 @@ test("single winner ctrl-click clears and replaces the prefilled multiselect win
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
     Rolls:RecordRolls(false)
-    Rolls:FetchRolls()
+    Rolls:GetDisplayModel()
 
     assertEqual(h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 0, "expected Rolls service to stop owning prefilled single-award multiselect state")
     assertEqual(h.feature.lootState.winner, nil, "expected Rolls service to stop mutating the selected winner mirror directly")
@@ -8099,7 +9056,7 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     Rolls:RecordRolls(false)
 
     local eligibility = Rolls:GetCandidateEligibility("Alice", link, h.rollTypes.MAINSPEC)
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local first = model and model.rows and model.rows[1]
 
     assertTrue(eligibility ~= nil and eligibility.ok == true, "expected accepted winner to remain candidate-eligible after consuming the quota")
@@ -8186,7 +9143,7 @@ test("reserved rolls exclude non-reservers and expose softres context in the dis
     assertTrue(Rolls:SubmitDebugRoll("Alice", 88) == true, "expected an in-raid reserver to be accepted during SR roll intake")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local alice
     local bob
     local cara
@@ -8261,7 +9218,7 @@ test("late accepted rolls show OOT info when intake remains open", function()
     h:flushTimers()
 
     local ok, reason = Rolls:SubmitDebugRoll("Alice", 87)
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local row = model and model.rows and model.rows[1]
 
     assertTrue(ok == true, "expected late roll to stay accepted while intake is open")
@@ -8324,7 +9281,7 @@ test("late tied OOT rolls stay excluded from manual resolution and reroll", func
 
     local okAlice, reasonAlice = Rolls:SubmitDebugRoll("Alice", 96)
     local okBob, reasonBob = Rolls:SubmitDebugRoll("Bob", 96)
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local rows = model and model.rows or {}
     local aliceRow
     local bobRow
@@ -8427,7 +9384,7 @@ test("master roll intake reopens after announcing rolls with service-owned sessi
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
     h:load("!KRT/Services/Rolls/Service.lua")
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(true, "KRTMaster")
@@ -8491,7 +9448,7 @@ test("master assignment buttons stay disabled until a target is selected", funct
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(true, "KRTMaster")
@@ -8618,7 +9575,7 @@ test("master auto loot suggestions stay visual only", function()
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(true, "KRTMaster")
@@ -8724,7 +9681,7 @@ test("master workflow model names rolling and ready states without changing stat
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local Private = Master._Private
@@ -8830,7 +9787,7 @@ test("master workflow model centralizes button capabilities without changing gat
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local Private = Master._Private
@@ -9011,7 +9968,7 @@ test("master dropdown click uses UIDropDown owner/value arguments", function()
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(true, "KRTMaster")
@@ -9120,7 +10077,7 @@ test("master item count bindings use shared edit-box handlers", function()
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(true, "KRTMaster")
@@ -9258,7 +10215,7 @@ test("master item selection popup stays clickable", function()
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(true, "KRTMaster")
@@ -9394,7 +10351,7 @@ test("master loot opened stays hidden while passively observing group loot", fun
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(false, "KRTMaster")
@@ -9479,7 +10436,7 @@ test("master roll rows stay clickable through the shared list controller", funct
     h.feature.MultiSelect = h.addon.MultiSelect
     h:load("!KRT/Modules/UI/ListController.lua")
     h.feature.ListController = h.addon.ListController
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     local frame = h.makeFrame(true, "KRTMaster")
@@ -9649,7 +10606,7 @@ test("explicit pass stays visible without entering winner resolution", function(
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local alice
     local bob
 
@@ -9717,7 +10674,7 @@ test("explicit pass can transition back into a valid roll while the session stay
     assertTrue(Rolls:SubmitDebugRoll("Alice", 88) == true, "expected pass responses to remain reversible into a valid roll")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local alice = model.rows[1]
 
     assertEqual(#Rolls:GetRolls(), 1, "expected the accepted post-pass roll to remain in the raw log")
@@ -9831,7 +10788,7 @@ test("cancelled response keeps raw roll history but leaves current resolution", 
     assertTrue(Rolls:PlayerCancel("Alice") == true, "expected cancel to retract an earlier explicit roll response")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local alice
 
     assertTrue(model.visibleRows == nil, "expected visibleRows filtering to become controller-owned, not service-owned")
@@ -9942,7 +10899,7 @@ test("cancelled responses can roll again while the session stays open", function
     assertTrue(Rolls:SubmitDebugRoll("Alice", 91) == true, "expected cancelled responses to remain reversible into a valid roll")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local alice = model.rows[1]
 
     assertEqual(#Rolls:GetRolls(), 2, "expected raw roll history to remain append-only across cancel and reroll")
@@ -10003,7 +10960,7 @@ test("timed out responses stay terminal for the current session", function()
     Rolls:RecordRolls(true)
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local alice = model.rows[1]
     local ok, reason = Rolls:SubmitDebugRoll("Alice", 87)
 
@@ -10066,11 +11023,11 @@ test("tie reroll resets intake to tied players only", function()
     Rolls:CHAT_MSG_SYSTEM("Cara 77")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     assertTrue(model.resolution.requiresManualResolution == true, "expected a first-place tie to require manual resolution before reroll")
     assertTrue(Rolls:BeginTieReroll(model.resolution.tiedNames) == true, "expected tied winners to reopen the current session as a reroll")
 
-    model = Rolls:FetchRolls()
+    model = Rolls:GetDisplayModel()
     assertEqual(#Rolls:GetRolls(), 0, "expected tie reroll to clear previous raw rolls")
     assertEqual(model.rows[1].name, "Alice", "expected the full model to keep tied players materialized")
     assertEqual(model.rows[2].name, "Bob", "expected the full model to keep tied players materialized")
@@ -10141,7 +11098,7 @@ test("duplicate roll attempts stay visible on the accepted response row", functi
     assertTrue(ok ~= true, "expected the duplicate roll to be denied")
     assertEqual(reason, "roll_limit", "expected duplicate roll denial to carry the roll-limit reason")
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local alice = model.rows[1]
 
     assertEqual(#Rolls:GetRolls(), 1, "expected duplicate attempts to stay out of raw roll intake")
@@ -10203,7 +11160,7 @@ test("master award button triggers reroll for single-select ties", function()
     })
     h.feature.Services = h.addon.Services
     h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
-    h:load("!KRT/Controllers/Master.lua")
+    loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
     Master.RequestRefresh = function()
@@ -10415,7 +11372,7 @@ test("row info tags stay separate from counter values", function()
     Rolls:RecordRolls(false)
 
     playerInRaid = false
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local first = model and model.rows and model.rows[1]
 
     assertTrue(first ~= nil, "expected rolled player to stay visible after leaving raid")
@@ -10477,7 +11434,7 @@ test("inventory winner stays undecorated in the pure rolls service model", funct
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     local first = model and model.rows and model.rows[1]
 
     assertEqual(h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 0, "expected inventory flow to keep the winner outside the loot-window multiselect")
@@ -10543,7 +11500,7 @@ test("inventory multi winners stay undecorated in the pure rolls service model",
     Rolls:CHAT_MSG_SYSTEM("Cara 45")
     Rolls:RecordRolls(false)
 
-    local model = Rolls:FetchRolls()
+    local model = Rolls:GetDisplayModel()
     assertEqual(h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 0, "expected Rolls service to stop prefiling inventory multi-copy multiselect state")
     assertTrue(model.rows[1].displayName == nil, "expected the pure rolls service model to omit UI display-name decoration")
     assertTrue(model.rows[2].displayName == nil, "expected the pure rolls service model to omit UI display-name decoration")
@@ -10785,7 +11742,7 @@ test("reserves expose item and roster match context for master loot", function()
     assertEqual(itemContext.presentPlayersText, "Alice (P+4)", "expected present reserve text to keep plus data")
     assertEqual(itemContext.missingPlayersText, "Bob (P+2)", "expected missing reserve text to keep plus data")
 
-    local report = Reserves:GetRosterReserveMatchReport()
+    local report = Reserves:GetReadinessReport().rosterReport
     assertEqual(report.totalReservePlayers, 3, "expected report to count unique imported reserve players")
     assertEqual(report.presentReservePlayers, 1, "expected report to count reserve players in current raid")
     assertEqual(report.missingReservePlayers, 2, "expected report to count reserve players outside current raid")
@@ -10840,7 +11797,7 @@ test("reserves name match report suggests read-only softres roster name fixes", 
     local Reserves = h.addon.Services.Reserves
     Reserves:Load()
 
-    local report = Reserves:GetNameMatchReport()
+    local report = Reserves:GetReadinessReport().nameMatchReport
 
     assertEqual(report.reservePlayersOutsideRaidText, "Alicee, Bbo, Cara", "expected all misspelled reserve names to be reported outside raid")
     assertEqual(report.raidPlayersWithoutReserveText, "Alice, Bob, Dan", "expected all unmatched raid names to be reported without exact reserves")
@@ -11192,21 +12149,6 @@ test("slash perf toggles runtime performance logging", function()
     local h = newHarness()
     _G.SlashCmdList = {}
 
-    h.addon.SetPerfMode = function(_, enabled)
-        h.addon.State.perfEnabled = enabled and true or false
-        h.addon.hasPerf = h.addon.State.perfEnabled and true or nil
-    end
-    h.addon.IsPerfModeEnabled = function()
-        return h.addon.State.perfEnabled == true
-    end
-    h.addon.SetPerfThresholdMs = function(_, value)
-        h.addon.State.perfThresholdMs = tonumber(value) or 0
-        return h.addon.State.perfThresholdMs
-    end
-    h.addon.GetPerfThresholdMs = function()
-        return tonumber(h.addon.State.perfThresholdMs) or 5
-    end
-
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/EntryPoints/SlashEvents.lua")
@@ -11460,6 +12402,141 @@ test("comms payload helpers encode split and pack addon-message fields", functio
     assertEqual(payload._DecodeText(fields[2]), "Alpha|Beta", "expected encoded delimiter text to round-trip")
     assertEqual(fields[3], "", "expected nil payload fields to pack as empty strings")
     assertEqual(fields[4], "tail", "expected final payload field")
+end)
+
+test("loot distribution session publishes item roll and done messages", function()
+    local h = newHarness()
+    local sent = {}
+    local itemLink = h.registerItem(9301, "Session Blade", 4, "Icon9301")
+    local itemKey = h.addon.Item.GetItemStringFromLink(itemLink)
+
+    h:setRaidRoleState({ inRaid = true, isMasterLooter = true })
+    h:load("!KRT/Modules/Comms.lua")
+    h.addon.Comms.Sync = function(prefix, msg)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+        }
+        return true
+    end
+    h:load("!KRT/Services/Loot/DistributionSession.lua")
+
+    local Distribution = h.addon.Services.Loot._DistributionSession
+    assertTrue(Distribution.PublishItem({
+        itemKey = itemKey,
+        itemLink = itemLink,
+        itemName = "Session Blade",
+        itemTexture = "Icon9301",
+        quality = 4,
+        count = 2,
+        slot = 1,
+    }) == true, "expected master looter to publish an item row")
+    assertTrue(Distribution.PublishRollStart(itemKey, h.rollTypes.MAINSPEC, 30) == true, "expected roll start to publish")
+    assertTrue(Distribution.PublishRollEnd(itemKey, "Alice", 98, "roll_resolution") == true, "expected roll end to publish")
+    assertTrue(Distribution.PublishItemDone(itemKey, "Alice") == true, "expected item done to publish")
+
+    local model = Distribution.GetDisplayModel()
+    assertEqual(#sent, 4, "expected compact item roll and done messages")
+    assertEqual(sent[1].prefix, "KRTDist", "expected dedicated distribution prefix")
+    assertEqual(#model.rows, 1, "expected one distribution display row")
+    assertEqual(model.rows[1].itemKey, itemKey, "expected item key to stay stable")
+    assertEqual(model.rows[1].itemLink, itemLink, "expected item link to stay visible")
+    assertEqual(model.rows[1].state, "done", "expected done state after award publication")
+    assertEqual(model.rows[1].winnerName, "Alice", "expected final winner to be retained")
+    assertEqual(model.rows[1].rollValue, 98, "expected final roll value to be retained")
+    assertEqual(model.rows[1].rollType, h.rollTypes.MAINSPEC, "expected roll type to be retained")
+end)
+
+test("loot service consumes distribution addon messages into a raider display model", function()
+    local source = newHarness()
+    local target = newHarness()
+    local sent = {}
+    local changed = 0
+    local itemLink = source.registerItem(9302, "Synced Session Blade", 4, "Icon9302")
+    local itemKey = source.addon.Item.GetItemStringFromLink(itemLink)
+
+    source:setRaidRoleState({ inRaid = true, isMasterLooter = true })
+    source:load("!KRT/Modules/Comms.lua")
+    source.addon.Comms.Sync = function(prefix, msg)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+        }
+        return true
+    end
+    source:load("!KRT/Services/Loot/DistributionSession.lua")
+
+    source.addon.Services.Loot._DistributionSession.PublishItem({
+        itemKey = itemKey,
+        itemLink = itemLink,
+        itemName = "Synced Session Blade",
+        itemTexture = "Icon9302",
+        quality = 4,
+        count = 1,
+        slot = 1,
+    })
+    source.addon.Services.Loot._DistributionSession.PublishRollStart(itemKey, source.rollTypes.RESERVED, 45)
+    source.addon.Services.Loot._DistributionSession.PublishRollEnd(itemKey, "Bob", 87, "manual_resolution")
+    source.addon.Services.Loot._DistributionSession.PublishItemDone(itemKey, "Bob")
+
+    target.Bus.RegisterCallback(target.addon.Events.Internal.LootDistributionSessionChanged, function()
+        changed = changed + 1
+    end)
+    target:setRaidRoleState({ inRaid = true, isMasterLooter = false })
+    target:load("!KRT/Modules/Comms.lua")
+    target:load("!KRT/Services/Loot.lua")
+
+    for i = 1, #sent do
+        local handled = target.addon.Services.Loot:RequestDistributionMessageHandling(sent[i].prefix, sent[i].msg, "RAID", "ML")
+        assertTrue(handled == true, "expected distribution message to be consumed")
+    end
+
+    local model = target.addon.Services.Loot:GetDistributionSessionModel()
+    assertTrue(changed >= 4, "expected distribution bus event for incoming state changes")
+    assertEqual(#model.rows, 1, "expected synced distribution model to contain one item")
+    assertEqual(model.rows[1].itemKey, itemKey, "expected synced item key")
+    assertEqual(model.rows[1].itemLink, itemLink, "expected synced item link")
+    assertEqual(model.rows[1].state, "done", "expected synced done state")
+    assertEqual(model.rows[1].winnerName, "Bob", "expected synced winner")
+    assertEqual(model.rows[1].rollValue, 87, "expected synced roll value")
+    assertEqual(model.rows[1].rollType, target.rollTypes.RESERVED, "expected synced roll type")
+end)
+
+test("loot service keeps booting when the distribution helper file is missing", function()
+    local h = newHarness()
+
+    h:load("!KRT/Services/Loot/Context.lua")
+    h:load("!KRT/Services/Loot/State.lua")
+    h:load("!KRT/Services/Loot/Snapshots.lua")
+    h:load("!KRT/Services/Loot/PendingAwards.lua")
+    h:load("!KRT/Services/Loot/PassiveGroupLoot.lua")
+    h:load("!KRT/Services/Loot/Tracking.lua")
+    h:load("!KRT/Services/Loot/Rules.lua")
+    h:load("!KRT/Services/Loot/Service.lua")
+
+    local loot = h.addon.Services.Loot
+    local model = loot:GetDistributionSessionModel()
+
+    assertTrue(loot._DistributionSession ~= nil, "expected service fallback to install a distribution helper table")
+    assertEqual(#model.rows, 0, "expected fallback display model to be empty")
+    assertTrue(loot:RequestDistributionMessageHandling("KRTDist", "ITEM|1", "RAID", "ML") == false, "expected fallback to ignore distribution messages")
+    assertTrue(loot:SetDistributionState("session") == false, "expected fallback session reset to be a no-op")
+    assertTrue(loot:SetDistributionState("roll_start", {
+        itemLink = "item:1",
+        rollType = h.rollTypes.MAINSPEC,
+        duration = 30,
+    }) == false, "expected fallback roll start to be a no-op")
+    assertTrue(loot:SetDistributionState("roll_end", {
+        itemLink = "item:1",
+        winnerName = "Alice",
+        rollValue = 98,
+        reason = "test",
+    }) == false, "expected fallback roll end to be a no-op")
+    assertTrue(loot:SetDistributionState("item_done", {
+        itemLink = "item:1",
+        winnerName = "Alice",
+    }) == false, "expected fallback item done to be a no-op")
+    assertTrue(loot:SetDistributionState("unknown") == false, "expected unknown distribution states to be ignored")
 end)
 
 test("comms sync reports unavailable group transport", function()

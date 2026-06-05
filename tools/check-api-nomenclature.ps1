@@ -67,6 +67,9 @@ function Get-ApiScope([string]$target, [string]$method) {
     if ($method -match "^_") {
         return "Internal"
     }
+    if ($target -match "(^|\.)_[A-Za-z0-9_]+(\.|$)") {
+        return "Internal"
+    }
     if ($target -match "(^|\.)_ui(\.|$)") {
         return "Internal"
     }
