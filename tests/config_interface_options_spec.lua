@@ -13,10 +13,20 @@ local function assertNotContains(text, pattern, message)
     assert(not text:find(pattern), message or ("unexpected pattern: " .. pattern))
 end
 
+local function assertBefore(text, first, second, message)
+    local firstIndex = assert(text:find(first, 1, true), "missing first pattern: " .. first)
+    local secondIndex = assert(text:find(second, 1, true), "missing second pattern: " .. second)
+    assert(firstIndex < secondIndex, message or (first .. " must appear before " .. second))
+end
+
 local configLua = read("!KRT/Widgets/Config.lua")
 local configXml = read("!KRT/UI/Config.xml")
 local optionsLayoutLua = read("!KRT/Modules/UI/OptionsLayout.lua")
+local screenNoticeLua = read("!KRT/Modules/UI/ScreenNotice.lua")
 local toc = read("!KRT/!KRT.toc")
+local initLua = read("!KRT/Init.lua")
+local masterLua = read("!KRT/Controllers/Master.lua")
+local raidLootMethodLua = read("!KRT/Services/Raid/LootMethod.lua")
 local localization = read("!KRT/Localization/localization.en.lua")
 local diagnoseLog = read("!KRT/Localization/DiagnoseLog.en.lua")
 local spammerLua = read("!KRT/Controllers/Spammer.lua")
@@ -26,6 +36,11 @@ assert(not localization:find("-- events: document inbound/outbound events in mod
 assertContains(diagnoseLog, "-- events: none", "DiagnoseLog must document static diagnostic-template event behavior")
 assert(not diagnoseLog:find("-- events: document inbound/outbound events in module body", 1, true), "DiagnoseLog must not keep the generic event placeholder")
 assertContains(configXml, 'Frame name="KRTConfig"', "Custom KRT config popup must remain available")
+local krtPopupStart = assert(configXml:find('Frame name="KRTConfig"', 1, true), "Config XML must define the custom KRT config popup")
+local krtPopupEnd = assert(configXml:find('Frame name="KRTInterfaceOptionsPanel"', krtPopupStart, true), "Interface Options panel must follow the custom config popup")
+local krtPopupXml = configXml:sub(krtPopupStart, krtPopupEnd - 1)
+assertContains(krtPopupXml, "$parentautoSpamLootOnLootOpened", "Custom KRT config popup must expose opened-loot autospam")
+assertContains(krtPopupXml, "$parentautoSpamSoftResOnLootOpened", "Custom KRT config popup must expose SoftRes autospam")
 assertNotContains(configLua, "addon%.options", "Config widget must use namespace cfg:Get/cfg:Set instead of addon.options")
 assertNotContains(configXml, "AboutStr", "Custom KRT config popup must not show the old about footer")
 assertNotContains(configLua, "StrConfigAbout", "Config widget must not localize the removed about footer")
@@ -104,6 +119,11 @@ local expectedControls = {
     "showTooltips",
     "showLootCounterDuringMSRoll",
     "minimapButton",
+    "autoMasterLootOnBossTarget",
+    "autoMasterLootNoticeSeconds",
+    "askGroupLootAfterBossLoot",
+    "autoSpamLootOnLootOpened",
+    "autoSpamSoftResOnLootOpened",
     "countdownDuration",
 }
 
@@ -123,6 +143,11 @@ local expectedDescriptions = {
     { "showTooltips", "ShowTooltips" },
     { "showLootCounterDuringMSRoll", "ShowLootCounterDuringMSRoll" },
     { "minimapButton", "MinimapButton" },
+    { "autoMasterLootOnBossTarget", "AutoMasterLootOnBossTarget" },
+    { "autoMasterLootNoticeSeconds", "AutoMasterLootNoticeSeconds" },
+    { "askGroupLootAfterBossLoot", "AskGroupLootAfterBossLoot" },
+    { "autoSpamLootOnLootOpened", "AutoSpamLootOnLootOpened" },
+    { "autoSpamSoftResOnLootOpened", "AutoSpamSoftResOnLootOpened" },
     { "countdownDuration", "CountdownDuration" },
 }
 
@@ -203,6 +228,67 @@ assertNotContains(configLua, 'relativeTo="$parentDefaultsPresetDesc" relativePoi
 assertContains(configLua, "textWidth = 240", "Config widget must keep the command column inside the AddOns viewport")
 assertContains(configLua, "commandWidth = 105", "Config widget must reserve a compact stable command column")
 assertContains(configLua, "columnGap = 12", "Config widget must keep a visible gap between text and command columns")
+assertContains(toc, "Services\\Raid\\LootMethod.lua", "TOC must load the raid loot-method automation service")
+assertContains(toc, "Modules\\UI\\ScreenNotice.lua", "TOC must load the shared screen notice UI module")
+assertContains(screenNoticeLua, "KRTScreenNoticeFrame", "Screen notice UI must use a dedicated KRT center-screen frame")
+assertContains(screenNoticeLua, "Bus.RegisterCallback(InternalEvents.ScreenNotice", "Screen notice UI must listen to the shared screen notice event")
+assertContains(screenNoticeLua, "Effects.SetTimedFade", "Screen notice UI must delegate timing to shared UI effects")
+assertContains(screenNoticeLua, 'SetPoint("CENTER", UIParent, "CENTER", 0, 140)', "Screen notice UI must render near RollFor's middle-screen position")
+assertContains(screenNoticeLua, 'SetFont(FONT_PATH, 24, "OUTLINE")', "Screen notice UI must use RollFor-style large outlined title text")
+assertContains(screenNoticeLua, 'SetFont(FONT_PATH, 16, "OUTLINE")', "Screen notice UI must keep a RollFor-style detail line available")
+assertContains(screenNoticeLua, '"|cffff2020Master Loot|r"', "Screen notice UI must colorize Master Loot inside the title text")
+assertContains(screenNoticeLua, 'SetFrameStrata("TOOLTIP")', "Screen notice UI must render above raid frames")
+assertContains(screenNoticeLua, "SetFrameLevel(1000)", "Screen notice UI must use a high frame level")
+assertContains(raidLootMethodLua, 'Options.AddNamespace("Master"', "Loot-method service must own Master option defaults")
+assertContains(raidLootMethodLua, "autoMasterLootOnBossTarget = false", "Auto Master Loot must default off")
+assertContains(raidLootMethodLua, "autoMasterLootNoticeSeconds = 1.25", "Auto Master Loot center notice must default to a slightly longer message hold")
+assertContains(raidLootMethodLua, "askGroupLootAfterBossLoot = false", "Group Loot restore prompt must default off")
+assertContains(raidLootMethodLua, "SetLootMethod", "Loot-method service must be the only new owner of SetLootMethod calls")
+assertContains(raidLootMethodLua, "PLAYER_TARGET_CHANGED", "Loot-method service must handle boss-target automation")
+assertContains(raidLootMethodLua, "Bus.TriggerEvent(InternalEvents.ScreenNotice", "Auto Master Loot must emit a UI-owned screen notice event")
+assertNotContains(raidLootMethodLua, "UIErrorsFrame", "Loot-method service must not own screen message frames")
+assertNotContains(raidLootMethodLua, "RaidNotice_AddMessage", "Auto Master Loot must not use RaidWarningFrame because 3.3.5 ignores custom duration")
+assertNotContains(raidLootMethodLua, "RaidWarningFrame", "Auto Master Loot notice must avoid the long Blizzard raid-warning hold time")
+assertContains(raidLootMethodLua, "DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS = 1.25", "Auto Master Loot center notice must have a slightly longer fallback")
+assertContains(raidLootMethodLua, "getAutoMasterLootNoticeSeconds", "Auto Master Loot center notice must read its duration from options")
+assertContains(
+    raidLootMethodLua,
+    "Bus.TriggerEvent(InternalEvents.ScreenNotice, message, getAutoMasterLootNoticeSeconds())",
+    "Auto Master Loot center notice must pass an explicit duration"
+)
+assertBefore(
+    raidLootMethodLua,
+    "showCenterNotice(L.MsgAutoMasterLootScreen",
+    'SetLootMethod("master", playerName)',
+    "Auto Master Loot must show the screen notice before changing loot method"
+)
+assertContains(raidLootMethodLua, "KRT_CONFIRM_GROUP_LOOT_RESTORE", "Loot-method service must define the Group Loot restore popup")
+assertContains(initLua, "PLAYER_TARGET_CHANGED", "Init must forward target-change events for Auto Master Loot")
+assertContains(masterLua, "function module:PLAYER_TARGET_CHANGED()", "Master controller must forward target changes to services")
+assertContains(masterLua, "NotifyLootWindowOpened", "Master controller must notify the loot-method service when boss loot opens")
+assertContains(masterLua, "NotifyLootWindowCleared", "Master controller must ask for Group Loot restore after loot clears")
+assertContains(masterLua, "autoSpamLootOnLootOpened", "Master controller must read the auto loot spam option")
+assertContains(masterLua, "autoSpamSoftResOnLootOpened", "Master controller must read the auto SoftRes spam option")
+assertContains(masterLua, "FormatReservedPlayersLine(itemId, false, false, false, true)", "Auto SoftRes spam must use chat-safe current-raid player lines")
+assertContains(localization, "L.MsgAutoMasterLootSet", "Localization must define Auto Master Loot status text")
+assertContains(localization, "L.MsgAutoMasterLootScreen", "Localization must define Auto Master Loot center-screen text")
+assertContains(localization, "L.StrConfigAutoSpamLootOnLootOpened", "Localization must define auto loot spam option label")
+assertContains(localization, "L.StrConfigAutoSpamSoftResOnLootOpened", "Localization must define auto SoftRes spam option label")
+assertContains(configLua, 'autoMasterLootNoticeSeconds = "Master"', "Config widget must bind Auto Master Loot notice duration to Master options")
+assertContains(configLua, 'autoSpamLootOnLootOpened = "Master"', "Config widget must bind auto loot spam to Master options")
+assertContains(configLua, 'autoSpamSoftResOnLootOpened = "Master"', "Config widget must bind auto SoftRes spam to Master options")
+assertContains(configLua, "refreshAutoSpamSoftResDependency", "Config widget must centralize the SoftRes auto-spam dependency")
+assertContains(configLua, 'setOption("autoSpamSoftResOnLootOpened", false)', "Disabling auto loot spam must also disable auto SoftRes spam")
+assertContains(configLua, "normalizeAutoMasterLootNoticeSeconds", "Config widget must normalize Auto Master Loot notice duration input")
+assert(not configLua:find("tonumber(gsub(text", 1, true), "Config widget must not pass gsub's replacement count into tonumber as a base")
+assertContains(configLua, "bindAutoMasterLootNoticeEditBox", "Config widget must bind the Auto Master Loot notice duration editbox")
+assertContains(configLua, "for i = 1, #optionSuffixes do", "Config refresh must cover every option checkbox suffix")
+assertContains(configLua, "setChecked(frameName, suffix, getOption(suffix) == true)", "Config refresh must keep Auto Master Loot checkbox state in sync")
+assertContains(configLua, 'type = "edit"', "Master Loot panel must render the notice duration as an editbox row")
+assertContains(optionsLayoutLua, 'rowType == "edit"', "OptionsLayout must support standalone editbox option rows")
+assertContains(masterLootPanelXml, "$parentautoMasterLootNoticeSecondsEditBox", "Master Loot panel XML must expose the notice duration editbox")
+assertContains(localization, "L.PopupGroupLootRestoreText", "Localization must define Group Loot restore popup text")
+assertContains(localization, "L.BtnGroupLoot", "Localization must define the Group Loot popup button")
 
 local customConfigStart = assert(configXml:find('Frame name="KRTConfig"', 1, true), "Config XML must define the custom config popup")
 local customConfigEnd = assert(configXml:find("End of Config Frame", customConfigStart, true), "Config XML must mark the end of the custom config popup")

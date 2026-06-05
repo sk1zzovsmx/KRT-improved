@@ -70,6 +70,7 @@ Runtime data/model/service modules:
 `addon.Services.Raid` is composed by:
 - `Services/Raid/State.lua` (core raid state + raid-side loot/boss coordination contracts)
 - `Services/Raid/Capabilities.lua` (role/capability policy + shared master-only guard)
+- `Services/Raid/LootMethod.lua` (opt-in Master Loot automation and Group Loot restore prompt)
 - `Services/Raid/Counts.lua` (loot counter operations)
 - `Services/Raid/Roster.lua` (live roster tracking and player lookups)
 - `Services/Raid/Attendance.lua` (per-player attendance ledger from roster deltas)
@@ -133,7 +134,8 @@ Common infra under `!KRT/Modules/`:
 - `Modules/LootSourcesData.lua` - static raid item-source data
 - `Modules/LootSources.lua` - itemId -> raid source resolver
 - `Modules/Dataset/IgnoredMobs.lua` - raid add/phase-ignore lookup plus canonical trash-mob name helpers
-- UI infra: `Frames`, `UI.Scaffold`, `ListController`, `Selection`, `UI` facade, `UI.Effects`
+- UI infra: `Frames`, `UI.Scaffold`, `ListController`, `Selection`, `UI` facade,
+  `UI.Effects`, `UI.ScreenNotice`
 - Messaging: `Bus`
 - Feature toggles: `Features`
 

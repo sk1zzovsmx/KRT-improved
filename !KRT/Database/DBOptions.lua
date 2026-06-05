@@ -160,7 +160,16 @@ function Options.AddNamespace(name, defaults)
 
     local existing = namespaces[name]
     if existing then
-        -- Allow idempotent re-registration with the same defaults.
+        -- Allow modular re-registration: each owner contributes its own keys.
+        for key, defaultValue in pairs(defaults) do
+            if existing._defaults[key] == nil then
+                existing._defaults[key] = defaultValue
+                if existing._store[key] == nil then
+                    existing._store[key] = defaultValue
+                end
+                keyToNamespace[key] = existing
+            end
+        end
         return existing
     end
 

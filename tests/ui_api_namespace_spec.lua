@@ -22,6 +22,7 @@ local luaFiles = {
     "!KRT/Modules/UI/ListController.lua",
     "!KRT/Modules/UI/MultiSelect.lua",
     "!KRT/Modules/UI/OptionsLayout.lua",
+    "!KRT/Modules/UI/ScreenNotice.lua",
     "!KRT/EntryPoints/Minimap.lua",
     "!KRT/EntryPoints/SlashEvents.lua",
     "!KRT/Controllers/Master.lua",
@@ -98,6 +99,9 @@ assertContains(effectsSource, "UI.Effects", "Effects must export through UI.Effe
 
 local optionsLayoutSource = read("!KRT/Modules/UI/OptionsLayout.lua")
 assertContains(optionsLayoutSource, "UI.Layout", "Options layout must export through UI.Layout")
+
+local screenNoticeSource = read("!KRT/Modules/UI/ScreenNotice.lua")
+assertContains(screenNoticeSource, "UI.ScreenNotice", "Screen notice must export through UI.ScreenNotice")
 
 local multiSelectSource = read("!KRT/Modules/UI/MultiSelect.lua")
 assertContains(multiSelectSource, "UI.Selection", "MultiSelect must export through UI.Selection")

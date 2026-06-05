@@ -27,7 +27,7 @@
     <!-- Config frame -->
 	<Frame name="KRTConfig" inherits="KRTFrameTemplate">
 		<Size>
-			<AbsDimension x="245" y="445" />
+			<AbsDimension x="245" y="485" />
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
@@ -160,6 +160,24 @@
 				<FontString name="$parentminimapButtonStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentshowLootCounterDuringMSRollStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-7.5" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoSpamLootOnLootOpenedStr" inherits="KRTConfigFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentminimapButtonStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-7.5" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoSpamSoftResOnLootOpenedStr" inherits="KRTConfigFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoSpamLootOnLootOpenedStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -308,6 +326,24 @@
 			<CheckButton name="$parentminimapButton" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeTo="$parentminimapButtonStr" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-2.5" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<CheckButton name="$parentautoSpamLootOnLootOpened" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentautoSpamLootOnLootOpenedStr" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-2.5" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<CheckButton name="$parentautoSpamSoftResOnLootOpened" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentautoSpamSoftResOnLootOpenedStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -803,9 +839,114 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentcountdownDurationStr" inherits="GameFontNormalSmall">
+				<FontString name="$parentautoMasterLootOnBossTargetStr" inherits="KRTConfigFontStringTemplate">
+					<Size>
+						<AbsDimension x="320" y="0" />
+					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentminimapButtonDesc" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-4" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoMasterLootOnBossTargetDesc" inherits="KRTConfigCompactDescriptionFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoMasterLootOnBossTargetStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoMasterLootNoticeSecondsStr" inherits="KRTConfigFontStringTemplate">
+					<Size>
+						<AbsDimension x="320" y="0" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoMasterLootOnBossTargetDesc" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-4" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoMasterLootNoticeSecondsDesc" inherits="KRTConfigCompactDescriptionFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoMasterLootNoticeSecondsStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentaskGroupLootAfterBossLootStr" inherits="KRTConfigFontStringTemplate">
+					<Size>
+						<AbsDimension x="320" y="0" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoMasterLootNoticeSecondsDesc" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-4" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentaskGroupLootAfterBossLootDesc" inherits="KRTConfigCompactDescriptionFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentaskGroupLootAfterBossLootStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoSpamLootOnLootOpenedStr" inherits="KRTConfigFontStringTemplate">
+					<Size>
+						<AbsDimension x="320" y="0" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentaskGroupLootAfterBossLootDesc" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-4" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoSpamLootOnLootOpenedDesc" inherits="KRTConfigCompactDescriptionFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoSpamLootOnLootOpenedStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoSpamSoftResOnLootOpenedStr" inherits="KRTConfigFontStringTemplate">
+					<Size>
+						<AbsDimension x="320" y="0" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoSpamLootOnLootOpenedDesc" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-4" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentautoSpamSoftResOnLootOpenedDesc" inherits="KRTConfigCompactDescriptionFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoSpamSoftResOnLootOpenedStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentcountdownDurationStr" inherits="GameFontNormalSmall">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentautoSpamSoftResOnLootOpenedDesc" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="-34" y="-18" />
 							</Offset>
@@ -1067,6 +1208,54 @@
 			<CheckButton name="$parentminimapButton" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeTo="$parentminimapButtonStr" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-8" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<CheckButton name="$parentautoMasterLootOnBossTarget" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentautoMasterLootOnBossTargetStr" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-8" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<EditBox name="$parentautoMasterLootNoticeSecondsEditBox" inherits="KRTEditBoxTemplate" letters="5">
+				<Size>
+					<AbsDimension x="105" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentautoMasterLootNoticeSecondsDesc" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="260" y="2" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</EditBox>
+			<CheckButton name="$parentaskGroupLootAfterBossLoot" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentaskGroupLootAfterBossLootStr" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-8" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<CheckButton name="$parentautoSpamLootOnLootOpened" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentautoSpamLootOnLootOpenedStr" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-8" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<CheckButton name="$parentautoSpamSoftResOnLootOpened" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentautoSpamSoftResOnLootOpenedStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-8" y="5" />
 						</Offset>

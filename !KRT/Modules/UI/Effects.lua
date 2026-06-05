@@ -9,8 +9,10 @@ local feature = addon.Database.GetFeatureShared()
 
 local floor = math.floor
 local max = math.max
+local min = math.min
 local lower = string.lower
 local pairs = pairs
+local tonumber, type = tonumber, type
 
 local UI = feature.UI or {}
 local Effects = UI.Effects or {}
@@ -394,6 +396,32 @@ local function stopAllGlow(glow)
     glow.buttonFrame:Hide()
 end
 
+local function onTimedFadeUpdate(frame, elapsed)
+    local fade = frame and frame._krtTimedFade
+    if not fade then
+        if frame and frame.SetScript then
+            frame:SetScript("OnUpdate", nil)
+        end
+        return
+    end
+
+    fade.elapsed = (fade.elapsed or 0) + (tonumber(elapsed) or 0)
+    if fade.elapsed >= fade.duration then
+        frame._krtTimedFade = nil
+        frame:SetScript("OnUpdate", nil)
+        if fade.onDone then
+            fade.onDone(frame)
+        end
+        return
+    end
+
+    if fade.elapsed <= fade.holdSeconds or fade.fadeSeconds <= 0 then
+        frame:SetAlpha(1)
+    else
+        frame:SetAlpha(max(1 - ((fade.elapsed - fade.holdSeconds) / fade.fadeSeconds), 0))
+    end
+end
+
 local function startBaseGlow(glow)
     glow.frame:Show()
     glow.framePulse:Play()
@@ -604,6 +632,26 @@ function Effects.SetButtonGlow(button, enabled, r, g, b, methodName, options)
     if methodCfg.flags.base then
         startBaseGlow(glow)
     end
+end
+
+function Effects.SetTimedFade(frame, duration, fadeSeconds, onDone)
+    if not (frame and frame.SetScript and frame.SetAlpha) then
+        return false
+    end
+
+    local holdSeconds = max(tonumber(duration) or 1, 0.1)
+    local resolvedFadeSeconds = min(max(tonumber(fadeSeconds) or 0, 0), 5)
+
+    frame._krtTimedFade = {
+        elapsed = 0,
+        duration = holdSeconds + resolvedFadeSeconds,
+        holdSeconds = holdSeconds,
+        fadeSeconds = resolvedFadeSeconds,
+        onDone = type(onDone) == "function" and onDone or nil,
+    }
+    frame:SetAlpha(1)
+    frame:SetScript("OnUpdate", onTimedFadeUpdate)
+    return true
 end
 
 local registry = feature.ModuleRegistry

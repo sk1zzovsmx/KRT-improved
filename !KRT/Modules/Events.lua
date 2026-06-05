@@ -34,6 +34,7 @@ Internal.RaidCreate = "RaidCreate"
 Internal.RaidLeave = "RaidLeave"
 Internal.RaidLootUpdate = "RaidLootUpdate"
 Internal.ReservesDataChanged = "ReservesDataChanged"
+Internal.ScreenNotice = "ScreenNotice"
 Internal.SetItem = "SetItem"
 
 Internal.ConfigSortAscending = "ConfigsortAscending"

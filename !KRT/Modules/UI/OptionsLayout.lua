@@ -171,6 +171,22 @@ local function applyEditCommandRow(frame, row, cfg, cursorY, titleHeight, bodyGa
     return height
 end
 
+local function applyEditRow(frame, row, cfg, cursorY, titleHeight, bodyGap)
+    local leftX = row.leftX or getCfg(cfg, "leftX")
+    local textWidth = row.textWidth or getCfg(cfg, "textWidth")
+    local commandWidth = row.commandWidth or getCfg(cfg, "commandWidth")
+    local columnGap = getCfg(cfg, "columnGap")
+    local commandX = leftX + textWidth + columnGap
+    local editHeight = row.editHeight or getCfg(cfg, "editHeight")
+    local descHeight = row.descHeight or getCfg(cfg, "descHeight")
+    local height = row.height or (titleHeight + bodyGap + descHeight)
+
+    placeText(frame, resolveWidget(frame, row.title), leftX, cursorY, textWidth, titleHeight)
+    placeText(frame, resolveWidget(frame, row.desc), leftX, cursorY - titleHeight - bodyGap, textWidth, descHeight)
+    place(frame, resolveWidget(frame, row.editBox), commandX, cursorY + (row.editYOffset or -2), commandWidth, editHeight)
+    return height
+end
+
 local function applyDropDownRow(frame, row, cfg, cursorY, titleHeight, bodyGap)
     local leftX = row.leftX or getCfg(cfg, "leftX")
     local textWidth = row.textWidth or getCfg(cfg, "textWidth")
@@ -270,6 +286,9 @@ local function applyRow(frame, row, cfg, cursorY)
         height = height or computedHeight
     elseif rowType == "editCommand" then
         computedHeight = applyEditCommandRow(frame, row, cfg, cursorY, titleHeight, bodyGap)
+        height = height or computedHeight
+    elseif rowType == "edit" then
+        computedHeight = applyEditRow(frame, row, cfg, cursorY, titleHeight, bodyGap)
         height = height or computedHeight
     elseif rowType == "dropdown" then
         computedHeight = applyDropDownRow(frame, row, cfg, cursorY, titleHeight, bodyGap)

@@ -71,6 +71,7 @@
 |   |   |   |-- ListController.lua
 |   |   |   |-- MultiSelect.lua
 |   |   |   |-- OptionsLayout.lua
+|   |   |   |-- ScreenNotice.lua
 |   |   |   \\-- Visuals.lua
 |   |   |-- Base64.lua
 |   |   |-- Bus.lua
@@ -112,6 +113,7 @@
 |   |   |   |-- Attendance.lua
 |   |   |   |-- Capabilities.lua
 |   |   |   |-- Counts.lua
+|   |   |   |-- LootMethod.lua
 |   |   |   |-- LootRecords.lua
 |   |   |   |-- Roster.lua
 |   |   |   |-- Session.lua
@@ -234,6 +236,7 @@
 |   |-- module_registry_ui_entrypoints_spec.lua
 |   |-- module_registry_ui_spec.lua
 |   |-- release_stabilization_spec.lua
+|   |-- screen_notice_runtime_spec.lua
 |   \\-- ui_api_namespace_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json

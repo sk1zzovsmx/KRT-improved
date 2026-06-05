@@ -58,6 +58,11 @@ local expectedModules = {
         path = "!KRT/Modules/Bus.lua",
         deps = { "Init", "Modules/ModuleRegistry" },
     },
+    {
+        name = "Modules/UI/ScreenNotice",
+        path = "!KRT/Modules/UI/ScreenNotice.lua",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Bus", "Modules/Events", "Modules/UI/Effects" },
+    },
 }
 
 local registrySource = read("!KRT/Modules/ModuleRegistry.lua")
@@ -69,6 +74,8 @@ assertContains(
 )
 assertContains(registrySource, 'ModuleRegistry.SetLoaded("Modules/ModuleRegistry")', "ModuleRegistry must mark itself loaded after consuming pending bootstrap loads")
 assertBefore(toc, "Modules\\ModuleRegistry.lua", "Modules\\Bus.lua")
+assertBefore(toc, "Modules\\Bus.lua", "Modules\\UI\\ScreenNotice.lua")
+assertBefore(toc, "Modules\\UI\\ScreenNotice.lua", "Services\\Raid\\LootMethod.lua")
 assertBefore(toc, "Modules\\Bus.lua", "Database\\DBRaidMigrations.lua")
 assertBefore(toc, "Modules\\Bus.lua", "Database\\DBRaidStore.lua")
 assertBefore(toc, "Modules\\Bus.lua", "Database\\DBRaidQueries.lua")
@@ -131,6 +138,11 @@ local uiModuleTables = {
         path = "!KRT/Modules/UI/OptionsLayout.lua",
         localName = "Layout",
         fieldName = "Layout",
+    },
+    {
+        path = "!KRT/Modules/UI/ScreenNotice.lua",
+        localName = "ScreenNotice",
+        fieldName = "ScreenNotice",
     },
 }
 
@@ -201,6 +213,10 @@ local uiEventHeaders = {
         path = "!KRT/Modules/UI/MultiSelect.lua",
         events = "-- events: none",
     },
+    {
+        path = "!KRT/Modules/UI/ScreenNotice.lua",
+        events = "-- events: listens Internal.ScreenNotice; delegates fade timing to UI.Effects",
+    },
 }
 
 for i = 1, #uiEventHeaders do
@@ -230,6 +246,7 @@ assert(#registryStatus.Deps == 1 and registryStatus.Deps[1] == "Init", "ModuleRe
 
 local preRegistryUtilityModules = {
     { name = "Modules/C", deps = { "Init" } },
+    { name = "Modules/Events", deps = { "Init" } },
     { name = "Modules/Colors", deps = { "Init" } },
     { name = "Modules/Strings", deps = { "Init", "Modules/Colors" } },
 }

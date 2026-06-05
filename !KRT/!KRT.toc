@@ -64,6 +64,7 @@ Modules\UI\ListController.lua
 Modules\UI\MultiSelect.lua
 Modules\UI\OptionsLayout.lua
 Modules\Bus.lua
+Modules\UI\ScreenNotice.lua
 
 # Layer 5 - Runtime modules (ordered by dependency)
 # Services + entrypoint + parents + child UI controllers
@@ -86,6 +87,7 @@ Services\Loot\Rules.lua
 Services\Loot\DistributionSession.lua
 Services\Raid\State.lua
 Services\Raid\Capabilities.lua
+Services\Raid\LootMethod.lua
 Services\Raid\Counts.lua
 Services\Raid\Roster.lua
 Services\Raid\Attendance.lua

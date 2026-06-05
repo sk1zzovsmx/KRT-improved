@@ -108,6 +108,8 @@ do
         announceOnHold = true,
         announceOnBank = false,
         announceOnDisenchant = false,
+        autoSpamLootOnLootOpened = false,
+        autoSpamSoftResOnLootOpened = false,
     })
     Options.AddNamespace("Loot", {
         lootWhispers = false,
@@ -2901,17 +2903,76 @@ do
             ChatApi.Announce(Chat, L.ChatReadyCheck)
             DoReadyCheck()
         else
-            ChatApi.Announce(Chat, L.ChatSpamLoot, "RAID")
-            for i = 1, lootState.lootCount do
-                local itemLink = Loot.GetItemLink(i)
-                if itemLink then
-                    local item = Loot.GetItem(i)
-                    local count = item and item.count or 1
-                    local suffix = (count and count > 1) and (" x" .. count) or ""
-                    ChatApi.Announce(Chat, i .. ". " .. itemLink .. suffix, "RAID")
+            Private.AnnounceLootLinks(false)
+        end
+    end
+
+    Private.GetLootSpamSourceName = function()
+        local unitName = _G.UnitName
+        if type(unitName) ~= "function" then
+            return nil
+        end
+
+        local name = unitName("target")
+        if type(name) ~= "string" or name == "" then
+            return nil
+        end
+        if name == _G.UNKNOWNOBJECT or name == _G.UNKNOWNBEING or name == _G.UKNOWNBEING then
+            return nil
+        end
+        return name
+    end
+
+    Private.GetLootSpamHeader = function()
+        local sourceName = Private.GetLootSpamSourceName()
+        local template = L.ChatSpamLootFrom
+        if sourceName and type(template) == "string" and template:find("%s", 1, true) then
+            return template:format(sourceName)
+        end
+        return L.ChatSpamLoot
+    end
+
+    Private.AnnounceLootLinks = function(includeSoftRes)
+        if lootState.fromInventory == true or lootState.lootCount <= 0 then
+            return false
+        end
+
+        local reserves = Services.Reserves
+        local hasReserveData = includeSoftRes == true and reserves and reserves.HasData and reserves:HasData() or false
+        local reservedItems = nil
+        local reservedCount = 0
+        ChatApi.Announce(Chat, Private.GetLootSpamHeader(), "RAID")
+        for i = 1, lootState.lootCount do
+            local itemLink = Loot.GetItemLink(i)
+            if itemLink then
+                local item = Loot.GetItem(i)
+                local count = item and item.count or 1
+                local suffix = (count and count > 1) and (" x" .. count) or ""
+                ChatApi.Announce(Chat, i .. ". " .. itemLink .. suffix, "RAID")
+
+                if hasReserveData and reserves.FormatReservedPlayersLine then
+                    local itemId = Item.GetItemIdFromLink(itemLink)
+                    local srList = itemId and reserves:FormatReservedPlayersLine(itemId, false, false, false, true) or ""
+                    if srList and srList ~= "" then
+                        reservedItems = reservedItems or {}
+                        reservedCount = reservedCount + 1
+                        reservedItems[reservedCount] = {
+                            itemLink = itemLink,
+                            players = srList,
+                        }
+                    end
                 end
             end
         end
+        if reservedCount > 0 then
+            ChatApi.Announce(Chat, L.ChatSpamLootReservedHeader or "Item reserved:", "RAID")
+            for i = 1, reservedCount do
+                local reservedItem = reservedItems[i]
+                local template = L.ChatSpamLootReservedLine or "%d. %s by %s"
+                ChatApi.Announce(Chat, template:format(i, reservedItem.itemLink, reservedItem.players), "RAID")
+            end
+        end
+        return true
     end
 
     -- Button: Reserve List (contextual)
@@ -3829,6 +3890,12 @@ do
             local perfStep = addon.hasPerf and addon:_PerfStart() or nil
             updateLootDistribution("session")
             Loot:FetchLoot()
+            if canAutoManageLootFrame() and getOption("Master", "autoSpamLootOnLootOpened") == true then
+                Private.AnnounceLootLinks(getOption("Master", "autoSpamSoftResOnLootOpened") == true)
+            end
+            if Raid.NotifyLootWindowOpened then
+                Raid:NotifyLootWindowOpened()
+            end
             if perfStep then
                 addon:_PerfFinish("Master.LOOT_OPENED FetchLoot", perfStep, "items=" .. tostring(lootState.lootCount or 0))
             end
@@ -3912,6 +3979,9 @@ do
                 end
                 Private.ResetItemCount()
                 handleLootSlotClearedVisibility()
+                if (tonumber(lootState.lootCount) or 0) <= 0 and Raid.NotifyLootWindowCleared then
+                    Raid:NotifyLootWindowCleared()
+                end
                 -- Continue a multi-award sequence (loot window only).
                 continueMultiAwardOnLootSlotCleared(clearedSlot)
             end
@@ -3930,6 +4000,12 @@ do
         end
         if PendingCounter:Fail(message) then
             module:RequestRefresh()
+        end
+    end
+
+    function module:PLAYER_TARGET_CHANGED()
+        if Raid.HandleAutoMasterLootTargetChanged then
+            Raid:HandleAutoMasterLootTargetChanged()
         end
     end
 
@@ -4417,6 +4493,7 @@ do
         registerWowForwarded("LOOT_OPENED")
         registerWowForwarded("LOOT_CLOSED")
         registerWowForwarded("LOOT_SLOT_CLEARED")
+        registerWowForwarded("PLAYER_TARGET_CHANGED")
         registerWowForwarded("UI_ERROR_MESSAGE")
         registerWowForwarded("TRADE_ACCEPT_UPDATE")
         registerWowForwarded("TRADE_REQUEST_CANCEL")

@@ -1,3 +1,3 @@
 "ApiPath","ApiScope","Target","Method","Separator","MethodStyle","Verb","TaxonomyCategory","IsCaseConformant","IsTaxonomyConformant","DefinitionCount","Layer","File","Line"
-"addon._PerfFinish","Internal","addon","_PerfFinish",".","snake_or_mixed","_PerfFinish","Internal","False","True","1","Root","!KRT/Init.lua","129"
-"addon._PerfStart","Internal","addon","_PerfStart",".","snake_or_mixed","_PerfStart","Internal","False","True","1","Root","!KRT/Init.lua","118"
+"addon._PerfFinish","Internal","addon","_PerfFinish",".","snake_or_mixed","_PerfFinish","Internal","False","True","1","Root","!KRT/Init.lua","130"
+"addon._PerfStart","Internal","addon","_PerfStart",".","snake_or_mixed","_PerfStart","Internal","False","True","1","Root","!KRT/Init.lua","119"

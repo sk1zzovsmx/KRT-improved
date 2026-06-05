@@ -27,9 +27,11 @@ local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 local _G = _G
 
 local format = string.format
+local gsub = string.gsub
 local strlen = string.len
 local strsub = string.sub
 local type, tostring, tonumber = type, tostring, tonumber
+local floor = math.floor
 
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
@@ -79,6 +81,9 @@ do
     }
     local MIN_COUNTDOWN = countdownDurationValues[1]
     local MAX_COUNTDOWN = countdownDurationValues[#countdownDurationValues]
+    local DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS = 1
+    local MIN_AUTO_MASTER_LOOT_NOTICE_SECONDS = 0.1
+    local MAX_AUTO_MASTER_LOOT_NOTICE_SECONDS = 5
     local interfacePanelFrameName = "KRTInterfaceOptionsPanel"
     local masterLootPanelFrameName = "KRTInterfaceOptionsMasterLootPanel"
     local masterLootContentFrameName = "KRTInterfaceOptionsMasterLootPanelScrollChild"
@@ -115,6 +120,10 @@ do
         "showTooltips",
         "showLootCounterDuringMSRoll",
         "minimapButton",
+        "autoMasterLootOnBossTarget",
+        "askGroupLootAfterBossLoot",
+        "autoSpamLootOnLootOpened",
+        "autoSpamSoftResOnLootOpened",
     }
 
     local optionNamespaces = {
@@ -122,6 +131,11 @@ do
         announceOnDisenchant = "Master",
         announceOnHold = "Master",
         announceOnWin = "Master",
+        askGroupLootAfterBossLoot = "Master",
+        autoMasterLootOnBossTarget = "Master",
+        autoMasterLootNoticeSeconds = "Master",
+        autoSpamLootOnLootOpened = "Master",
+        autoSpamSoftResOnLootOpened = "Master",
         countdownDuration = "Rolls",
         countdownRollsBlock = "Rolls",
         countdownSimpleRaidMsg = "Rolls",
@@ -147,6 +161,7 @@ do
         local refs = {
             defaultsBtn = Frames.GetRef(frame, "DefaultsBtn"),
             countdownDuration = Frames.GetRef(frame, "countdownDuration"),
+            autoMasterLootNoticeSecondsEditBox = Frames.GetRef(frame, "autoMasterLootNoticeSecondsEditBox"),
             options = {},
         }
         if includeClose then
@@ -197,6 +212,33 @@ do
         local widget = _G[frameName .. suffix]
         if widget then
             widget:SetChecked(checked == true)
+        end
+    end
+
+    local function setOptionControlEnabled(frameName, suffix, enabled)
+        local button = _G[frameName .. suffix]
+        local label = _G[frameName .. suffix .. "Str"]
+        local desc = _G[frameName .. suffix .. "Desc"]
+        if button then
+            if enabled and button.Enable then
+                button:Enable()
+            elseif button.Disable then
+                button:Disable()
+            end
+        end
+        if label and label.SetTextColor then
+            if enabled then
+                label:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+            else
+                label:SetTextColor(0.5, 0.5, 0.5)
+            end
+        end
+        if desc and desc.SetTextColor then
+            if enabled then
+                desc:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+            else
+                desc:SetTextColor(0.5, 0.5, 0.5)
+            end
         end
     end
 
@@ -253,6 +295,18 @@ do
         return selected
     end
 
+    local function normalizeAutoMasterLootNoticeSeconds(value)
+        local text = tostring(value or "")
+        local normalizedText = gsub(text, ",", ".")
+        local seconds = tonumber(normalizedText) or DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS
+        if seconds < MIN_AUTO_MASTER_LOOT_NOTICE_SECONDS then
+            seconds = MIN_AUTO_MASTER_LOOT_NOTICE_SECONDS
+        elseif seconds > MAX_AUTO_MASTER_LOOT_NOTICE_SECONDS then
+            seconds = MAX_AUTO_MASTER_LOOT_NOTICE_SECONDS
+        end
+        return floor((seconds * 100) + 0.5) / 100
+    end
+
     local function normalizeLoggerLootQualityThreshold(value)
         local threshold = tonumber(value) or 4
         for i = 1, #loggerLootQualityOptions do
@@ -305,6 +359,15 @@ do
         end
         setText(frameName, "countdownDurationText", duration)
         return duration
+    end
+
+    local function refreshAutoSpamSoftResDependency(frameName)
+        local autoLootEnabled = getOption("autoSpamLootOnLootOpened") == true
+        if not autoLootEnabled and getOption("autoSpamSoftResOnLootOpened") == true then
+            setOption("autoSpamSoftResOnLootOpened", false)
+        end
+        setChecked(frameName, "autoSpamSoftResOnLootOpened", autoLootEnabled and getOption("autoSpamSoftResOnLootOpened") == true)
+        setOptionControlEnabled(frameName, "autoSpamSoftResOnLootOpened", autoLootEnabled)
     end
 
     local function setConfigTitle(frameName, titleText, plainTitle)
@@ -365,6 +428,15 @@ do
                 gap = 4,
             }
         end
+        rows[#rows + 1] = {
+            type = "edit",
+            title = "autoMasterLootNoticeSecondsStr",
+            desc = "autoMasterLootNoticeSecondsDesc",
+            editBox = "autoMasterLootNoticeSecondsEditBox",
+            descHeight = 22,
+            height = 40,
+            gap = 10,
+        }
         rows[#rows + 1] = {
             type = "slider",
             title = "countdownDurationStr",
@@ -698,6 +770,35 @@ do
         end
     end
 
+    local function saveAutoMasterLootNoticeSeconds(editBox)
+        if not editBox then
+            return nil
+        end
+        local value = normalizeAutoMasterLootNoticeSeconds(editBox:GetText())
+        setOptions({
+            autoMasterLootNoticeSeconds = value,
+        })
+        editBox:SetText(tostring(value))
+        return value
+    end
+
+    local function bindAutoMasterLootNoticeEditBox(editBox)
+        if not editBox then
+            return
+        end
+        Frames.SetScriptSafely(editBox, "OnEnterPressed", function(self)
+            saveAutoMasterLootNoticeSeconds(self)
+            self:ClearFocus()
+        end)
+        Frames.SetScriptSafely(editBox, "OnEditFocusLost", function(self)
+            saveAutoMasterLootNoticeSeconds(self)
+        end)
+        Frames.SetScriptSafely(editBox, "OnEscapePressed", function(self)
+            self:SetText(tostring(normalizeAutoMasterLootNoticeSeconds(getOption("autoMasterLootNoticeSeconds"))))
+            self:ClearFocus()
+        end)
+    end
+
     function module:ApplyMasterLootPreset(presetName)
         if presetName == "quiet" then
             setOptions({
@@ -760,6 +861,11 @@ do
         setText(frameName, "showTooltipsStr", L.StrConfigShowTooltips)
         setText(frameName, "showLootCounterDuringMSRollStr", L.StrConfigShowLootCounterDuringMSRoll)
         setText(frameName, "minimapButtonStr", L.StrConfigMinimapButton)
+        setText(frameName, "autoMasterLootOnBossTargetStr", L.StrConfigAutoMasterLootOnBossTarget)
+        setText(frameName, "autoMasterLootNoticeSecondsStr", L.StrConfigAutoMasterLootNoticeSeconds)
+        setText(frameName, "askGroupLootAfterBossLootStr", L.StrConfigAskGroupLootAfterBossLoot)
+        setText(frameName, "autoSpamLootOnLootOpenedStr", L.StrConfigAutoSpamLootOnLootOpened)
+        setText(frameName, "autoSpamSoftResOnLootOpenedStr", L.StrConfigAutoSpamSoftResOnLootOpened)
         setText(frameName, "countdownDurationStr", L.StrConfigCountdownDuration)
         setText(frameName, "countdownSimpleRaidMsgStr", L.StrConfigCountdownSimpleRaidMsg)
         setText(frameName, "sortAscendingDesc", L.StrConfigSortAscendingDesc)
@@ -776,6 +882,11 @@ do
         setText(frameName, "showTooltipsDesc", L.StrConfigShowTooltipsDesc)
         setText(frameName, "showLootCounterDuringMSRollDesc", L.StrConfigShowLootCounterDuringMSRollDesc)
         setText(frameName, "minimapButtonDesc", L.StrConfigMinimapButtonDesc)
+        setText(frameName, "autoMasterLootOnBossTargetDesc", L.StrConfigAutoMasterLootOnBossTargetDesc)
+        setText(frameName, "autoMasterLootNoticeSecondsDesc", L.StrConfigAutoMasterLootNoticeSecondsDesc)
+        setText(frameName, "askGroupLootAfterBossLootDesc", L.StrConfigAskGroupLootAfterBossLootDesc)
+        setText(frameName, "autoSpamLootOnLootOpenedDesc", L.StrConfigAutoSpamLootOnLootOpenedDesc)
+        setText(frameName, "autoSpamSoftResOnLootOpenedDesc", L.StrConfigAutoSpamSoftResOnLootOpenedDesc)
         setText(frameName, "countdownDurationDesc", L.StrConfigCountdownDurationDesc)
         setText(frameName, "countdownSimpleRaidMsgDesc", L.StrConfigCountdownSimpleRaidMsgDesc)
         setText(frameName, "PresetsTitle", L.StrConfigMasterLootPresetsTitle)
@@ -921,8 +1032,15 @@ do
         setChecked(frameName, "showLootCounterDuringMSRoll", getOption("showLootCounterDuringMSRoll") == true)
         setChecked(frameName, "minimapButton", getOption("minimapButton") == true)
         setChecked(frameName, "countdownSimpleRaidMsg", getOption("countdownSimpleRaidMsg") == true)
+        setChecked(frameName, "autoSpamLootOnLootOpened", getOption("autoSpamLootOnLootOpened") == true)
+        for i = 1, #optionSuffixes do
+            local suffix = optionSuffixes[i]
+            setChecked(frameName, suffix, getOption(suffix) == true)
+        end
 
+        setEditBoxText(frameName, "autoMasterLootNoticeSecondsEditBox", tostring(normalizeAutoMasterLootNoticeSeconds(getOption("autoMasterLootNoticeSeconds"))))
         setCountdownDurationDisplay(frameName, getOption("countdownDuration"))
+        refreshAutoSpamSoftResDependency(frameName)
 
         local useRaidWarning = getOption("useRaidWarning") == true
         local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
@@ -1035,6 +1153,9 @@ do
         end
 
         name = strsub(name, strlen(frameName) + 1)
+        if name == "autoSpamLootOnLootOpened" and value ~= true then
+            setOption("autoSpamSoftResOnLootOpened", false)
+        end
         setOption(name, value)
         local eventName = Events.GetConfigOptionChanged and Events.GetConfigOptionChanged(name)
         if eventName then
@@ -1061,6 +1182,7 @@ do
             onOptionClick(self, frameName)
         end)
         initCountdownSlider(refs.countdownDuration)
+        bindAutoMasterLootNoticeEditBox(refs.autoMasterLootNoticeSecondsEditBox)
 
         for i = 1, #optionSuffixes do
             local suffix = optionSuffixes[i]

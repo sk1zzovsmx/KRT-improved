@@ -39,6 +39,15 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **Loot method automation** - Added opt-in Master Loot options to switch
+  to Master Loot when a raid leader targets a recognized raid boss and to
+  show a configurable RollFor-style KRT screen notice when it fires, then ask
+  before restoring Group Loot after boss loot is cleared.
+- **Opened-loot autospam** - Added opt-in Master Loot options to announce
+  opened loot automatically and, when enabled with loot autospam, add SoftRes
+  player lines only for opened items that have current-raid SoftRes players.
+  Loot spam now names the current loot target when the client exposes one and
+  groups reserved-item lines after the full opened-loot list.
 - **SoftRes import wizard** - Reworked the SoftRes import popup into a compact
   chooser with explicit Multi-reserve/Plus System and JSON/CSV buttons, defaulting
   to JSON for RaidRes and softres.it Gargul export payloads, bundling LibDeflate

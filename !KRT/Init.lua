@@ -82,6 +82,7 @@ local function seedBootstrapEvents()
     Wow.LootOpened = Wow.LootOpened or "wow.LOOT_OPENED"
     Wow.LootClosed = Wow.LootClosed or "wow.LOOT_CLOSED"
     Wow.LootSlotCleared = Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
+    Wow.PlayerTargetChanged = Wow.PlayerTargetChanged or "wow.PLAYER_TARGET_CHANGED"
     Wow.UiErrorMessage = Wow.UiErrorMessage or "wow.UI_ERROR_MESSAGE"
     Wow.ChatMsgWhisper = Wow.ChatMsgWhisper or "wow.CHAT_MSG_WHISPER"
     Wow.TradeAcceptUpdate = Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
@@ -811,6 +812,7 @@ do
         LOOT_CLOSED = "LOOT_CLOSED",
         LOOT_OPENED = "LOOT_OPENED",
         LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+        PLAYER_TARGET_CHANGED = "PLAYER_TARGET_CHANGED",
         UI_ERROR_MESSAGE = "UI_ERROR_MESSAGE",
         TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
         TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
@@ -823,6 +825,7 @@ do
             LOOT_OPENED = WowEvents.LootOpened,
             LOOT_CLOSED = WowEvents.LootClosed,
             LOOT_SLOT_CLEARED = WowEvents.LootSlotCleared,
+            PLAYER_TARGET_CHANGED = WowEvents.PlayerTargetChanged,
             UI_ERROR_MESSAGE = WowEvents.UiErrorMessage,
             CHAT_MSG_WHISPER = WowEvents.ChatMsgWhisper,
             TRADE_ACCEPT_UPDATE = WowEvents.TradeAcceptUpdate,

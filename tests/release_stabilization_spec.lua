@@ -1535,11 +1535,26 @@ local function newHarness()
                 addon.State.debugEnabled = enabled and true or false
             end
             function Opts.AddNamespace(name, defaults)
-                if namespaces[name] then
-                    return namespaces[name]
-                end
                 local store = getOrInitFlat()
                 local namespaceStore = getOrInitNamespaceStore(name)
+                if namespaces[name] then
+                    local ns = namespaces[name]
+                    for k, v in pairs(defaults or {}) do
+                        if ns._defaults[k] == nil then
+                            ns._defaults[k] = v
+                            if namespaceStore[k] ~= nil then
+                                store[k] = namespaceStore[k]
+                            elseif store[k] == nil then
+                                store[k] = v
+                                namespaceStore[k] = v
+                            else
+                                namespaceStore[k] = store[k]
+                            end
+                            keyToNs[k] = ns
+                        end
+                    end
+                    return ns
+                end
                 local ns = { _name = name, _defaults = defaults or {} }
                 for k, v in pairs(ns._defaults) do
                     if namespaceStore[k] ~= nil then
@@ -2196,6 +2211,7 @@ local function newHarness()
                 "!KRT/Services/Raid/Attendance.lua",
                 "!KRT/Services/Raid/LootRecords.lua",
                 "!KRT/Services/Raid/Session.lua",
+                "!KRT/Services/Raid/LootMethod.lua",
             }
 
             local function loadFiles(files)
@@ -3457,6 +3473,59 @@ test("raid roster update records joins leaves and player metadata", function()
     assertTrue(tonumber(raid.players[2].leave) == 1000, "expected Bob to be marked left")
     assertEqual(raid.players[3].name, "Cara", "expected Cara to be added to roster")
     assertEqual(_G.KRT_Players.TestRealm.Cara.class, "PRIEST", "expected realm player metadata to be updated")
+end)
+
+test("auto master loot and group loot restore default off", function()
+    local h = newHarness()
+    local setLootMethodCalls = {}
+
+    _G.GetTime = function()
+        return 1000
+    end
+    _G.GetLootMethod = function()
+        return "group"
+    end
+    _G.SetLootMethod = function(...)
+        setLootMethodCalls[#setLootMethodCalls + 1] = { ... }
+    end
+    _G.UnitExists = function(unit)
+        return unit == "target"
+    end
+    _G.UnitGUID = function(unit)
+        return unit == "target" and "Creature-0-0-0-0-15956-0000000000" or nil
+    end
+    _G.UnitInRaid = function(unit)
+        return unit == "player"
+    end
+    _G.UnitIsDead = function()
+        return false
+    end
+    _G.UnitName = function(unit)
+        return unit == "player" and "Tester" or nil
+    end
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15956] = true,
+        },
+    }
+    h.addon.GetCreatureId = function()
+        return 15956
+    end
+    h:setRaidRoleState({
+        isLeader = true,
+        isMasterLooter = false,
+        inRaid = true,
+    })
+
+    h:load("!KRT/Services/Raid.lua")
+
+    local masterCfg = h.addon.Options.Get("Master")
+    assertEqual(masterCfg:Get("autoMasterLootOnBossTarget"), false, "expected Auto Master Loot to default off")
+    assertEqual(masterCfg:Get("askGroupLootAfterBossLoot"), false, "expected Group Loot restore prompt to default off")
+    assertEqual(masterCfg:GetDefaults().autoMasterLootOnBossTarget, false, "expected Auto Master Loot default contract to be off")
+    assertEqual(masterCfg:GetDefaults().askGroupLootAfterBossLoot, false, "expected Group Loot restore default contract to be off")
+    assertEqual(h.addon.Services.Raid:HandleAutoMasterLootTargetChanged(), false, "expected default-off Auto Master Loot to stay inert")
+    assertEqual(#setLootMethodCalls, 0, "expected default-off Auto Master Loot not to call SetLootMethod")
 end)
 
 test("raid roster update preserves previous names for temporary unknown units", function()
@@ -12581,6 +12650,135 @@ test("blizzard loot frame buttons show softres reserve hints", function()
     assertEqual(tooltipLines[2], h.addon.L.StrLootReservedBy, "expected tooltip reserve heading")
     assertEqual(tooltipLines[3], "Gargull (x2)", "expected tooltip first reserver line")
     assertEqual(tooltipLines[4], "Emann", "expected tooltip second reserver line")
+end)
+
+test("master auto spam announces opened loot with softres lines only for reserved items", function()
+    local h = newHarness()
+    local reservedLink = h.registerItem(9431, "Reserved Auto Blade")
+    local openLink = h.registerItem(9432, "Open Auto Blade")
+    local items = {
+        [1] = { itemLink = reservedLink, itemName = "Reserved Auto Blade", itemTexture = "IconReserved", count = 1 },
+        [2] = { itemLink = openLink, itemName = "Open Auto Blade", itemTexture = "IconOpen", count = 1 },
+    }
+
+    h.addon.L.ChatSpamLootFrom = "%s dropped:"
+    h.addon.L.ChatSpamLootReservedHeader = "Item reserved:"
+    h.addon.L.ChatSpamLootReservedLine = "%d. %s by %s"
+    h.addon.Options.AddNamespace("Master", {
+        autoSpamLootOnLootOpened = false,
+        autoSpamSoftResOnLootOpened = false,
+    })
+    setHarnessOption(h, "Master", "autoSpamLootOnLootOpened", true)
+    setHarnessOption(h, "Master", "autoSpamSoftResOnLootOpened", true)
+    h.addon.Services.Loot = {
+        FetchLoot = function()
+            h.feature.lootState.lootCount = 2
+            h.feature.lootState.currentItemIndex = 1
+        end,
+        GetLootWindowItems = function()
+            return items
+        end,
+        GetItem = function(index)
+            return items[index]
+        end,
+        GetItemLink = function(index)
+            return items[index] and items[index].itemLink or nil
+        end,
+        GetItemName = function(index)
+            return items[index] and items[index].itemName or nil
+        end,
+        GetItemTexture = function(index)
+            return items[index] and items[index].itemTexture or nil
+        end,
+        GetCurrentItemCount = function()
+            return 1
+        end,
+        ItemExists = function(_, index)
+            return items[index] ~= nil
+        end,
+    }
+    h.addon.Services.Raid = {
+        IsMasterLooter = function()
+            return true
+        end,
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+        _EnsureLootWindowItemContext = function()
+            return nil
+        end,
+        NotifyLootWindowOpened = function()
+            return true
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return true
+        end,
+        HasItemReserves = function(itemId)
+            return itemId == 9431
+        end,
+        GetReserveCountForItem = function(itemId)
+            return itemId == 9431 and 2 or 0
+        end,
+        FormatReservedPlayersLine = function(_, itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers)
+            assertEqual(useColor, false, "expected auto spam SoftRes lines to be chat-safe")
+            assertEqual(showPlus, false, "expected auto spam SoftRes lines to hide Plus suffixes")
+            assertEqual(showMulti, false, "expected auto spam SoftRes lines to hide multi-reserve suffixes")
+            assertEqual(onlyCurrentRaidPlayers, true, "expected auto spam SoftRes lines to include current raid players only")
+            if itemId == 9431 then
+                return "Alice, Bob"
+            end
+            return ""
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    _G.UnitName = function(unit)
+        if unit == "target" then
+            return "Anub'Rekhan"
+        end
+        return nil
+    end
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.UI = h.addon.UI
+    loadMasterController(h)
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(false, "KRTMaster")
+
+    _G.KRTMaster = frame
+    Master.RequestRefresh = function() end
+    Master.EnsureUI = function()
+        return frame
+    end
+
+    Master:LOOT_OPENED()
+
+    local output = table.concat(h.logs.info, "\n")
+    local secondItemStart = string.find(output, "2. " .. openLink, 1, true)
+    local reservedHeaderStart = string.find(output, h.addon.L.ChatSpamLootReservedHeader, 1, true)
+
+    assertContains(h.logs.info, "Anub'Rekhan dropped:", "expected auto spam to announce the loot source name")
+    assertContains(h.logs.info, "1. " .. reservedLink, "expected auto spam to announce the reserved item")
+    assertContains(h.logs.info, "2. " .. openLink, "expected auto spam to announce the open item")
+    assertContains(h.logs.info, h.addon.L.ChatSpamLootReservedHeader, "expected reserved items section after the loot list")
+    assertContains(h.logs.info, "1. " .. reservedLink .. " by Alice, Bob", "expected reserved item line in the reserved section")
+    assertTrue(secondItemStart and reservedHeaderStart and secondItemStart < reservedHeaderStart, "expected reserved section after the full loot list")
+    assertTextNotContains(output, reservedLink .. " SoftRes:", "expected no inline SoftRes line for reserved item")
+    assertTextNotContains(output, openLink .. " by", "expected no reserved-section line for item without reservers")
 end)
 
 test("master loot opened stays hidden while passively observing group loot", function()
