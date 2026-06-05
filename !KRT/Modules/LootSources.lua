@@ -24,6 +24,15 @@ local VALID_SOURCE_KINDS = {
     trash = true,
 }
 
+local VALID_MODE_KEYS = {
+    normal10 = true,
+    normal20 = true,
+    normal25 = true,
+    normal40 = true,
+    heroic10 = true,
+    heroic25 = true,
+}
+
 -- ----- Private helpers ----- --
 local function trimText(value)
     if Strings and Strings.TrimText then
@@ -85,14 +94,14 @@ local function getModeKey(context)
 
     if type(context.mode) == "string" then
         local mode = normalizeText(context.mode)
-        if mode == "normal10" or mode == "normal25" or mode == "heroic10" or mode == "heroic25" then
+        if VALID_MODE_KEYS[mode] == true then
             return mode
         end
     end
 
     local raidSize = tonumber(context.raidSize)
     local difficulty = tonumber(context.difficulty)
-    if raidSize ~= 10 and raidSize ~= 25 then
+    if raidSize ~= 10 and raidSize ~= 20 and raidSize ~= 25 and raidSize ~= 40 then
         if difficulty == 3 or difficulty == 5 then
             raidSize = 10
         elseif difficulty == 4 or difficulty == 6 then
@@ -100,13 +109,17 @@ local function getModeKey(context)
         end
     end
 
-    if raidSize ~= 10 and raidSize ~= 25 then
+    if raidSize ~= 10 and raidSize ~= 20 and raidSize ~= 25 and raidSize ~= 40 then
         return nil
     end
 
     local heroic = difficulty == 5 or difficulty == 6
     if context.isHeroic == true or context.heroic == true then
         heroic = true
+    end
+
+    if raidSize == 20 or raidSize == 40 then
+        return "normal" .. tostring(raidSize)
     end
 
     return (heroic and "heroic" or "normal") .. tostring(raidSize)
@@ -163,40 +176,6 @@ local function withConfidence(candidate, confidence)
     return resolved
 end
 
-local function findUniqueRecentCandidate(candidates, context)
-    if type(context) ~= "table" then
-        return nil
-    end
-
-    local recentNpcId = tonumber(context.recentSourceNpcId)
-    local recentName = normalizeText(context.recentSourceName)
-    if not recentNpcId and not recentName then
-        return nil
-    end
-
-    local matched
-    local matchedCount = 0
-    for i = 1, #candidates do
-        local candidate = candidates[i]
-        local isMatch = false
-        if recentNpcId and tonumber(candidate.npcId) == recentNpcId then
-            isMatch = true
-        elseif recentName and normalizeText(candidate.npcName) == recentName then
-            isMatch = true
-        end
-
-        if isMatch then
-            matched = candidate
-            matchedCount = matchedCount + 1
-        end
-    end
-
-    if matchedCount == 1 then
-        return matched
-    end
-    return nil
-end
-
 local function findSharedTrashCandidate(candidates)
     local sharedNpcId
     local sharedCandidate
@@ -220,6 +199,10 @@ local function findSharedTrashCandidate(candidates)
     end
 
     return sharedCandidate
+end
+
+local function setDataForTests(byItemId)
+    addon.LootSourcesData.ByItemId = byItemId or {}
 end
 
 -- ----- Public methods ----- --
@@ -254,11 +237,6 @@ function LootSources.FindSource(itemId, context)
         return withConfidence(candidates[1], "exact")
     end
 
-    local recentCandidate = findUniqueRecentCandidate(candidates, context)
-    if recentCandidate then
-        return withConfidence(recentCandidate, "context")
-    end
-
     local sharedTrashCandidate = findSharedTrashCandidate(candidates)
     if sharedTrashCandidate then
         return withConfidence(sharedTrashCandidate, "shared-trash")
@@ -267,6 +245,4 @@ function LootSources.FindSource(itemId, context)
     return { reason = "ambiguous", candidates = candidates }
 end
 
-function LootSources.SetDataForTests(byItemId)
-    addon.LootSourcesData.ByItemId = byItemId or {}
-end
+LootSources._SetDataForTests = setDataForTests
