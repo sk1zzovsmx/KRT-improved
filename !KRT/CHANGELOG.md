@@ -6,6 +6,13 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.8.0-beta.1
 
+### Fixes
+
+- **Group Loot inventory trades** - Loot Master inventory-item roll and trade
+  actions now use a separate inventory-trade permission, so raid leaders,
+  assistants, and the active Master Looter can trade already-held items while
+  the raid uses Group Loot without unlocking protected loot-window awards.
+
 ## [0.8.0-beta.1] - 2026-06-05
 
 ### Documentation

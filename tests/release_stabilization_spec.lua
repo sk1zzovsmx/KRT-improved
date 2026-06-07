@@ -889,6 +889,16 @@ local function newHarness()
             return state
         end
 
+        if capability == "inventory_trade" then
+            if not role.inRaid or role.isMasterLooter or role.hasRaidLeadership then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_loot_or_leadership"
+            end
+            return state
+        end
+
         if capability == "raid_leadership" or capability == "loot_counter_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
             if not role.inRaid then
                 state.reason = "not_in_raid"
@@ -2479,6 +2489,48 @@ end
 
 local function refreshMasterFrameForTest(Master)
     return Master._Private.RefreshFrame()
+end
+
+local function installMasterFrameParts(h, frame)
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
 end
 
 local function setupInventoryTradeHarness(order, rollsByName)
@@ -12431,10 +12483,13 @@ test("harness raid capability service mirrors shared loot and leadership policy"
     })
 
     local lootState = raid:GetCapabilityState("loot")
+    local inventoryTradeState = raid:GetCapabilityState("inventory_trade")
     local counterState = raid:GetCapabilityState("loot_counter_broadcast")
 
     assertEqual(lootState.allowed, false, "expected loot capability to require master looter in raid")
     assertEqual(lootState.reason, "missing_master_looter", "expected missing ML denial reason")
+    assertEqual(inventoryTradeState.allowed, false, "expected inventory trade capability to require loot or leadership in raid")
+    assertEqual(inventoryTradeState.reason, "missing_loot_or_leadership", "expected inventory trade denial reason")
     assertEqual(counterState.allowed, false, "expected counter broadcast to require raid leadership")
     assertEqual(counterState.reason, "missing_leadership", "expected leadership denial reason")
     assertTrue(raid:EnsureMasterOnlyAccess() ~= true, "expected shared master-only guard to block when loot access is denied")
@@ -12443,10 +12498,20 @@ test("harness raid capability service mirrors shared loot and leadership policy"
     h:setRaidRoleState({
         inRaid = true,
         rank = 1,
+        isMasterLooter = false,
+    })
+
+    assertTrue(raid:CanUseCapability("loot") ~= true, "expected assistant without ML to stay outside loot capability")
+    assertTrue(raid:CanUseCapability("inventory_trade") == true, "expected assistant to use inventory trade capability")
+
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 1,
         isMasterLooter = true,
     })
 
     assertTrue(raid:CanUseCapability("loot") == true, "expected ML ownership to re-enable loot capability")
+    assertTrue(raid:CanUseCapability("inventory_trade") == true, "expected ML ownership to enable inventory trade capability")
     assertTrue(raid:CanUseCapability("loot_counter_broadcast") == true, "expected raid leadership to re-enable counter broadcast")
     assertTrue(raid:CanUseCapability("ready_check") == true, "expected leadership to re-enable ready checks")
 end)
@@ -12638,6 +12703,117 @@ test("master assignment buttons stay disabled until a target is selected", funct
     assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
     assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to stay disabled without a target")
+end)
+
+test("master enables inventory Trade in group loot without unlocking loot-window actions", function()
+    local h = newHarness()
+    local link = h.registerItem(9410, "Group Trade Blade")
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return { itemLink = link, count = 1 }
+        end,
+        GetItemLink = function()
+            return link
+        end,
+        ItemExists = function()
+            return true
+        end,
+    }
+    h.addon.Services.Raid = {
+        CanUseCapability = function(_, capability)
+            return capability == "inventory_trade" or capability == "ready_check"
+        end,
+        EnsureMasterOnlyAccess = function()
+            return false
+        end,
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.UI = h.addon.UI
+    h:load("!KRT/Services/Rolls/Service.lua")
+    loadMasterController(h)
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    installMasterFrameParts(h, frame)
+    Master.RequestRefresh = function() end
+    loadMasterFrameForTest(Master, frame)
+
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.rollsCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
+    h.feature.lootState.fromInventory = true
+    h.feature.lootState.holder = "Alice"
+    h.feature.lootState.banker = "Bob"
+    h.feature.lootState.disenchanter = "Cara"
+
+    h.addon.Services.Rolls.GetDisplayModel = function()
+        return {
+            rows = {
+                { name = "Alice", status = "ROLL", roll = 98, selectionAllowed = true, isEligible = true },
+            },
+            winner = "Alice",
+            selectionAllowed = true,
+            requiredWinnerCount = 1,
+            resolution = {
+                autoWinners = {
+                    { name = "Alice", roll = 98 },
+                },
+                tiedNames = {},
+                requiresManualResolution = false,
+                topRollName = "Alice",
+            },
+        }
+    end
+    h.addon.Services.Rolls.GetHighestRoll = function()
+        return 98
+    end
+    h.addon.Services.Rolls.GetRollStatus = function()
+        return h.rollTypes.MAINSPEC, false, false, false
+    end
+
+    refreshMasterFrameForTest(Master)
+
+    assertEqual(_G.KRTMasterAwardBtn:GetText(), "Trade", "expected inventory action to render as Trade")
+    assertEqual(_G.KRTMasterAwardBtn._enabled, true, "expected inventory Trade to enable through inventory_trade access")
+    assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected inventory Hold trade to enable through inventory_trade access")
+    assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected inventory Bank trade to enable through inventory_trade access")
+    assertEqual(_G.KRTMasterDisenchantBtn._enabled, true, "expected inventory DE trade to enable through inventory_trade access")
+    assertEqual(_G.KRTMasterMSBtn._enabled, true, "expected inventory rolls to enable through inventory_trade access")
+
+    h.feature.lootState.fromInventory = false
+    refreshMasterFrameForTest(Master)
+
+    assertEqual(_G.KRTMasterAwardBtn:GetText(), "Award", "expected loot-window action to render as Award")
+    assertEqual(_G.KRTMasterAwardBtn._enabled, false, "expected loot-window Award to stay gated behind Master Loot access")
+    assertEqual(_G.KRTMasterHoldBtn._enabled, false, "expected loot-window Hold to stay gated behind Master Loot access")
+    assertEqual(_G.KRTMasterBankBtn._enabled, false, "expected loot-window Bank to stay gated behind Master Loot access")
+    assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected loot-window DE to stay gated behind Master Loot access")
+    assertEqual(_G.KRTMasterMSBtn._enabled, false, "expected loot-window roll starts to stay gated behind Master Loot access")
 end)
 
 test("master auto loot suggestions stay visual only", function()

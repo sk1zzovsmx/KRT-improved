@@ -101,6 +101,16 @@ do
             return state
         end
 
+        if capability == "inventory_trade" then
+            if not role.inRaid or role.isMasterLooter or role.hasRaidLeadership then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_loot_or_leadership"
+            end
+            return state
+        end
+
         if capability == "raid_leadership" or capability == "loot_counter_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
             if not role.inRaid then
                 state.reason = "not_in_raid"

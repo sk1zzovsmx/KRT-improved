@@ -216,8 +216,15 @@ do
     end
 
     -- Module-level helper: wrap a click handler ensuring master-only access.
-    local function wrapMasterOnlyClick(handler)
+    local function wrapMasterOnlyClick(handler, allowInventoryTrade)
         return function(...)
+            if allowInventoryTrade == true and lootState.fromInventory == true then
+                if RaidApi.CanUseCapability(Raid, "inventory_trade") then
+                    return handler(...)
+                end
+                addon:warn(L.WarnInventoryTradeNoPermission or L.WarnMLOnlyMode)
+                return
+            end
             if not RaidApi.EnsureMasterOnlyAccess(Raid) then
                 return
             end
@@ -493,7 +500,7 @@ do
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnSelectItem(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(refs.spamLootBtn, "OnClick", function(self, button)
             if not ensureSpamLootAccess() then
@@ -506,28 +513,28 @@ do
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnMS(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.osBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnOS(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.srBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnSR(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.freeBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnFree(self, button)
-            end)
+            end, true)
         )
         if refs.countdownBtn and refs.countdownBtn.RegisterForClicks then
             local ok = pcall(function()
@@ -543,49 +550,49 @@ do
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnCountdown(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.awardBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnAward(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.rollBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Rolls:Roll(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.clearBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnClear(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.holdBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnHold(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.bankBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnBank(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.disenchantBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnDisenchant(self, button)
-            end)
+            end, true)
         )
         UI.Frames.SetScriptSafely(
             refs.reserveListBtn,
@@ -1410,6 +1417,7 @@ do
         local currentMultiWinner = opts.currentMultiWinner
         local autoLootSuggestion = opts.autoLootSuggestion
         local hasLootAccess = opts.hasLootAccess == true
+        local hasItemActionAccess = (lootState.fromInventory == true and opts.hasInventoryTradeAccess == true) or hasLootAccess
         local countdownRunning = opts.countdownRunning == true
         local lootCount = tonumber(lootState.lootCount) or 0
         local rollsCount = tonumber(lootState.rollsCount) or 0
@@ -1424,12 +1432,12 @@ do
             requiredWinnerCount = 1
         end
 
-        state.canStartRolls = hasLootAccess and lootCount >= 1 and not countdownRunning
+        state.canStartRolls = hasItemActionAccess and lootCount >= 1 and not countdownRunning
         state.canStartSR = state.canStartRolls and opts.hasEligibleRaidReserve == true
-        state.canChangeItem = hasLootAccess and currentFlowState ~= FLOW_STATES.COUNTDOWN
-        state.canAward = hasLootAccess and lootCount >= 1 and rollsCount >= 1 and not countdownRunning and opts.canAwardSelection == true
+        state.canChangeItem = (hasLootAccess or opts.hasInventoryTradeAccess == true) and currentFlowState ~= FLOW_STATES.COUNTDOWN
+        state.canAward = hasItemActionAccess and lootCount >= 1 and rollsCount >= 1 and not countdownRunning and opts.canAwardSelection == true
         state.canReserveList = true
-        state.canRollSelf = hasLootAccess and opts.record == true and opts.canRoll == true and opts.rolled == false and countdownRunning
+        state.canRollSelf = hasItemActionAccess and opts.record == true and opts.canRoll == true and opts.rolled == false and countdownRunning
         state.canSpamLoot = lootCount >= 1 and ((lootState.fromInventory and opts.hasReadyCheckAccess == true) or ((not lootState.fromInventory) and hasLootAccess))
 
         if not opts.hasItem then
@@ -1636,19 +1644,25 @@ do
         }
 
         if not opts.hasLootAccess then
-            tooltipState.selectItem = L.WarnMLOnlyMode
-            tooltipState.ms = L.WarnMLOnlyMode
-            tooltipState.os = L.WarnMLOnlyMode
-            tooltipState.sr = L.WarnMLOnlyMode
-            tooltipState.free = L.WarnMLOnlyMode
-            tooltipState.countdown = L.WarnMLOnlyMode
-            tooltipState.award = L.WarnMLOnlyMode
-            tooltipState.roll = L.WarnMLOnlyMode
-            tooltipState.clear = L.WarnMLOnlyMode
-            tooltipState.hold = L.WarnMLOnlyMode
-            tooltipState.bank = L.WarnMLOnlyMode
-            tooltipState.disenchant = L.WarnMLOnlyMode
-            tooltipState.reserveList = L.WarnMLOnlyMode
+            local itemActionWarning = lootState.fromInventory and (L.WarnInventoryTradeNoPermission or L.WarnMLOnlyMode) or L.WarnMLOnlyMode
+            local hasItemActionAccess = lootState.fromInventory and opts.hasInventoryTradeAccess == true
+
+            if not (lootState.fromInventory and opts.hasInventoryTradeAccess == true) then
+                tooltipState.selectItem = itemActionWarning
+            end
+            if not hasItemActionAccess then
+                tooltipState.ms = itemActionWarning
+                tooltipState.os = itemActionWarning
+                tooltipState.sr = itemActionWarning
+                tooltipState.free = itemActionWarning
+                tooltipState.countdown = itemActionWarning
+                tooltipState.award = itemActionWarning
+                tooltipState.roll = itemActionWarning
+                tooltipState.clear = itemActionWarning
+                tooltipState.hold = itemActionWarning
+                tooltipState.bank = itemActionWarning
+                tooltipState.disenchant = itemActionWarning
+            end
         end
 
         return tooltipState
@@ -1675,6 +1689,8 @@ do
         local tooltipState = opts.tooltipState or {}
         local workflowState = opts.workflowState or {}
         local hasLootAccess = opts.hasLootAccess
+        local hasInventoryTradeAccess = opts.hasInventoryTradeAccess == true
+        local hasItemActionAccess = (lootState.fromInventory == true and hasInventoryTradeAccess) or hasLootAccess
         local countdownRunning = opts.countdownRunning
         local autoLootSuggestion = opts.autoLootSuggestion
         local suggestedAction = type(autoLootSuggestion) == "table" and autoLootSuggestion.action or nil
@@ -1701,24 +1717,27 @@ do
             disenchantTooltip = tooltipState.disenchant,
             reserveListTooltip = tooltipState.reserveList,
             lootCounterTooltip = tooltipState.lootCounter,
-            canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRunning,
+            canSelectItem = (
+                ((not lootState.fromInventory) and hasLootAccess and lootState.lootCount > 1)
+                or (lootState.fromInventory and hasInventoryTradeAccess and lootState.lootCount >= 1)
+            ) and not countdownRunning,
             canChangeItem = workflowState.canChangeItem == true,
             canSpamLoot = workflowState.canSpamLoot == true,
             canStartRolls = workflowState.canStartRolls == true,
             canStartSR = workflowState.canStartSR == true,
-            canCountdown = hasLootAccess and lootState.lootCount >= 1 and opts.hasItem and (lootState.rollStarted or countdownRunning),
-            canHold = hasLootAccess and lootState.lootCount >= 1 and lootState.holder,
-            canBank = hasLootAccess and lootState.lootCount >= 1 and lootState.banker,
-            canDisenchant = hasLootAccess and lootState.lootCount >= 1 and lootState.disenchanter,
+            canCountdown = hasItemActionAccess and lootState.lootCount >= 1 and opts.hasItem and (lootState.rollStarted or countdownRunning),
+            canHold = hasItemActionAccess and lootState.lootCount >= 1 and lootState.holder,
+            canBank = hasItemActionAccess and lootState.lootCount >= 1 and lootState.banker,
+            canDisenchant = hasItemActionAccess and lootState.lootCount >= 1 and lootState.disenchanter,
             canAward = workflowState.canAward == true,
             reserveListText = opts.hasReserves and L.BtnOpenList or L.BtnInsertList,
             canReserveList = workflowState.canReserveList == true,
             canRoll = workflowState.canRollSelf == true,
-            canClear = hasLootAccess and lootState.rollsCount >= 1,
+            canClear = hasItemActionAccess and lootState.rollsCount >= 1,
             glowSR = workflowState.canStartSR == true,
-            glowHoldSuggestion = hasLootAccess and suggestedAction == "hold" and lootState.holder,
-            glowBankSuggestion = hasLootAccess and suggestedAction == "bank" and lootState.banker,
-            glowDisenchantSuggestion = hasLootAccess and suggestedAction == "disenchant" and lootState.disenchanter,
+            glowHoldSuggestion = hasItemActionAccess and suggestedAction == "hold" and lootState.holder,
+            glowBankSuggestion = hasItemActionAccess and suggestedAction == "bank" and lootState.banker,
+            glowDisenchantSuggestion = hasItemActionAccess and suggestedAction == "disenchant" and lootState.disenchanter,
         }
     end
 
@@ -3306,8 +3325,10 @@ do
         end
         local autoLootSuggestion = Loot.GetAutoLootSuggestion and Loot:GetAutoLootSuggestion() or nil
         local countdownRunning = isCountdownRunning()
+        local hasInventoryTradeAccess = RaidApi.CanUseCapability(Raid, "inventory_trade")
         flagButtonsOnChange("hasEligibleRaidReserve", hasEligibleRaidReserve)
         flagButtonsOnChange("hasLootAccess", hasLootAccess)
+        flagButtonsOnChange("hasInventoryTradeAccess", hasInventoryTradeAccess)
         flagButtonsOnChange("hasReadyCheckAccess", hasReadyCheckAccess)
         flagButtonsOnChange("autoLootSuggestion", buildAutoLootSuggestionToken(autoLootSuggestion))
         flagButtonsOnChange("countdownRun", countdownRunning)
@@ -3326,6 +3347,7 @@ do
             displayedWinner = displayedWinner,
             hasEligibleRaidReserve = hasEligibleRaidReserve,
             hasItem = hasItem,
+            hasInventoryTradeAccess = hasInventoryTradeAccess,
             hasLootAccess = hasLootAccess,
             hasReadyCheckAccess = hasReadyCheckAccess,
             record = record,
@@ -3346,6 +3368,7 @@ do
             disenchanter = lootState.disenchanter,
             fromInventory = lootState.fromInventory,
             hasEligibleRaidReserve = hasEligibleRaidReserve,
+            hasInventoryTradeAccess = hasInventoryTradeAccess,
             hasLootAccess = hasLootAccess,
             hasReadyCheckAccess = hasReadyCheckAccess,
             hasReserves = hasReserves,
@@ -3374,6 +3397,7 @@ do
                 disenchanter = lootState.disenchanter,
                 fromInventory = lootState.fromInventory,
                 hasItem = hasItem,
+                hasInventoryTradeAccess = hasInventoryTradeAccess,
                 hasLootAccess = hasLootAccess,
                 hasReadyCheckAccess = hasReadyCheckAccess,
                 hasReserves = hasReserves,
