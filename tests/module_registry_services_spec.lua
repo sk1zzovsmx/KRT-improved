@@ -216,6 +216,23 @@ local expectedService = {
     events = "-- events: owns chat output helpers and LFM spam Timer ticker",
 }
 
+local expectedSpecInspectService = {
+    name = "Services/SpecInspect",
+    path = "!KRT/Services/SpecInspect.lua",
+    owner = "module",
+    separator = ":",
+    registryFromFeature = true,
+    deps = {
+        "Init",
+        "Modules/ModuleRegistry",
+        "Modules/Events",
+        "Modules/Bus",
+        "Modules/Strings",
+        "Services/Raid/Roster",
+    },
+    events = "-- events: listens wow.READY_CHECK and LibGroupTalents callbacks; emits SpecInspectUpdated",
+}
+
 local expectedSpammerServices = {
     {
         name = "Services/Spammer/Draft",
@@ -1540,6 +1557,8 @@ for i = 1, #expectedSpammerServices do
     assertServiceRegistryContract(expectedSpammerServices[i])
 end
 
+assertServiceRegistryContract(expectedSpecInspectService)
+
 local pending = {}
 for i = 1, #preRegistryCoreModules do
     local expected = preRegistryCoreModules[i]
@@ -1602,6 +1621,9 @@ for i = 1, #expectedRaidServices do
     registry.SetLoaded(expected.name)
 end
 
+registry.AddModule(expectedSpecInspectService.name, { deps = expectedSpecInspectService.deps })
+registry.SetLoaded(expectedSpecInspectService.name)
+
 for i = 1, #expectedRollServices do
     local expected = expectedRollServices[i]
     registry.AddModule(expected.name, { deps = expected.deps })
@@ -1643,6 +1665,10 @@ assert(issues == nil, "valid services registry sequence must not report dependen
 local status = registry.GetStatus(expectedService.name)
 assert(status and status.Loaded == true, "Services/Chat must be loaded in registry")
 assertDeps(status.Deps, expectedService.deps, expectedService.name)
+
+local specInspectStatus = registry.GetStatus(expectedSpecInspectService.name)
+assert(specInspectStatus and specInspectStatus.Loaded == true, "Services/SpecInspect must be loaded in registry")
+assertDeps(specInspectStatus.Deps, expectedSpecInspectService.deps, expectedSpecInspectService.name)
 
 for i = 1, #expectedRollServices do
     local expected = expectedRollServices[i]
@@ -1802,6 +1828,7 @@ local function findExpectedSpec(name)
         expectedReservesServices,
         expectedDebugServices,
         expectedMasterServices,
+        { expectedSpecInspectService },
     }
 
     for i = 1, #expectedLists do

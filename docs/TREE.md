@@ -157,7 +157,8 @@
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
 |   |   |-- README.md
-|   |   \\-- Reserves.lua
+|   |   |-- Reserves.lua
+|   |   \\-- SpecInspect.lua
 |   |-- UI
 |   |   |-- Templates
 |   |   |   \\-- Common.xml
@@ -292,6 +293,7 @@
 |   |-- module_registry_ui_spec.lua
 |   |-- release_stabilization_spec.lua
 |   |-- screen_notice_runtime_spec.lua
+|   |-- spec_inspect_service_spec.lua
 |   \\-- ui_api_namespace_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json

@@ -24,8 +24,10 @@ Database.EnsureBootstrapEvents()
 
 Wow.OpenMasterLootList = Wow.OpenMasterLootList or "wow.OPEN_MASTER_LOOT_LIST"
 Wow.UpdateMasterLootList = Wow.UpdateMasterLootList or "wow.UPDATE_MASTER_LOOT_LIST"
+Wow.ReadyCheck = Wow.ReadyCheck or "wow.READY_CHECK"
 
 Internal.AddRoll = "AddRoll"
+Internal.SpecInspectUpdated = "SpecInspectUpdated"
 Internal.LoggerLootLogRequest = "LoggerLootLogRequest"
 Internal.LoggerSelectRaid = "LoggerSelectRaid"
 Internal.LoggerSelectBoss = "LoggerSelectBoss"

@@ -105,6 +105,7 @@ local cmdAttendance = { "attendance", "attendees", "att" }
 local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
 local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve", "sr", "softres" }, { "minimap", "mm" }, { "validate" }
 local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
+local cmdSpecInspect = { "specinspect", "inspectspec" }
 local cmdPerf = { "perf", "performance" }
 
 -- ----- Private helpers ----- --
@@ -145,6 +146,7 @@ local function showHelp()
     printHelp("debug", L.StrCmdDebug)
     printHelp("counter", L.StrCmdCounter)
     printHelp("reserves", L.StrCmdReserves)
+    printHelp("specinspect [force]", L.StrCmdSpecInspect)
     printHelp("validate", L.StrCmdValidate)
     printHelp("perf", L.StrCmdPerf)
     printHelp("version", L.StrCmdVersion)
@@ -946,6 +948,25 @@ local function handleCounterCommand(rest)
     end
 end
 
+local function handleSpecInspectCommand(rest)
+    local sub = Strings.SplitArgs(rest)
+    local service = Services and Services.SpecInspect or nil
+    local result
+    if not service then
+        addon:warn(L.MsgSpecInspectNoService)
+        return
+    end
+
+    if sub == "force" then
+        result = service:ForceRefreshRaidSpecs("slash_force")
+    else
+        result = service:RefreshRaidSpecs({ reason = "slash" })
+    end
+
+    result = result or {}
+    addon:info(L.MsgSpecInspectRefresh, tonumber(result.refreshed) or 0, tonumber(result.cached) or 0, tonumber(result.skipped) or 0)
+end
+
 local function formatReserveNameMatches(matches)
     local out = {}
     for i = 1, #(matches or {}) do
@@ -1290,6 +1311,9 @@ local function handleHelpCommand(rest)
         printHelp("toggle", L.StrRaidAttendance)
     elseif topic == "lfm" or topic == "pug" or topic == "group" or topic == "grouper" then
         handleLfmCommand("help")
+    elseif topic == "specinspect" or topic == "inspectspec" then
+        addon:info(format(L.StrCmdCommands, "krt specinspect"), "KRT")
+        printHelp("force", L.StrCmdSpecInspect)
     elseif topic == "config" or topic == "conf" or topic == "options" or topic == "opt" then
         addon:info(format(L.StrCmdCommands, "krt config"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
@@ -1355,6 +1379,7 @@ registerAliases(cmdLogger, handleLoggerCommand)
 registerAliases(cmdAttendance, handleAttendanceCommand)
 registerAliases(cmdLoot, handleLootCommand)
 registerAliases(cmdCounter, handleCounterCommand)
+registerAliases(cmdSpecInspect, handleSpecInspectCommand)
 registerAliases(cmdReserves, handleReservesCommand)
 registerAliases(cmdValidate, handleValidateCommand)
 registerAliases(cmdLFM, handleLfmCommand)

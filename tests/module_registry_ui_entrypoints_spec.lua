@@ -1130,6 +1130,9 @@ local function assertEntryPointFeatureUiDependencyContract()
     assertNotContains(slashSource, "local coreState = feature.coreState or addon.State", "SlashEvents must not fall back to addon.State for core state")
     assertNotContains(slashSource, "addon.State and addon.State.perfThresholdMs", "SlashEvents must use local coreState for perf threshold")
     assertNotContains(slashSource, "addon.State and addon.State.perfEnabled", "SlashEvents must use local coreState for perf enabled")
+    assertContains(slashSource, "cmdSpecInspect", "SlashEvents must wire cmdSpecInspect in command assertions")
+    assertContains(slashSource, "handleSpecInspectCommand", "SlashEvents must wire handleSpecInspectCommand in command assertions")
+    assertContains(slashSource, "Services.SpecInspect", "SlashEvents should route to Services.SpecInspect")
 end
 
 local function assertEntryPointOwnerTableContracts()

@@ -18893,6 +18893,15 @@ test("reserves sync compact payload reduces repeated player names and imports", 
     )
 end)
 
+test("spec inspect service source is checked for modern talent refresh", function()
+    local ok, specInspectSource = pcall(readText, "!KRT/Services/SpecInspect.lua")
+    assertTrue(ok, "expected SpecInspect service source file to exist")
+
+    assertTextContains(specInspectSource, 'LibStub("LibGroupTalents-1.0", true)', "expected LibGroupTalents dependency")
+    assertTextNotContains(specInspectSource, "NotifyInspect(", "must avoid deprecated unit inspect API")
+    assertTextContains(specInspectSource, "RefreshTalentsByUnit", "must use LibGroupTalents refresh API")
+end)
+
 local failures = 0
 for i = 1, #tests do
     local entry = tests[i]
