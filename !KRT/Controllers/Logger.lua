@@ -15,6 +15,7 @@ local UI = feature.UI
 local Rows = UI.Rows
 local Popups = UI.Popups
 local Events = feature.Events
+local Frames = UI.Frames
 local C = feature.C
 local Database = feature.Database
 local Options = feature.Options
@@ -85,66 +86,86 @@ module._loggerPanelNames = module._loggerPanelNames or {
     "KRTRaidAttendanceRaidAttendees",
 }
 
-local LOGGER_COMPACT_ROW_HEIGHT = 22
-local LOGGER_LOOT_ROW_HEIGHT = 32
-
-local LOGGER_LIST_WIDTH_FALLBACK = 240
-local LOGGER_SCROLLBAR_GUTTER_WIDTH = 24
-local LOGGER_ROW_LEFT_INSET = 3
-local LOGGER_ROW_COLUMN_GAP = 6
-local LOGGER_HEADER_COLUMN_GAP = LOGGER_ROW_COLUMN_GAP
-local LOGGER_LOOT_NAME_LEFT_OFFSET = 34
-local LOGGER_PANEL_SCROLL_LEFT_OFFSET = 3
-local LOGGER_HEADER_TOP_OFFSET = -25
-local LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH = 56
-
-local LOGGER_LOOT_COLUMN_MIN_WIDTHS = {
-    icon = 30,
-    item = 165,
-    source = 105,
-    winner = 86,
-    type = 45,
-    roll = 38,
-    time = 48,
-}
-
-local LOGGER_LOOT_COLUMN_RATIOS = {
-    item = 0.34,
-    source = 0.22,
-    winner = 0.18,
-    type = 0.08,
-    roll = 0.07,
-    time = 0.11,
-}
-
-local LOGGER_ATTENDANCE_COMPACT_COLUMN_MIN_WIDTHS = {
-    name = 106,
-    join = LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH,
-    leave = LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH,
-}
-
-local LOGGER_ATTENDANCE_COMPACT_COLUMN_RATIOS = {
-    name = 0.56,
-    join = 0.22,
-    leave = 0.22,
-}
-
-local LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS = {
-    name = 68,
-    join = 39,
-    leave = 39,
-    ilvl = 30,
-    spec = 37,
-    inspect = 324,
-}
-
-local LOGGER_ATTENDANCE_COLUMN_RATIOS = {
-    name = 0,
-    join = 0,
-    leave = 0,
-    ilvl = 0,
-    spec = 0,
-    inspect = 1,
+-- Uniform fields: grouped layout constants for Logger row/list sizing and inspect/spec icon layout.
+local LoggerLayout = {
+    LOGGER_COMPACT_ROW_HEIGHT = 22,
+    LOGGER_LOOT_ROW_HEIGHT = 32,
+    LOGGER_LIST_WIDTH_FALLBACK = 240,
+    LOGGER_SCROLLBAR_GUTTER_WIDTH = 24,
+    LOGGER_ROW_LEFT_INSET = 3,
+    LOGGER_ROW_COLUMN_GAP = 6,
+    LOGGER_HEADER_COLUMN_GAP = 6,
+    LOGGER_LOOT_NAME_LEFT_OFFSET = 34,
+    LOGGER_PANEL_SCROLL_LEFT_OFFSET = 3,
+    LOGGER_HEADER_TOP_OFFSET = -25,
+    LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH = 56,
+    LOGGER_LOOT_COLUMN_MIN_WIDTHS = {
+        icon = 30,
+        item = 165,
+        source = 105,
+        winner = 86,
+        type = 45,
+        roll = 38,
+        time = 48,
+    },
+    LOGGER_LOOT_COLUMN_RATIOS = {
+        item = 0.34,
+        source = 0.22,
+        winner = 0.18,
+        type = 0.08,
+        roll = 0.07,
+        time = 0.11,
+    },
+    LOGGER_ATTENDANCE_COMPACT_COLUMN_MIN_WIDTHS = {
+        name = 106,
+        join = 56,
+        leave = 56,
+    },
+    LOGGER_ATTENDANCE_COMPACT_COLUMN_RATIOS = {
+        name = 0.56,
+        join = 0.22,
+        leave = 0.22,
+    },
+    LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS = {
+        name = 68,
+        join = 39,
+        leave = 39,
+        ilvl = 30,
+        spec = 37,
+        inspect = 324,
+    },
+    LOGGER_ATTENDANCE_COLUMN_RATIOS = {
+        name = 0,
+        join = 0,
+        leave = 0,
+        ilvl = 0,
+        spec = 0,
+        inspect = 1,
+    },
+    RAID_SORT_HEADERS = {
+        { suffix = "HeaderNum", key = "id" },
+        { suffix = "HeaderDate", key = "date" },
+        { suffix = "HeaderZone", key = "zone" },
+        { suffix = "HeaderSize", key = "size" },
+    },
+    LOGGER_RAID_COLUMN_MIN_WIDTHS = {
+        id = 24,
+        date = 88,
+        zone = 128,
+        size = 36,
+    },
+    LOGGER_RAID_COLUMN_RATIOS = {
+        date = 0.20,
+        zone = 0.66,
+        size = 0.14,
+    },
+    RAID_INSPECT_SLOTS = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 },
+    RAID_INSPECT_ICON_SIZE = 18,
+    RAID_INSPECT_ICON_GAP = 1,
+    RAID_SPEC_ICON_SIZE = 17,
+    RAID_SPEC_ICON_GAP = 1,
+    RAID_INSPECT_ICON_LEFT_OFFSET = 1,
+    RAID_SPEC_ICON_LEFT_OFFSET = 1,
 }
 
 module._selectionEvents = module._selectionEvents
@@ -177,26 +198,6 @@ local function getActionCommitOpts(extra)
     return opts
 end
 
-local RAID_SORT_HEADERS = {
-    { suffix = "HeaderNum", key = "id" },
-    { suffix = "HeaderDate", key = "date" },
-    { suffix = "HeaderZone", key = "zone" },
-    { suffix = "HeaderSize", key = "size" },
-}
-
-local LOGGER_RAID_COLUMN_MIN_WIDTHS = {
-    id = 24,
-    date = 88,
-    zone = 128,
-    size = 36,
-}
-
-local LOGGER_RAID_COLUMN_RATIOS = {
-    date = 0.20,
-    zone = 0.66,
-    size = 0.14,
-}
-
 local function setWidgetWidth(widget, width)
     if widget and widget.SetWidth then
         widget:SetWidth(width)
@@ -204,7 +205,7 @@ local function setWidgetWidth(widget, width)
 end
 
 local function setHeaderWidth(widget, width, includeTrailingGap)
-    local gap = includeTrailingGap and LOGGER_HEADER_COLUMN_GAP or 0
+    local gap = includeTrailingGap and LoggerLayout.LOGGER_HEADER_COLUMN_GAP or 0
     setWidgetWidth(widget, (tonumber(width) or 0) + gap)
 end
 
@@ -215,25 +216,25 @@ local function positionLoggerHeader(header, frameName, offsetX, width, includeTr
     end
 
     header:ClearAllPoints()
-    header:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, LOGGER_HEADER_TOP_OFFSET)
+    header:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, LoggerLayout.LOGGER_HEADER_TOP_OFFSET)
     setHeaderWidth(header, width, includeTrailingGap)
 end
 
 local function positionLoggerHeaderColumns(frameName, columns, startOffset)
-    local offset = tonumber(startOffset) or LOGGER_PANEL_SCROLL_LEFT_OFFSET
+    local offset = tonumber(startOffset) or LoggerLayout.LOGGER_PANEL_SCROLL_LEFT_OFFSET
     for i = 1, #columns do
         local column = columns[i]
         positionLoggerHeader(column.header, frameName, offset, column.width, column.trailingGap)
         offset = offset + (tonumber(column.width) or 0)
         if column.trailingGap then
-            offset = offset + LOGGER_HEADER_COLUMN_GAP
+            offset = offset + LoggerLayout.LOGGER_HEADER_COLUMN_GAP
         end
     end
 end
 
 local function getLoggerListContentWidth(frameName)
     if not frameName then
-        return LOGGER_LIST_WIDTH_FALLBACK
+        return LoggerLayout.LOGGER_LIST_WIDTH_FALLBACK
     end
 
     local scroll = _G[frameName .. "ScrollFrame"]
@@ -241,20 +242,20 @@ local function getLoggerListContentWidth(frameName)
     if type(width) ~= "number" or width <= 0 then
         local frame = _G[frameName]
         width = frame and frame.GetWidth and frame:GetWidth() or nil
-        if type(width) == "number" and width > LOGGER_SCROLLBAR_GUTTER_WIDTH then
-            width = width - LOGGER_SCROLLBAR_GUTTER_WIDTH
+        if type(width) == "number" and width > LoggerLayout.LOGGER_SCROLLBAR_GUTTER_WIDTH then
+            width = width - LoggerLayout.LOGGER_SCROLLBAR_GUTTER_WIDTH
         end
     end
 
-    width = tonumber(width) or LOGGER_LIST_WIDTH_FALLBACK
-    return max(LOGGER_LIST_WIDTH_FALLBACK, floor(width))
+    width = tonumber(width) or LoggerLayout.LOGGER_LIST_WIDTH_FALLBACK
+    return max(LoggerLayout.LOGGER_LIST_WIDTH_FALLBACK, floor(width))
 end
 
 local function getLoggerListColumnBudget(frameName, leadOffset, gapCount, returnedWidthOffset)
     local width = getLoggerListContentWidth(frameName)
-    local budget = width - (tonumber(leadOffset) or 0) - ((tonumber(gapCount) or 0) * LOGGER_ROW_COLUMN_GAP)
+    local budget = width - (tonumber(leadOffset) or 0) - ((tonumber(gapCount) or 0) * LoggerLayout.LOGGER_ROW_COLUMN_GAP)
     budget = budget + (tonumber(returnedWidthOffset) or 0)
-    return max(LOGGER_LIST_WIDTH_FALLBACK, floor(budget))
+    return max(LoggerLayout.LOGGER_LIST_WIDTH_FALLBACK, floor(budget))
 end
 
 local function calculateLoggerColumnWidths(totalWidth, minWidths, ratios, fixedKeys)
@@ -310,23 +311,23 @@ local function calculateLoggerColumnWidths(totalWidth, minWidths, ratios, fixedK
 end
 
 local function getRaidColumnWidths(frameName)
-    local budget = getLoggerListColumnBudget(frameName, LOGGER_ROW_LEFT_INSET, 3)
-    return calculateLoggerColumnWidths(budget, LOGGER_RAID_COLUMN_MIN_WIDTHS, LOGGER_RAID_COLUMN_RATIOS, { "id" })
+    local budget = getLoggerListColumnBudget(frameName, LoggerLayout.LOGGER_ROW_LEFT_INSET, 3)
+    return calculateLoggerColumnWidths(budget, LoggerLayout.LOGGER_RAID_COLUMN_MIN_WIDTHS, LoggerLayout.LOGGER_RAID_COLUMN_RATIOS, { "id" })
 end
 
 local function getLootColumnWidths(frameName)
-    local budget = getLoggerListColumnBudget(frameName, LOGGER_LOOT_NAME_LEFT_OFFSET, 5, LOGGER_LOOT_COLUMN_MIN_WIDTHS.icon)
-    return calculateLoggerColumnWidths(budget, LOGGER_LOOT_COLUMN_MIN_WIDTHS, LOGGER_LOOT_COLUMN_RATIOS, { "icon" })
+    local budget = getLoggerListColumnBudget(frameName, LoggerLayout.LOGGER_LOOT_NAME_LEFT_OFFSET, 5, LoggerLayout.LOGGER_LOOT_COLUMN_MIN_WIDTHS.icon)
+    return calculateLoggerColumnWidths(budget, LoggerLayout.LOGGER_LOOT_COLUMN_MIN_WIDTHS, LoggerLayout.LOGGER_LOOT_COLUMN_RATIOS, { "icon" })
 end
 
 local function getAttendanceColumnWidths(frameName)
     local isInspectPanel = frameName == "KRTRaidAttendanceRaidAttendees"
     local gapCount = isInspectPanel and 5 or 2
-    local budget = getLoggerListColumnBudget(frameName, LOGGER_ROW_LEFT_INSET, gapCount)
+    local budget = getLoggerListColumnBudget(frameName, LoggerLayout.LOGGER_ROW_LEFT_INSET, gapCount)
     if not isInspectPanel then
-        return calculateLoggerColumnWidths(budget, LOGGER_ATTENDANCE_COMPACT_COLUMN_MIN_WIDTHS, LOGGER_ATTENDANCE_COMPACT_COLUMN_RATIOS)
+        return calculateLoggerColumnWidths(budget, LoggerLayout.LOGGER_ATTENDANCE_COMPACT_COLUMN_MIN_WIDTHS, LoggerLayout.LOGGER_ATTENDANCE_COMPACT_COLUMN_RATIOS)
     end
-    return calculateLoggerColumnWidths(budget, LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS, LOGGER_ATTENDANCE_COLUMN_RATIOS)
+    return calculateLoggerColumnWidths(budget, LoggerLayout.LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS, LoggerLayout.LOGGER_ATTENDANCE_COLUMN_RATIOS)
 end
 
 local function applyRaidListColumnWidths(frameName)
@@ -339,7 +340,7 @@ local function applyRaidListColumnWidths(frameName)
         { header = _G[frameName .. "HeaderDate"], width = widths.date, trailingGap = true },
         { header = _G[frameName .. "HeaderZone"], width = widths.zone, trailingGap = true },
         { header = _G[frameName .. "HeaderSize"], width = widths.size, trailingGap = false },
-    }, LOGGER_PANEL_SCROLL_LEFT_OFFSET + LOGGER_ROW_LEFT_INSET)
+    }, LoggerLayout.LOGGER_PANEL_SCROLL_LEFT_OFFSET + LoggerLayout.LOGGER_ROW_LEFT_INSET)
 end
 
 local function applyRaidRowColumnWidths(ui, frameName)
@@ -365,7 +366,7 @@ local function applyLootListColumnWidths(frameName)
         { header = _G[frameName .. "HeaderType"], width = widths.type, trailingGap = true },
         { header = _G[frameName .. "HeaderRoll"], width = widths.roll, trailingGap = true },
         { header = _G[frameName .. "HeaderTime"], width = widths.time, trailingGap = false },
-    }, LOGGER_PANEL_SCROLL_LEFT_OFFSET)
+    }, LoggerLayout.LOGGER_PANEL_SCROLL_LEFT_OFFSET)
 end
 
 local function applyLootRowColumnWidths(ui, frameName)
@@ -397,7 +398,7 @@ local function applyAttendanceListColumnWidths(frameName)
         columns[#columns + 1] = { header = _G[frameName .. "HeaderSpec"], width = widths.spec, trailingGap = true }
         columns[#columns + 1] = { header = _G[frameName .. "HeaderInspect"], width = widths.inspect, trailingGap = false }
     end
-    positionLoggerHeaderColumns(frameName, columns, LOGGER_PANEL_SCROLL_LEFT_OFFSET + LOGGER_ROW_LEFT_INSET)
+    positionLoggerHeaderColumns(frameName, columns, LoggerLayout.LOGGER_PANEL_SCROLL_LEFT_OFFSET + LoggerLayout.LOGGER_ROW_LEFT_INSET)
 end
 
 local function applyAttendanceRowColumnWidths(ui, frameName)
@@ -415,13 +416,6 @@ local function applyAttendanceRowColumnWidths(ui, frameName)
     end
 end
 
-local RAID_INSPECT_SLOTS = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 }
-local RAID_INSPECT_ICON_SIZE = 18
-local RAID_INSPECT_ICON_GAP = 1
-local RAID_SPEC_ICON_SIZE = 17
-local RAID_SPEC_ICON_GAP = 1
-local RAID_INSPECT_ICON_LEFT_OFFSET = 1
-local RAID_SPEC_ICON_LEFT_OFFSET = 1
 local bindAttendanceSpecIconTooltip
 
 local function getInspectStatusLabel(status, reason)
@@ -474,7 +468,7 @@ local function getAttendanceInspectIcon(row, index, ui)
         return nil
     end
     icon:EnableMouse(true)
-    icon:SetSize(RAID_INSPECT_ICON_SIZE, RAID_INSPECT_ICON_SIZE)
+    icon:SetSize(LoggerLayout.RAID_INSPECT_ICON_SIZE, LoggerLayout.RAID_INSPECT_ICON_SIZE)
     icon:SetID(index)
     icon.texture = iconName and _G[iconName .. "Texture"] or nil
     if not icon.texture then
@@ -483,7 +477,7 @@ local function getAttendanceInspectIcon(row, index, ui)
     icon.texture:SetAllPoints(icon)
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     if not icon:GetScript("OnEnter") then
-        icon:SetScript("OnEnter", function(self)
+        Frames.SetScriptSafely(icon, "OnEnter", function(self)
             local link = self._krtItemLink
             if not link then
                 return
@@ -496,7 +490,7 @@ local function getAttendanceInspectIcon(row, index, ui)
         end)
     end
     if not icon:GetScript("OnLeave") then
-        icon:SetScript("OnLeave", function()
+        Frames.SetScriptSafely(icon, "OnLeave", function()
             if GameTooltip and GameTooltip.Hide then
                 GameTooltip:Hide()
             end
@@ -549,7 +543,7 @@ local function getAttendanceSpecIcon(row)
         return nil
     end
     icon:EnableMouse(true)
-    icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
+    icon:SetSize(LoggerLayout.RAID_SPEC_ICON_SIZE, LoggerLayout.RAID_SPEC_ICON_SIZE)
     icon.texture = iconName and _G[iconName .. "Texture"] or nil
     if not icon.texture then
         return nil
@@ -576,7 +570,7 @@ local function getAttendanceSecondarySpecIcon(row)
         return nil
     end
     icon:EnableMouse(true)
-    icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
+    icon:SetSize(LoggerLayout.RAID_SPEC_ICON_SIZE, LoggerLayout.RAID_SPEC_ICON_SIZE)
     icon.texture = iconName and _G[iconName .. "Texture"] or nil
     if not icon.texture then
         return nil
@@ -593,7 +587,7 @@ bindAttendanceSpecIconTooltip = function(icon)
         return
     end
 
-    icon:SetScript("OnEnter", function(self)
+    Frames.SetScriptSafely(icon, "OnEnter", function(self)
         local specName = self and self._krtSpecName
         if not (specName and specName ~= "") then
             return
@@ -604,7 +598,7 @@ bindAttendanceSpecIconTooltip = function(icon)
             GameTooltip:Show()
         end
     end)
-    icon:SetScript("OnLeave", function()
+    Frames.SetScriptSafely(icon, "OnLeave", function()
         if GameTooltip and GameTooltip.Hide then
             GameTooltip:Hide()
         end
@@ -675,9 +669,9 @@ local function setAttendanceSpecIcon(row, ui, primarySpecIcon, secondarySpecIcon
     end
 
     primaryIcon:ClearAllPoints()
-    primaryIcon:SetPoint("TOPLEFT", ui.Spec, "TOPLEFT", RAID_SPEC_ICON_LEFT_OFFSET, -1)
+    primaryIcon:SetPoint("TOPLEFT", ui.Spec, "TOPLEFT", LoggerLayout.RAID_SPEC_ICON_LEFT_OFFSET, -1)
     secondaryIcon:ClearAllPoints()
-    secondaryIcon:SetPoint("TOPLEFT", ui.Spec, "TOPLEFT", RAID_SPEC_ICON_LEFT_OFFSET + RAID_SPEC_ICON_SIZE + RAID_SPEC_ICON_GAP, -1)
+    secondaryIcon:SetPoint("TOPLEFT", ui.Spec, "TOPLEFT", LoggerLayout.RAID_SPEC_ICON_LEFT_OFFSET + LoggerLayout.RAID_SPEC_ICON_SIZE + LoggerLayout.RAID_SPEC_ICON_GAP, -1)
 
     setAttendanceSpecIconTexture(primaryIcon, primarySpecIcon, primarySpecName, false)
     setAttendanceSpecIconTexture(secondaryIcon, secondarySpecIcon, secondarySpecName, true)
@@ -711,10 +705,10 @@ local function renderAttendanceInspectIcons(row, ui, playerNid, snapshot)
         return
     end
 
-    local x = RAID_INSPECT_ICON_LEFT_OFFSET
+    local x = LoggerLayout.RAID_INSPECT_ICON_LEFT_OFFSET
     local count = 0
-    for i = 1, #RAID_INSPECT_SLOTS do
-        local slot = RAID_INSPECT_SLOTS[i]
+    for i = 1, #LoggerLayout.RAID_INSPECT_SLOTS do
+        local slot = LoggerLayout.RAID_INSPECT_SLOTS[i]
         local item = items[slot]
         if item and (item.texture or item.itemLink) then
             count = count + 1
@@ -737,7 +731,7 @@ local function renderAttendanceInspectIcons(row, ui, playerNid, snapshot)
             icon:ClearAllPoints()
             icon:SetPoint("TOPLEFT", ui.InspectStatus, "TOPLEFT", x, -1)
             icon:Show()
-            x = x + RAID_INSPECT_ICON_SIZE + RAID_INSPECT_ICON_GAP
+            x = x + LoggerLayout.RAID_INSPECT_ICON_SIZE + LoggerLayout.RAID_INSPECT_ICON_GAP
         end
     end
 end
@@ -748,8 +742,8 @@ local function bindRaidSortHeaders(frameName, listRef)
         return
     end
 
-    for i = 1, #RAID_SORT_HEADERS do
-        local header = RAID_SORT_HEADERS[i]
+    for i = 1, #LoggerLayout.RAID_SORT_HEADERS do
+        local header = LoggerLayout.RAID_SORT_HEADERS[i]
         local sortKey = header.key
         local headerButton = _G[frameName .. header.suffix]
         if headerButton then
@@ -1972,7 +1966,7 @@ local function makeLoggerList(cfg, selField, msCtxField, hlOpts)
     end
     if cfg.drawRow then
         local drawRow = cfg.drawRow
-        local rowHeight = cfg.rowHeight or (cfg.poolTag == "logger-loot" and LOGGER_LOOT_ROW_HEIGHT or LOGGER_COMPACT_ROW_HEIGHT)
+        local rowHeight = cfg.rowHeight or (cfg.poolTag == "logger-loot" and LoggerLayout.LOGGER_LOOT_ROW_HEIGHT or LoggerLayout.LOGGER_COMPACT_ROW_HEIGHT)
         cfg.drawRow = function(row, it, visibleIndex)
             Rows.SetLoggerRowIndex(row, visibleIndex)
             if row.SetHeight then
@@ -3069,7 +3063,7 @@ local function initializeRaidAttendanceFrame()
 
         rowName = UI.Lists.MakeIndexedRowName("PlayerBtn"),
         rowTmpl = "KRTRaidAttendancePlayerRowTemplate",
-        rowHeight = LOGGER_COMPACT_ROW_HEIGHT + 1,
+        rowHeight = LoggerLayout.LOGGER_COMPACT_ROW_HEIGHT + 1,
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
             if not row._krtAttendanceBound then
                 UI.Frames.SetScriptSafely(row, "OnClick", function(self, button)

@@ -6,6 +6,7 @@ local function read(path)
 end
 
 local master = read("!KRT/Controllers/Master.lua")
+local commonXml = read("!KRT/UI/Templates/Common.xml")
 
 assert(master:find("copyMasterRollRowForList", 1, true), "Master roll list must use a dedicated row copy helper before handing data to ListController")
 assert(master:find("for key, value in pairs(source)", 1, true), "Master roll list row copy should be generic instead of mirroring every field")
@@ -15,7 +16,8 @@ assert(master:find("updateRollListRefreshToken", 1, true), "Master roll list mus
 assert(master:find("GetPlayerSpecSnapshot", 1, true), "Master roll rows must copy spec snapshot fields")
 assert(master:find("local spec = specInspect:GetPlayerSpecSnapshot(copy.name)", 1, true), "Master roll rows should use the safe SpecInspect snapshot API")
 assert(not master:find("pcall(specInspect.GetPlayerSpecSnapshot", 1, true), "Master roll rows should not own SpecInspect error handling")
-assert(not master:find('"SpecIcon"', 1, true), "Master roll list must not require a static spec icon row part")
+assert(master:find('_rowParts = { "Name", "Roll", "Counter", "Info", "Star", "SpecIcon" },', 1, true), "Master roll row parts should declare SpecIcon for UI.Lists acquisition")
+assert(commonXml:find("$parentSpecIcon", 1, true), "Master roll template should expose $parentSpecIcon")
 assert(master:find("SpecInspectUpdated", 1, true), "Master roll list must refresh on spec updates")
 assert(not master:find("buildRollListInteractionToken", 1, true), "Master roll list interaction token should be folded into the refresh-token helper")
 assert(not master:find("flagRollListOnChange", 1, true), "Master roll list should avoid a generic one-off dirty helper")

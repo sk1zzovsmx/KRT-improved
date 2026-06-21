@@ -23,9 +23,7 @@ THUMB_SIZE = 160
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Convert local WoW Interface BLP files to a visual JPEG catalog."
-    )
+    parser = argparse.ArgumentParser(description="Convert local WoW Interface BLP files to a visual JPEG catalog.")
     parser.add_argument(
         "--source",
         type=Path,
@@ -111,9 +109,7 @@ def build_cards(items: list[dict[str, object]]) -> str:
         folder = html.escape(str(item["folder"]))
         image = html.escape(str(item["image"]))
         size = html.escape(str(item["size"]))
-        search = html.escape(
-            " ".join([str(item["path"]), str(item["folder"]), Path(str(item["path"])).name]).lower()
-        )
+        search = html.escape(" ".join([str(item["path"]), str(item["folder"]), Path(str(item["path"])).name]).lower())
         cards.append(
             "\n".join(
                 [
@@ -121,7 +117,7 @@ def build_cards(items: list[dict[str, object]]) -> str:
                     f'  <img src="{image}" alt="{path}" loading="lazy">',
                     f'  <div class="name">{html.escape(Path(path).name)}</div>',
                     f'  <div class="meta">{folder} / {size}</div>',
-                    f'  <code>{path}</code>',
+                    f"  <code>{path}</code>",
                     "</article>",
                 ]
             )

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import hashlib
 import json
 import os
@@ -15,7 +16,6 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
 
 
 CODEX_55TO53_MULTI_FILE_CUES = (
@@ -71,6 +71,7 @@ TOOLS_DIR = REPO_ROOT / "tools"
 ADDON_DIR = REPO_ROOT / "!KRT"
 TOC_PATH = ADDON_DIR / "!KRT.toc"
 ADDON_CHANGELOG_PATH = ADDON_DIR / "CHANGELOG.md"
+DEV_REQUIREMENTS_PATH = TOOLS_DIR / "requirements-dev.txt"
 RELEASE_ZIP_EXCLUDED_PATHS = {
     "!KRT/Libs/CallbackHandler-1.0/CallbackHandler-1.0.xml",
     "!KRT/Libs/LibBossIDs-1.0/LibBossIDs-1.0.toc",
@@ -365,12 +366,7 @@ def build_codex_55to53_prompt(user_prompt: str, classification: str) -> str:
         "code-mapper was used, whether spark_implementer was used, files changed, "
         "tests/checks run, and remaining risks if any."
     )
-    return (
-        f"{common}\n\n"
-        f"{workflow}\n\n"
-        f"{response_contract}\n\n"
-        f"Original user task:\n{user_prompt}"
-    )
+    return f"{common}\n\n{workflow}\n\n{response_contract}\n\nOriginal user task:\n{user_prompt}"
 
 
 def codex_55to53(args: argparse.Namespace) -> int:
@@ -391,11 +387,7 @@ def codex_55to53(args: argparse.Namespace) -> int:
     if not user_prompt:
         raise CliError("Prompt is empty.")
 
-    classification = (
-        args.classification
-        if args.classification != "auto"
-        else classify_codex_55to53_prompt(user_prompt)
-    )
+    classification = args.classification if args.classification != "auto" else classify_codex_55to53_prompt(user_prompt)
     branch_result = ensure_codex_55to53_branch(args, classification, user_prompt)
     if branch_result.get("blocked"):
         result = {
@@ -450,7 +442,7 @@ def codex_55to53(args: argparse.Namespace) -> int:
             output_path = (REPO_ROOT / output_path).resolve()
 
         header = [
-            f"# Codex 55to53 Handoff",
+            "# Codex 55to53 Handoff",
             "",
             f"- Profile: {args.profile}",
             f"- Classification: {classification}",
@@ -495,8 +487,7 @@ def codex_55to53(args: argparse.Namespace) -> int:
         )
     except FileNotFoundError as exc:
         raise CliError(
-            "Codex launcher not found. Set --codex-command or KRT_CODEX_COMMAND. "
-            f"Underlying error: {exc}"
+            f"Codex launcher not found. Set --codex-command or KRT_CODEX_COMMAND. Underlying error: {exc}"
         ) from exc
     except PermissionError as exc:
         raise CliError(
@@ -666,10 +657,7 @@ def parse_release_version(version: str) -> dict[str, Any]:
             prerelease_number=int(prerelease_number) if prerelease_number else None,
         )
 
-    raise CliError(
-        "Release version "
-        f"'{version}' must use SemVer `x.y.z`, `x.y.z-alpha.N`, or `x.y.z-beta.N`."
-    )
+    raise CliError(f"Release version '{version}' must use SemVer `x.y.z`, `x.y.z-alpha.N`, or `x.y.z-beta.N`.")
 
 
 def compare_release_versions(left: dict[str, Any], right: dict[str, Any]) -> int:
@@ -691,15 +679,9 @@ def format_release_progression_reason(
             f"Current '{current_version}' vs previous '{previous_version}'."
         )
     if comparison < 0:
-        return (
-            "Release version must increase. "
-            f"Current '{current_version}' vs previous '{previous_version}'."
-        )
+        return f"Release version must increase. Current '{current_version}' vs previous '{previous_version}'."
 
-    return (
-        "Release version increased. "
-        f"Current '{current_version}' vs previous '{previous_version}'."
-    )
+    return f"Release version increased. Current '{current_version}' vs previous '{previous_version}'."
 
 
 def resolve_release_metadata(expected_channel: str | None = None) -> dict[str, Any]:
@@ -916,10 +898,12 @@ def git_commit_entries(range_expr: str) -> list[dict[str, str]]:
         subject = parts[1].strip() if len(parts) > 1 else ""
         if not short_sha or not subject:
             continue
-        entries.append({
-            "short_sha": short_sha,
-            "subject": subject,
-        })
+        entries.append(
+            {
+                "short_sha": short_sha,
+                "subject": subject,
+            }
+        )
     return entries
 
 
@@ -1103,8 +1087,7 @@ def build_release_zip(args: argparse.Namespace) -> int:
 
     with zipfile.ZipFile(zip_path, "r") as archive:
         unexpected = [
-            name for name in archive.namelist()
-            if name.strip() and name != "!KRT/" and not name.startswith("!KRT/")
+            name for name in archive.namelist() if name.strip() and name != "!KRT/" and not name.startswith("!KRT/")
         ]
     if unexpected:
         sample = ", ".join(unexpected[:5])
@@ -1294,6 +1277,58 @@ def run_krt_mcp(args: argparse.Namespace) -> int:
 
     return run_command([python_exe, str(server_path)], cwd=REPO_ROOT)
 
+
+def install_python_dev_deps(_: argparse.Namespace) -> int:
+    if not sys.executable:
+        raise CliError("Python executable not available in this environment.")
+    if not DEV_REQUIREMENTS_PATH.is_file():
+        raise CliError(f"Requirements file missing: {DEV_REQUIREMENTS_PATH}")
+
+    return run_command([sys.executable, "-m", "pip", "install", "-r", str(DEV_REQUIREMENTS_PATH)])
+
+
+def python_quality_check(args: argparse.Namespace) -> int:
+    if not sys.executable:
+        raise CliError("Python executable not available in this environment.")
+
+    targets = args.targets if args.targets else ["tools", "tests/python"]
+
+    if not args.skip_ruff:
+        exit_code = run_command([sys.executable, "-m", "ruff", "check", *targets])
+        if exit_code != 0:
+            return exit_code
+
+        exit_code = run_command([sys.executable, "-m", "ruff", "format", "--check", *targets])
+        if exit_code != 0:
+            return exit_code
+
+    if args.skip_pytest:
+        return 0
+
+    return run_command([sys.executable, "-m", "pytest", "tests/python"])
+
+
+def python_package_readiness() -> list[dict[str, Any]]:
+    checks = (
+        ("ruff", "ruff"),
+        ("pytest", "pytest"),
+        ("jsonschema", "jsonschema"),
+        ("Pillow", "PIL"),
+    )
+    readiness: list[dict[str, Any]] = []
+    for display_name, module_name in checks:
+        found = importlib.util.find_spec(module_name) is not None
+        readiness.append(
+            {
+                "name": display_name,
+                "module": module_name,
+                "available": found,
+                "status": "ready" if found else "warning",
+            }
+        )
+    return readiness
+
+
 def command_status(name: str, candidates: list[str], required: bool, purpose: str) -> dict[str, Any]:
     resolved = first_command(candidates)
     status = "ready" if resolved else ("missing" if required else "warning")
@@ -1429,6 +1464,7 @@ def dev_stack_status(args: argparse.Namespace) -> int:
         "commands": commands,
         "paths": paths,
         "managedSkills": managed_skills,
+        "pythonPackages": python_package_readiness(),
         "warnings": warnings,
     }
     if verification is not None:
@@ -1775,6 +1811,21 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--json", action="store_true")
     status.add_argument("--verify-skills", action="store_true")
     status.set_defaults(handler=dev_stack_status)
+
+    install_python_deps = subparsers.add_parser(
+        "install-python-dev-deps",
+        help="Install repo-local Python development dependencies.",
+    )
+    install_python_deps.set_defaults(handler=install_python_dev_deps)
+
+    python_quality = subparsers.add_parser(
+        "python-quality-check",
+        help="Run Python quality checks for tools and tests.",
+    )
+    python_quality.add_argument("targets", nargs="*", help="Targets for ruff check/format.")
+    python_quality.add_argument("--skip-ruff", action="store_true", help="Skip ruff checks and formatting.")
+    python_quality.add_argument("--skip-pytest", action="store_true", help="Skip pytest run.")
+    python_quality.set_defaults(handler=python_quality_check)
 
     release = subparsers.add_parser(
         "release-metadata",

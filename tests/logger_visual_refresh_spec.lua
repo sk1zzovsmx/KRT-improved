@@ -85,7 +85,7 @@ assert(logger:find("it.inspect and it.inspect.specName", 1, true), "Logger must 
 assert(logger:find("it.inspect and it.inspect.secondarySpecName", 1, true), "Logger must pass secondary spec name to setAttendanceSpecIcon")
 assert(logger:find("_krtAttendanceSecondarySpecIcon", 1, true), "Logger must keep a secondary spec icon cache/slot")
 assert(logger:find("bindAttendanceSpecIconTooltip", 1, true), "Logger must bind spec icon tooltip behavior through a dedicated helper")
-assert(logger:find('SetScript("OnEnter", function', 1, true), "Logger must bind hover tooltip handlers for spec icons")
+assert(logger:find('Frames.SetScriptSafely(icon, "OnEnter", function', 1, true), "Logger must bind hover tooltip handlers for spec icons")
 assert(logger:find("GameTooltip:AddLine", 1, true), "Logger must add tooltip lines for spec icon hover")
 assert(logger:find("icon._krtSpecName", 1, true), "Logger must cache spec name state on spec icon widgets")
 assert(logger:find("setAttendanceSpecIconTexture(primaryIcon, primarySpecIcon, primarySpecName, false)", 1, true), "Logger must keep primary spec saturated")

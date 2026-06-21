@@ -21,22 +21,40 @@ function Get-StagedLuaFiles {
     return @($output | Where-Object { $_ -is [string] -and $_.Trim() -ne "" })
 }
 
+function Get-StagedPythonToolingFiles {
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        return @()
+    }
+
+    $output = & git diff --cached --name-only --diff-filter=ACMR -- "*.py" "pyproject.toml" "tools/requirements-dev.txt" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "git diff --cached --name-only --diff-filter=ACMR for Python tooling files failed."
+    }
+
+    return @($output | Where-Object { $_ -is [string] -and $_.Trim() -ne "" })
+}
+
 function Invoke-KrtCli {
     param([string[]]$Arguments)
 
     $scriptPath = Join-Path $repoRoot "tools/krt.py"
-    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
-    if ($pyLauncher) {
-        & $pyLauncher.Source -3 $scriptPath @Arguments
+    $venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
+    if (Test-Path -LiteralPath $venvPython) {
+        & $venvPython $scriptPath @Arguments
     } else {
-        $pythonCmd = Get-Command python3 -ErrorAction SilentlyContinue
-        if (-not $pythonCmd) {
-            $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+        $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+        if ($pyLauncher) {
+            & $pyLauncher.Source -3 $scriptPath @Arguments
+        } else {
+            $pythonCmd = Get-Command python3 -ErrorAction SilentlyContinue
+            if (-not $pythonCmd) {
+                $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+            }
+            if (-not $pythonCmd) {
+                throw "python3/python not found in PATH."
+            }
+            & $pythonCmd.Source $scriptPath @Arguments
         }
-        if (-not $pythonCmd) {
-            throw "python3/python not found in PATH."
-        }
-        & $pythonCmd.Source $scriptPath @Arguments
     }
 
     if ($LASTEXITCODE -ne 0) {
@@ -82,7 +100,20 @@ function Run-LuaChecks {
     }
 }
 
+function Run-PythonChecks {
+    param([string[]]$StagedPythonToolingFiles)
+
+    if (-not $StagedPythonToolingFiles -or $StagedPythonToolingFiles.Count -eq 0) {
+        Write-Host "Skipping Python gates (no staged Python tooling files)."
+        return
+    }
+
+    Write-Host "Running Python quality check..."
+    Invoke-KrtCli @("python-quality-check")
+}
+
 $stagedLuaFiles = Get-StagedLuaFiles
+$stagedPythonToolingFiles = Get-StagedPythonToolingFiles
 
 Write-Host "Running TOC file checks..."
 & (Join-Path $repoRoot "tools/check-toc-files.ps1")
@@ -97,6 +128,7 @@ Write-Host "Running UI binding checks..."
 & (Join-Path $repoRoot "tools/check-ui-binding.ps1")
 
 Run-LuaChecks -StagedLuaFiles $stagedLuaFiles
+Run-PythonChecks -StagedPythonToolingFiles $stagedPythonToolingFiles
 
 Write-Host "Running API catalog drift check..."
 Invoke-KrtCli @("api-catalog-check")

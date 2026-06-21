@@ -309,6 +309,8 @@
 |   |-- fixtures
 |   |   \\-- sv
 |   |       \\-- canonical-minimal-01.lua
+|   |-- python
+|   |   \\-- test_krt_python_tooling.py
 |   |-- audit_cleanup_micro_wave_doc_test_alignment_spec.lua
 |   |-- audit_cleanup_wave2_spec.lua
 |   |-- audit_cleanup_wave3_spec.lua
@@ -373,6 +375,7 @@
 |   |-- krt_mcp_server.py
 |   |-- pre-commit.ps1
 |   |-- README.md
+|   |-- requirements-dev.txt
 |   |-- requirements-mcp.txt
 |   |-- run-krt-mcp.ps1
 |   |-- run-markitdown-mcp.py
@@ -395,6 +398,7 @@
 |-- .styluaignore
 |-- AGENTS.md
 |-- CHANGELOG.md
+|-- pyproject.toml
 \\-- README.md
 ```
 

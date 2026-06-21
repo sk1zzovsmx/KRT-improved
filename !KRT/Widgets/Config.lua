@@ -81,7 +81,7 @@ do
     }
     local MIN_COUNTDOWN = countdownDurationValues[1]
     local MAX_COUNTDOWN = countdownDurationValues[#countdownDurationValues]
-    local DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS = 1
+    local DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS = 1.25
     local MIN_AUTO_MASTER_LOOT_NOTICE_SECONDS = 0.1
     local MAX_AUTO_MASTER_LOOT_NOTICE_SECONDS = 5
     local interfacePanelFrameName = "KRTInterfaceOptionsPanel"

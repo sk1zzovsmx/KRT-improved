@@ -24,6 +24,7 @@ local configXml = read("!KRT/UI/Config.xml")
 local optionsLayoutLua = read("!KRT/Modules/UI/OptionsLayout.lua")
 local uiFramesLua = read("!KRT/Modules/UI/Frames.lua")
 local screenNoticeLua = read("!KRT/Modules/UI/ScreenNotice.lua")
+local screenNoticeXml = read("!KRT/UI/ScreenNotice.xml")
 local toc = read("!KRT/!KRT.toc")
 local initLua = read("!KRT/Init.lua")
 local masterLua = read("!KRT/Controllers/Master.lua")
@@ -235,11 +236,14 @@ assertContains(toc, "Modules\\UI\\ScreenNotice.lua", "TOC must load the shared s
 assertContains(screenNoticeLua, "KRTScreenNoticeFrame", "Screen notice UI must use a dedicated KRT center-screen frame")
 assertContains(screenNoticeLua, "Bus.RegisterCallback(InternalEvents.ScreenNotice", "Screen notice UI must listen to the shared screen notice event")
 assertContains(screenNoticeLua, "Effects.SetTimedFade", "Screen notice UI must delegate timing to shared UI effects")
-assertContains(screenNoticeLua, 'SetPoint("CENTER", UIParent, "CENTER", 0, 140)', "Screen notice UI must render near RollFor's middle-screen position")
-assertContains(screenNoticeLua, 'SetFont(FONT_PATH, 24, "OUTLINE")', "Screen notice UI must use RollFor-style large outlined title text")
-assertContains(screenNoticeLua, 'SetFont(FONT_PATH, 16, "OUTLINE")', "Screen notice UI must keep a RollFor-style detail line available")
+assertContains(screenNoticeXml, 'Frame name="KRTScreenNoticeFrame"', "Screen notice XML must define the dedicated frame")
+assertContains(screenNoticeXml, '<Anchor point="CENTER" relativeTo="UIParent" relativePoint="CENTER">', "Screen notice XML must anchor the frame to UIParent center")
+assertContains(screenNoticeXml, '<AbsDimension x="0" y="140" />', "Screen notice XML must place the frame at y=140")
+assertContains(screenNoticeXml, 'height="24"', "Screen notice XML must set title font height to 24")
+assertContains(screenNoticeXml, 'height="16"', "Screen notice XML must set detail font height to 16")
+assertContains(screenNoticeXml, 'flags="OUTLINE"', "Screen notice XML must use OUTLINE font flags")
+assertContains(screenNoticeXml, 'frameStrata="TOOLTIP"', "Screen notice XML must keep tooltip strata")
 assertContains(screenNoticeLua, '"|cffff2020Master Loot|r"', "Screen notice UI must colorize Master Loot inside the title text")
-assertContains(screenNoticeLua, 'SetFrameStrata("TOOLTIP")', "Screen notice UI must render above raid frames")
 assertContains(screenNoticeLua, "SetFrameLevel(1000)", "Screen notice UI must use a high frame level")
 assertContains(raidLootMethodLua, 'Options.AddNamespace("Master"', "Loot-method service must own Master option defaults")
 assertContains(raidLootMethodLua, "autoMasterLootOnBossTarget = false", "Auto Master Loot must default off")
@@ -297,10 +301,14 @@ assertContains(configLua, 'autoSpamSoftResOnLootOpened = "Master"', "Config widg
 assertContains(configLua, "refreshAutoSpamSoftResDependency", "Config widget must centralize the SoftRes auto-spam dependency")
 assertContains(configLua, 'setOption("autoSpamSoftResOnLootOpened", false)', "Disabling auto loot spam must also disable auto SoftRes spam")
 assertContains(configLua, "normalizeAutoMasterLootNoticeSeconds", "Config widget must normalize Auto Master Loot notice duration input")
+assertContains(configLua, "DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS = 1.25", "Config widget notice duration fallback must match the Master option default")
 assert(not configLua:find("tonumber(gsub(text", 1, true), "Config widget must not pass gsub's replacement count into tonumber as a base")
 assertContains(configLua, "bindAutoMasterLootNoticeEditBox", "Config widget must bind the Auto Master Loot notice duration editbox")
 assertContains(configLua, "for i = 1, #optionSuffixes do", "Config refresh must cover every option checkbox suffix")
-assertContains(configLua, "setChecked(frameName, suffix, getOption(suffix) == true)", "Config refresh must keep Auto Master Loot checkbox state in sync")
+assert(
+    configLua:find("setChecked(frameName, suffix, getOption(suffix) == true)", 1, true) ~= nil or configLua:find("setChecked(frameName, suffix, GetOptionByKey", 1, true) ~= nil,
+    "Config refresh must keep Auto Master Loot checkbox state in sync"
+)
 assertContains(
     configLua,
     'Layout.EditRow("autoMasterLootNoticeSeconds", "autoMasterLootNoticeSecondsEditBox"',

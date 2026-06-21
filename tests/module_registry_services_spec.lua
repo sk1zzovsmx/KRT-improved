@@ -722,6 +722,7 @@ local expectedReservesServices = {
             "Modules/Bus",
             "Modules/Strings",
             "Modules/Item",
+            "Modules/LootSources",
             "Services/Reserves/Import",
             "Services/Reserves/Aliases",
             "Services/Reserves/Display",

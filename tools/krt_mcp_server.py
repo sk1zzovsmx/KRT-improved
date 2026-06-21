@@ -29,6 +29,7 @@ REPO_CHECKS = {
     "lua_uniformity": "check-lua-uniformity.ps1",
 }
 
+
 class ToolError(Exception):
     """Raised for invalid MCP tool inputs."""
 
@@ -320,8 +321,7 @@ TOOLS = {
         ToolSpec(
             name="skills_verify",
             description=(
-                "Verify that vendored skills exactly match the manifest-pinned upstream snapshots. "
-                "Read-only check."
+                "Verify that vendored skills exactly match the manifest-pinned upstream snapshots. Read-only check."
             ),
             input_schema={
                 "type": "object",
@@ -366,10 +366,7 @@ TOOLS = {
         ),
         ToolSpec(
             name="repo_quality_check",
-            description=(
-                "Run one of the repo-local addon quality checks from tools/. "
-                "These scripts are repo-local."
-            ),
+            description=("Run one of the repo-local addon quality checks from tools/. These scripts are repo-local."),
             input_schema={
                 "type": "object",
                 "properties": {
@@ -481,11 +478,13 @@ def main() -> int:
             transport.write_message(make_error_response(request_id, -32603, str(exc)))
             continue
 
-        transport.write_message({
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "result": result,
-        })
+        transport.write_message(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": result,
+            }
+        )
 
 
 if __name__ == "__main__":

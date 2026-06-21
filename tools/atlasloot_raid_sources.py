@@ -100,7 +100,7 @@ def load_existing_dataset() -> OrderedDict:
     if not lua_exe:
         raise RuntimeError("lua executable not found; set LUA to the Lua 5.1/LuaJIT command")
 
-    script = r'''
+    script = r"""
 local addon = {}
 addon.Database = {}
 local feature = {}
@@ -143,7 +143,7 @@ for i = 1, #raw do
         end
     end
 end
-'''
+"""
     result = subprocess.run(
         [lua_exe, "-"],
         input=script,
@@ -258,10 +258,12 @@ def parse_atlas_blocks(text: str) -> dict[str, list[dict[str, int]]]:
         for row_text, item_text in row_pattern.findall(body):
             item_id = int(item_text)
             if item_id > 0:
-                rows.append({
-                    "row": int(row_text),
-                    "item_id": item_id,
-                })
+                rows.append(
+                    {
+                        "row": int(row_text),
+                        "item_id": item_id,
+                    }
+                )
         blocks[key] = rows
     return blocks
 
@@ -286,10 +288,7 @@ def filter_block_item_ids(rows: list[dict[str, int]], spec: dict) -> list[int]:
 
 
 def apply_atlas_sources(data: OrderedDict, atlas_texts: dict[str, str]) -> tuple[int, list[str]]:
-    blocks_by_expansion = {
-        expansion: parse_atlas_blocks(text)
-        for expansion, text in atlas_texts.items()
-    }
+    blocks_by_expansion = {expansion: parse_atlas_blocks(text) for expansion, text in atlas_texts.items()}
     additions = 0
     missing_keys = []
     for spec in SOURCES:
@@ -376,33 +375,43 @@ def write_lua_file(expansion: str, path: pathlib.Path, raid_bucket: OrderedDict)
     ]
 
     for raid_name, sources in raid_bucket.items():
-        lines.extend([
-            "    {",
-            '        name = "%s",' % escape_lua_string(raid_name),
-            "        sources = {",
-        ])
+        lines.extend(
+            [
+                "    {",
+                '        name = "%s",' % escape_lua_string(raid_name),
+                "        sources = {",
+            ]
+        )
         for source in sources.values():
-            lines.extend([
-                "            {",
-                '                name = "%s",' % escape_lua_string(source["name"]),
-                "                npcId = %d," % source["npc_id"],
-            ])
+            lines.extend(
+                [
+                    "            {",
+                    '                name = "%s",' % escape_lua_string(source["name"]),
+                    "                npcId = %d," % source["npc_id"],
+                ]
+            )
             if source["kind"] != "boss":
                 lines.append('                kind = "%s",' % escape_lua_string(source["kind"]))
             lines.append("                items = {")
             for item_id, modes in sorted(source["items"].items()):
                 lines.append("                    { %d, %s }," % (item_id, mode_expression(modes)))
-            lines.extend([
-                "                },",
-                "            },",
-            ])
-        lines.extend([
-            "        },",
-            "    },",
-        ])
-    lines.extend([
-        "})",
-    ])
+            lines.extend(
+                [
+                    "                },",
+                    "            },",
+                ]
+            )
+        lines.extend(
+            [
+                "        },",
+                "    },",
+            ]
+        )
+    lines.extend(
+        [
+            "})",
+        ]
+    )
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines))
         handle.write("\n")

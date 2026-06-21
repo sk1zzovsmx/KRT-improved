@@ -112,6 +112,19 @@ py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
   prompt; for complex orchestrated tasks it creates a dedicated
   `codex/55to53-*` branch unless the worktree is dirty.
 
+## Python Dev Tooling
+
+- `tools/requirements-dev.txt`: repo-local developer dependencies for Python tooling:
+  `ruff`, `pytest`, `jsonschema`, and `Pillow` layered on top of
+  `requirements-mcp.txt`.
+- `tools/requirements-mcp.txt` remains MCP-only and should stay the base set for MCP
+  runtime.
+- `.venv\Scripts\python.exe -m pip install -r tools\requirements-dev.txt`
+- `.venv\Scripts\python.exe tools\krt.py install-python-dev-deps`
+- `.venv\Scripts\python.exe tools\krt.py python-quality-check`
+- `python-quality-check` target defaults are `tools` and `tests/python` and supports:
+  `--skip-ruff`, `--skip-pytest`.
+
 ## Catalogs And Tree
 
 - `fnmap-inventory.ps1`: inventories Lua functions into

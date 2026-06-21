@@ -210,7 +210,6 @@ SOURCES = [
     entry("Vanilla", "ZGMuddyChurningWaters", "Zul'Gurub", source("Gahz'ranka", 15114), MODE_NORMAL_20),
     entry("Vanilla", "ZGShared", "Zul'Gurub", ZG_BOSSES, MODE_NORMAL_20),
     entry("Vanilla", "WorldBossesClassic", "Azshara", source("Azuregos", 6109), MODE_NORMAL_40),
-
     # The Burning Crusade raid instances.
     entry("BurningCrusade", "BTNajentus", "Black Temple", source("High Warlord Naj'entus", 22887), MODE_NORMAL_25),
     entry("BurningCrusade", "BTSupremus", "Black Temple", source("Supremus", 22898), MODE_NORMAL_25),

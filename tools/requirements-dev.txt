@@ -1,0 +1,5 @@
+-r requirements-mcp.txt
+ruff
+pytest
+jsonschema
+Pillow
