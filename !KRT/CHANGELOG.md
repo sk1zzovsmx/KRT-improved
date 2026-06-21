@@ -18,6 +18,10 @@ Release-Version: 0.8.0-beta.1
 
 ### Fixes
 
+- **Reserve List item headers** - Aligned grouped item headers with Loot Master
+  and Loot History sizing, using compact item icons and shared small text.
+- **Reserve List player colors** - Normalized reserve player class tokens in
+  grouped item rows so player names can render with class colors.
 - **Inspect ownership** - Renamed raid attendance equipment inspection to
   EquipInspect and made SpecInspect the canonical owner of active and secondary
   talent/spec snapshots.
@@ -106,6 +110,15 @@ Release-Version: 0.8.0-beta.1
 - **Reserves display row allocation** - Reduced temporary row and tooltip-list
   allocation in SoftRes display rebuilds by reusing item row tables and
   clearing stale display fields between refreshes.
+- **Reserve List edit actions** - Added inline Reserve List edit commit/remove
+  behavior for quantity/plus edits and remove actions through
+  `Services.Reserves` APIs.
+- **Reserve List edit confirmations** - Added confirmation popups for Reserve List row
+  removal and edit-mode save actions; apply/removal now waits for explicit
+  confirmation and edit-mode only exits after confirmed save.
+- **Reserve List source collapse API cleanup** - Removed unused
+  `Services.Reserves:IsSourceCollapsed` and `ToggleSourceCollapsed` after
+  Reserve List collapse moved to UI-local item headers.
 - **Reserves sync payload optimization** - Added a negotiated compact runtime
   SoftRes sync payload format for clients that support it, reducing repeated
   player-name bytes while keeping legacy data requests on the existing format.
@@ -472,6 +485,9 @@ Release-Version: 0.8.0-beta.1
   reserve data now replies with the same no-reserves feedback instead of silence.
   The Reserve List footer action now announces the whisper commands to the raid
   instead of duplicating the window close button, and stays silent outside raid.
+  Reserve List now owns the `Accept SR` and `Response Wisp` toggles plus inline
+  whisper help text; the old Master Config reply-whisper setting was removed.
+  The Reserve List toggles now persist WotLK numeric checkbox states correctly.
 - **Auto-loot suggestions** - Added a lightweight suggestion-only loot rules
   classifier for ignored items, enchanting materials, and quality BoE loot,
   including 3.3.5a tooltip-based bind detection; it does not auto-award or

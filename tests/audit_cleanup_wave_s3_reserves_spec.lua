@@ -59,8 +59,6 @@ local publicMethods = {
     "GetSyncPayload",
     "SetSyncedData",
     "DeleteSyncedReservesCache",
-    "IsSourceCollapsed",
-    "ToggleSourceCollapsed",
     "RequestSyncMetadata",
     "HandleSyncMessage",
     "HasPendingItem",
@@ -70,6 +68,9 @@ for i = 1, #publicMethods do
     local methodName = publicMethods[i]
     assertContains(reserves, "function module:" .. methodName .. "(", "missing Reserves public method: " .. methodName)
 end
+assertNotContains(reserves, "function module:IsSourceCollapsed(", "source collapse API should no longer be on Reserves facade")
+assertNotContains(reserves, "function module:ToggleSourceCollapsed(", "source collapse API should no longer be on Reserves facade")
+assertNotContains(reserves, "collapsedBossGroups", "source collapse source state should no longer exist in Reserves service contract")
 
 assertContains(reserves, "function Sync:GetPayload()")
 assertContains(reserves, "function Sync:SetSyncedData(sourceData, meta)")

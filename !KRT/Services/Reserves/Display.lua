@@ -85,7 +85,48 @@ local function colorizeReserveName(ctx, itemId, playerName, className)
     return playerName
 end
 
-local function addReservePlayer(data, reserveEntry, countOverride, fallbackName)
+local function normalizePlayerEntry(player)
+    if type(player) == "table" then
+        return player.name or player.displayName or player.playerName or player.playerNameDisplay
+    end
+    return player
+end
+
+local function getStructuredPlayerQuantity(player)
+    if type(player) == "table" then
+        return tonumber(player.quantity) or 1
+    end
+    return 1
+end
+
+local function resolvePlayerClassInfo(ctx, itemId, playerName, className)
+    local classToken = normalizeClassToken(className)
+    if not classToken and itemId and playerName then
+        local reserveEntry = ctx.getReserveEntryForItem(itemId, playerName)
+        if reserveEntry then
+            classToken = normalizeClassToken(reserveEntry.class)
+        end
+    end
+
+    if not classToken then
+        local raidService = ctx.getRaidService()
+        if raidService and raidService.GetPlayerClass then
+            classToken = normalizeClassToken(raidService:GetPlayerClass(playerName))
+        end
+    end
+
+    if not classToken then
+        return nil, nil
+    end
+
+    local token, classColor = getClassColorStr(classToken)
+    if token == "UNKNOWN" then
+        return nil, nil
+    end
+    return token, classColor
+end
+
+local function addReservePlayer(ctx, data, reserveEntry, countOverride, fallbackName)
     if not data.players then
         data.players = {}
     end
@@ -99,6 +140,7 @@ local function addReservePlayer(data, reserveEntry, countOverride, fallbackName)
     local name
     local count
     local className
+    local classColor
     local plus
 
     if type(reserveEntry) == "table" then
@@ -106,17 +148,43 @@ local function addReservePlayer(data, reserveEntry, countOverride, fallbackName)
         count = tonumber(reserveEntry.quantity) or 1
         className = reserveEntry.class
         plus = tonumber(reserveEntry.plus) or 0
+        className, classColor = resolvePlayerClassInfo(ctx, reserveEntry.rawID, name, className)
     else
         name = reserveEntry or "?"
         count = tonumber(countOverride) or 1
     end
     count = count or 1
 
-    local existing = data.playerCounts[name]
+    local playerRowsByName = data._playerRowsByName
+    if type(playerRowsByName) ~= "table" then
+        playerRowsByName = {}
+        data._playerRowsByName = playerRowsByName
+    end
+
+    local existing = playerRowsByName[name]
     if existing then
-        data.playerCounts[name] = existing + count
+        existing.quantity = (tonumber(existing.quantity) or 1) + count
+        local existingPlus = tonumber(existing.plus) or 0
+        if plus > existingPlus then
+            existing.plus = plus
+        end
+        if className and className ~= "" and (not existing.class or existing.class == "") then
+            existing.class = className
+            existing.classColor = classColor
+        end
+        data.playerCounts[name] = (tonumber(data.playerCounts[name]) or 0) + count
     else
-        data.players[#data.players + 1] = name
+        existing = {
+            name = name,
+            displayName = (type(reserveEntry) == "table" and reserveEntry.playerNameDisplay) or name,
+            class = className,
+            classColor = classColor,
+            quantity = count,
+            plus = plus,
+            checked = true,
+        }
+        playerRowsByName[name] = existing
+        data.players[#data.players + 1] = existing
         data.playerCounts[name] = count
     end
 
@@ -134,6 +202,7 @@ local function addReservePlayer(data, reserveEntry, countOverride, fallbackName)
 end
 
 local function getMetaForPlayer(ctx, metaByName, itemId, playerName)
+    playerName = normalizePlayerEntry(playerName)
     local meta = metaByName and metaByName[playerName]
     if meta and (meta.class or meta.plus) then
         return meta
@@ -163,7 +232,15 @@ local function getMetaForPlayer(ctx, metaByName, itemId, playerName)
 end
 
 local function formatReservePlayerName(ctx, itemId, name, count, metaByName, useColor, showPlus, showMulti)
+    if type(name) == "table" then
+        count = tonumber(name.quantity) or count
+        name = normalizePlayerEntry(name) or name
+    end
+
     local meta = getMetaForPlayer(ctx, metaByName, itemId, name)
+    if type(meta) ~= "table" then
+        meta = getMetaForPlayer(ctx, nil, itemId, name)
+    end
     local out
 
     if useColor == false then
@@ -193,23 +270,27 @@ local function sortPlayersForDisplay(ctx, itemId, players, counts, metaByName)
 
     if ctx.isPlusSystem() and itemId then
         sort(players, function(a, b)
-            local aMeta = getMetaForPlayer(ctx, metaByName, itemId, a)
-            local bMeta = getMetaForPlayer(ctx, metaByName, itemId, b)
+            local aName = normalizePlayerEntry(a)
+            local bName = normalizePlayerEntry(b)
+            local aMeta = getMetaForPlayer(ctx, metaByName, itemId, aName)
+            local bMeta = getMetaForPlayer(ctx, metaByName, itemId, bName)
             local aPlus = (aMeta and tonumber(aMeta.plus)) or 0
             local bPlus = (bMeta and tonumber(bMeta.plus)) or 0
             if aPlus ~= bPlus then
                 return aPlus > bPlus
             end
-            return tostring(a) < tostring(b)
+            return tostring(aName) < tostring(bName)
         end)
     elseif ctx.isMultiReserve() and counts then
         sort(players, function(a, b)
-            local aQuantity = counts[a] or 1
-            local bQuantity = counts[b] or 1
+            local aName = normalizePlayerEntry(a)
+            local bName = normalizePlayerEntry(b)
+            local aQuantity = counts[aName] or getStructuredPlayerQuantity(a)
+            local bQuantity = counts[bName] or getStructuredPlayerQuantity(b)
             if aQuantity ~= bQuantity then
                 return aQuantity > bQuantity
             end
-            return tostring(a) < tostring(b)
+            return tostring(aName) < tostring(bName)
         end)
     end
 end
@@ -223,7 +304,8 @@ local function buildPlayerTokens(ctx, itemId, players, counts, metaByName, useCo
     twipe(playerTextTemp)
     for i = 1, #players do
         local name = players[i]
-        playerTextTemp[#playerTextTemp + 1] = formatReservePlayerName(ctx, itemId, name, counts and counts[name] or 1, metaByName, useColor, showPlus, showMulti)
+        local normalizedName = normalizePlayerEntry(name)
+        playerTextTemp[#playerTextTemp + 1] = formatReservePlayerName(ctx, itemId, name, counts and counts[normalizedName] or 1, metaByName, useColor, showPlus, showMulti)
     end
     return playerTextTemp
 end
@@ -252,13 +334,17 @@ local function buildPlayersTooltipLines(ctx, itemId, players, counts, metaByName
         local keys = {}
         for i = 1, #players do
             local name = players[i]
-            local meta = getMetaForPlayer(ctx, metaByName, itemId, name)
+            local normalizedName = normalizePlayerEntry(name)
+            local meta = getMetaForPlayer(ctx, metaByName, itemId, normalizedName)
             local plus = (meta and tonumber(meta.plus)) or 0
+            if type(name) == "table" and tonumber(name.plus) then
+                plus = tonumber(name.plus)
+            end
             if groups[plus] == nil then
                 groups[plus] = {}
                 keys[#keys + 1] = plus
             end
-            groups[plus][#groups[plus] + 1] = formatReservePlayerNameBase(ctx, itemId, name, metaByName)
+            groups[plus][#groups[plus] + 1] = formatReservePlayerNameBase(ctx, itemId, normalizedName, metaByName)
         end
         sort(keys, function(a, b)
             return a > b
@@ -272,12 +358,13 @@ local function buildPlayersTooltipLines(ctx, itemId, players, counts, metaByName
         local keys = {}
         for i = 1, #players do
             local name = players[i]
-            local quantity = counts[name] or 1
+            local normalizedName = normalizePlayerEntry(name)
+            local quantity = counts[normalizedName] or getStructuredPlayerQuantity(name)
             if groups[quantity] == nil then
                 groups[quantity] = {}
                 keys[#keys + 1] = quantity
             end
-            groups[quantity][#groups[quantity] + 1] = formatReservePlayerNameBase(ctx, itemId, name, metaByName)
+            groups[quantity][#groups[quantity] + 1] = formatReservePlayerNameBase(ctx, itemId, normalizedName, metaByName)
         end
         sort(keys, function(a, b)
             return a > b
@@ -322,8 +409,8 @@ local function buildPlayersText(ctx, itemId, players, counts, metaByName, toolti
     return shortText, tooltipLines, fullText
 end
 
-local function getDisplayRowKey(source, itemId)
-    return tostring(source or "") .. "\t" .. tostring(itemId or "")
+local function getDisplayRowKey(_source, itemId)
+    return tostring(itemId or "")
 end
 
 local function resetReserveDisplayRow(row)
@@ -332,12 +419,16 @@ local function resetReserveDisplayRow(row)
     end
 
     local players = row._players
+    local playerRowsByName = row._playerRowsByName
     local playerCounts = row._playerCounts
     local playerMeta = row._playerMeta
     local tooltipLines = row._playersTooltipLines or row.playersTooltipLines
 
     if type(players) == "table" then
         twipe(players)
+    end
+    if type(playerRowsByName) == "table" then
+        twipe(playerRowsByName)
     end
     if type(playerCounts) == "table" then
         twipe(playerCounts)
@@ -354,6 +445,9 @@ local function resetReserveDisplayRow(row)
     if type(players) == "table" then
         row._players = players
     end
+    if type(playerRowsByName) == "table" then
+        row._playerRowsByName = playerRowsByName
+    end
     if type(playerCounts) == "table" then
         row._playerCounts = playerCounts
     end
@@ -369,6 +463,7 @@ local function prepareReserveDisplayRow(row, itemId, reserveEntry, source)
     resetReserveDisplayRow(row)
 
     local players = row._players or {}
+    local playerRowsByName = row._playerRowsByName or {}
     local playerCounts = row._playerCounts or {}
     local playerMeta = row._playerMeta or {}
     local tooltipLines = row._playersTooltipLines or {}
@@ -379,6 +474,7 @@ local function prepareReserveDisplayRow(row, itemId, reserveEntry, source)
     row.itemIcon = reserveEntry.itemIcon
     row.source = source
     row.players = players
+    row._playerRowsByName = playerRowsByName
     row.playerCounts = playerCounts
     row.playerMeta = playerMeta
     row.playersTooltipLines = tooltipLines
@@ -394,10 +490,6 @@ local function releaseReserveDisplayScratch(row)
     if type(row) ~= "table" then
         return
     end
-
-    row.players = nil
-    row.playerCounts = nil
-    row.playerMeta = nil
 end
 
 local function getReserveSource(source)
@@ -448,7 +540,7 @@ local function filterPlayersByCurrentRaid(ctx, players, raidNum)
 
     local filteredPlayers = {}
     for i = 1, #players do
-        local name = players[i]
+        local name = normalizePlayerEntry(players[i])
         if type(name) == "string" and name ~= "" then
             local playerNid = getPlayerIdWithAlias(ctx, raidService, name, targetRaidNum)
             if tonumber(playerNid) and playerNid > 0 then
@@ -512,26 +604,41 @@ local function buildTextForPlayers(ctx, itemId, players, counts, metaByName, sho
     return tconcat(out, ", ")
 end
 
+local function normalizePlayerNameList(players)
+    if not players then
+        return {}
+    end
+    local names = {}
+    for i = 1, #players do
+        names[i] = normalizePlayerEntry(players[i]) or ""
+    end
+    return names
+end
+
 local function splitPresentAndMissingPlayers(ctx, players, raidNum)
+    if not players then
+        return {}, {}, false
+    end
+
     local presentPlayers, filterApplied = filterPlayersByCurrentRaid(ctx, players, raidNum)
     if not filterApplied then
-        return copyPlayers(players), {}, false
+        return normalizePlayerNameList(players), {}, false
     end
 
     local presentByName = {}
     for i = 1, #presentPlayers do
-        presentByName[presentPlayers[i]] = true
+        presentByName[normalizePlayerEntry(presentPlayers[i])] = true
     end
 
     local missingPlayers = {}
     for i = 1, #players do
-        local name = players[i]
+        local name = normalizePlayerEntry(players[i])
         if not presentByName[name] then
             missingPlayers[#missingPlayers + 1] = name
         end
     end
 
-    return presentPlayers, missingPlayers, true
+    return normalizePlayerNameList(presentPlayers), missingPlayers, true
 end
 
 local function levenshteinDistance(left, right)
@@ -877,19 +984,16 @@ function Display.RebuildIndex(ctx)
                 local reserveEntry = list[i]
                 if type(reserveEntry) == "table" then
                     local source = getReserveSource(reserveEntry.source)
-                    local bySource = ctx.grouped[source]
+                    local byItem = ctx.grouped[itemId]
 
-                    if not bySource then
-                        bySource = {}
-                        ctx.grouped[source] = bySource
-                        if ctx.collapsedBossGroups[source] == nil then
-                            ctx.collapsedBossGroups[source] = false
-                        end
+                    if not byItem then
+                        byItem = {}
+                        ctx.grouped[itemId] = byItem
                     end
 
-                    local data = bySource[itemId]
+                    local data = byItem[itemId]
                     if not data then
-                        local rowKey = getDisplayRowKey(source, itemId)
+                        local rowKey = getDisplayRowKey(nil, itemId)
                         if ctx.reservesDisplayActiveKeys then
                             ctx.reservesDisplayActiveKeys[rowKey] = true
                         end
@@ -903,10 +1007,10 @@ function Display.RebuildIndex(ctx)
                             data = {}
                         end
                         prepareReserveDisplayRow(data, itemId, reserveEntry, source)
-                        bySource[itemId] = data
+                        byItem[itemId] = data
                     end
 
-                    addReservePlayer(data, reserveEntry)
+                    addReservePlayer(ctx, data, reserveEntry)
                 end
             end
         end
@@ -963,7 +1067,7 @@ function Display.GetPlayersForItem(ctx, itemId, useColor, showPlus, showMulti, o
     for i = 1, #list do
         local reserveEntry = list[i]
         if type(reserveEntry) == "table" then
-            addReservePlayer(data, reserveEntry)
+            addReservePlayer(ctx, data, reserveEntry)
         end
     end
 
@@ -1012,7 +1116,7 @@ function Display.GetItemReserveContext(ctx, itemId, raidNum)
     for i = 1, #list do
         local reserveEntry = list[i]
         if type(reserveEntry) == "table" then
-            addReservePlayer(data, reserveEntry)
+            addReservePlayer(ctx, data, reserveEntry)
         end
     end
 
@@ -1161,11 +1265,10 @@ end
 function Display.GetDisplayList(ctx)
     if ctx.isDirty() then
         sort(ctx.reservesDisplayList, function(a, b)
-            if a.source ~= b.source then
-                return a.source < b.source
-            end
-            if a.itemId ~= b.itemId then
-                return a.itemId < b.itemId
+            local aItemId = tonumber(a.itemId) or 0
+            local bItemId = tonumber(b.itemId) or 0
+            if aItemId ~= bItemId then
+                return aItemId < bItemId
             end
             return false
         end)

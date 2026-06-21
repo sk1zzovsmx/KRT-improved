@@ -47,6 +47,9 @@ local publicMethods = {
     "QueryMissingItems",
     "GetReserveCountForItem",
     "GetPlusForItem",
+    "SetPlayerReserveQuantity",
+    "SetPlayerReservePlus",
+    "RemovePlayerReserve",
     "HasCurrentRaidPlayersForItem",
     "GetItemReserveContext",
     "GetReadinessReport",
@@ -57,8 +60,6 @@ local publicMethods = {
     "GetSyncPayload",
     "SetSyncedData",
     "DeleteSyncedReservesCache",
-    "IsSourceCollapsed",
-    "ToggleSourceCollapsed",
     "RequestSyncMetadata",
     "HandleSyncMessage",
     "HasPendingItem",
@@ -70,6 +71,9 @@ for i = 1, #publicMethods do
     local missingMessage = "missing documented Reserves facade method: " .. methodName
     assertContains(reserves, methodNeedle, missingMessage)
 end
+assertNotContains(reserves, "function module:IsSourceCollapsed(", "source collapse API should no longer be on Reserves facade")
+assertNotContains(reserves, "function module:ToggleSourceCollapsed(", "source collapse API should no longer be on Reserves facade")
+assertNotContains(reserves, "collapsedBossGroups", "source collapse source state should no longer exist in Reserves service contract")
 
 assertContains(reserves, "function Sync:GetPayload()")
 assertContains(reserves, "function Sync:SetSyncedData(sourceData, meta)")
@@ -106,9 +110,9 @@ assertContains(master, "reserves:HasData()")
 assertContains(master, "reserves:FormatReservedPlayersLine(")
 assertContains(master, "reserves:HasCurrentRaidPlayersForItem(itemId)")
 
-assertContains(reservesUi, "Reserves:ToggleSourceCollapsed(source)")
-assertContains(reservesUi, "Reserves:IsSourceCollapsed(source)")
-assertContains(reservesUi, "Reserves:GetDisplayList()")
+assertContains(reservesUi, "collapsedItems[itemId]", "ReservesUI should keep item collapse as UI-local state")
+assertContains(reservesUi, "reserveHeaderOnClick", "ReservesUI should collapse directly from the item header")
+assertContains(reservesUi, "getDisplayList(Reserves)", "ReservesUI should render the Reserves display contract")
 assertContains(reservesUi, "Reserves:QueryItemInfo(itemId)")
 assertContains(reservesUi, "Reserves:QueryMissingItems(silent")
 assertContains(reservesUi, "Reserves:ClearSavedReserves()")

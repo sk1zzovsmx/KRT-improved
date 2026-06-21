@@ -45,6 +45,7 @@ do
 
     -- Namespace registration: reserve options (whisper replies and import mode).
     local reservesNs = Options.AddNamespace("Reserves", {
+        softResWhisperAdds = false,
         softResWhisperReplies = false,
         srImportMode = 0,
         nameAliases = {},
@@ -73,7 +74,6 @@ do
     local pendingDisplayRefreshHandle = nil
     local pendingDisplayRefreshQueued = false
     local pendingDisplayRefreshDelaySeconds = 0.05
-    local collapsedBossGroups = {}
     local grouped = {}
     local syncedCacheMeta = nil
     local syncedCacheActive = false
@@ -606,6 +606,66 @@ do
         return source.npcName
     end
 
+    local function getCanonicalReserveRow(player, itemId)
+        if type(player) ~= "table" or type(player.reserves) ~= "table" then
+            return nil, false
+        end
+
+        local first
+        local rowCount = #player.reserves
+        local kept = {}
+        for i = 1, rowCount do
+            local row = player.reserves[i]
+            if type(row) == "table" and row.rawID == itemId then
+                if not first then
+                    first = row
+                    kept[#kept + 1] = row
+                end
+            else
+                kept[#kept + 1] = row
+            end
+        end
+
+        local changed = #kept ~= rowCount
+        if changed then
+            player.reserves = kept
+        end
+
+        return first, changed
+    end
+
+    local function ensureMutableLocalReserves()
+        if not syncedCacheActive then
+            return false
+        end
+        local normalized = buildRuntimeReservesData(reservesData, "edit")
+        copyReservesData(normalized, persistedReservesData)
+        copyReservesData(persistedReservesData, reservesData)
+        syncedCacheMeta = nil
+        syncedCacheActive = false
+        return true
+    end
+
+    local function normalizeEditNumber(value)
+        local n = tonumber(value)
+        if n == nil then
+            return nil
+        end
+        return math.floor(n)
+    end
+
+    local function getPlayerReserveContainer(playerName)
+        local playerKey = resolveReservePlayerKey(playerName)
+        if not playerKey then
+            return nil, "invalid_player"
+        end
+        local player = persistedReservesData[playerKey]
+        if type(player) ~= "table" then
+            return nil, "invalid_player"
+        end
+        return player, playerKey
+    end
+
     local function upsertPlayerReserve(target, playerKey, displayName, reserveEntry)
         local player = target[playerKey]
         if not player then
@@ -781,7 +841,6 @@ do
             reservesDisplayRowsByKey = reservesDisplayRowsByKey,
             reservesDisplayActiveKeys = reservesDisplayActiveKeys,
             grouped = grouped,
-            collapsedBossGroups = collapsedBossGroups,
             resolvePlayerNameDisplay = resolvePlayerNameDisplay,
             getReserveEntryForItem = getReserveEntryForItem,
             getPlusForItem = function(itemId, playerName)
@@ -948,6 +1007,124 @@ do
             end
         end
         return entries
+    end
+
+    function module:SetPlayerReserveQuantity(playerName, itemId, quantity)
+        if not playerName or not itemId then
+            return false, "invalid_input"
+        end
+
+        local numericQuantity = normalizeEditNumber(quantity)
+        if not numericQuantity then
+            return false, "invalid_quantity"
+        end
+
+        numericQuantity = tonumber(numericQuantity) or 1
+        if numericQuantity < 1 then
+            numericQuantity = 1
+        end
+
+        ensureMutableLocalReserves()
+
+        local player, playerKey = getPlayerReserveContainer(playerName)
+        if not player then
+            return false, playerKey
+        end
+
+        local row, changed = getCanonicalReserveRow(player, tonumber(itemId))
+        if not row then
+            return false, "missing_item"
+        end
+        if tonumber(row.quantity) == numericQuantity and not changed then
+            return false, "no_change"
+        end
+
+        row.quantity = numericQuantity
+        copyReservesData(persistedReservesData, reservesData)
+        saveCanonicalReservesData(persistedReservesData)
+        rebuildReserveIndexes("edit-reserve", nil, self:GetImportMode(), addon.tLength(reservesData))
+        return true
+    end
+
+    function module:SetPlayerReservePlus(playerName, itemId, plus)
+        if not playerName or not itemId then
+            return false, "invalid_input"
+        end
+
+        local numericPlus = normalizeEditNumber(plus)
+        if not numericPlus then
+            return false, "invalid_plus"
+        end
+
+        if numericPlus < 0 then
+            numericPlus = 0
+        end
+
+        ensureMutableLocalReserves()
+
+        local player, playerKey = getPlayerReserveContainer(playerName)
+        if not player then
+            return false, playerKey
+        end
+
+        local row, changed = getCanonicalReserveRow(player, tonumber(itemId))
+        if not row then
+            return false, "missing_item"
+        end
+        if tonumber(row.plus) == numericPlus and not changed then
+            return false, "no_change"
+        end
+
+        row.plus = numericPlus
+        copyReservesData(persistedReservesData, reservesData)
+        saveCanonicalReservesData(persistedReservesData)
+        rebuildReserveIndexes("edit-reserve", nil, self:GetImportMode(), addon.tLength(reservesData))
+        return true
+    end
+
+    function module:RemovePlayerReserve(playerName, itemId)
+        if not playerName or not itemId then
+            return false, "invalid_input"
+        end
+
+        ensureMutableLocalReserves()
+
+        local player, playerKey = getPlayerReserveContainer(playerName)
+        if not player then
+            return false, playerKey
+        end
+
+        if type(player.reserves) ~= "table" then
+            return false, "missing_item"
+        end
+
+        local itemKey = tonumber(itemId)
+        local keep = {}
+        local removed = false
+        for i = 1, #player.reserves do
+            local row = player.reserves[i]
+            if type(row) == "table" and row.rawID == itemKey then
+                removed = true
+            else
+                keep[#keep + 1] = row
+            end
+        end
+
+        if not removed then
+            return false, "missing_item"
+        end
+
+        if #keep > 0 then
+            player.reserves = keep
+        else
+            persistedReservesData[playerKey] = nil
+            reservesData[playerKey] = nil
+        end
+
+        copyReservesData(persistedReservesData, reservesData)
+        saveCanonicalReservesData(persistedReservesData)
+        rebuildReserveIndexes("edit-reserve", nil, self:GetImportMode(), addon.tLength(reservesData))
+        return true
     end
 
     function module:AddPlayerReserve(playerName, itemRef)
@@ -1491,25 +1668,6 @@ do
         copyReservesData(persistedReservesData, reservesData)
         rebuildReserveIndexes("sync-clear", nil, importMode, addon.tLength(reservesData))
         return true
-    end
-
-    function module:IsSourceCollapsed(source)
-        if not source then
-            return false
-        end
-        return collapsedBossGroups[source] == true
-    end
-
-    function module:ToggleSourceCollapsed(source)
-        if not source then
-            return false
-        end
-        local nextState = not (collapsedBossGroups[source] == true)
-        collapsedBossGroups[source] = nextState
-        if isDebugEnabled() then
-            addon:debug(Diag.D.LogReservesToggleCollapse:format(source, tostring(nextState)))
-        end
-        return nextState
     end
 
     function module:RequestSyncMetadata()

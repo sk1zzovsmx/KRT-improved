@@ -176,7 +176,12 @@ requestWhisperReply = function(msg, sender)
         return true
     end
 
-    if GetOption("Reserves", "softResWhisperReplies") ~= true then
+    local hasItemRef = itemRef and itemRef ~= ""
+    if hasItemRef then
+        if GetOption("Reserves", "softResWhisperAdds") ~= true then
+            return true
+        end
+    elseif GetOption("Reserves", "softResWhisperReplies") ~= true then
         return true
     end
 
@@ -184,7 +189,7 @@ requestWhisperReply = function(msg, sender)
         return true
     end
 
-    if itemRef and itemRef ~= "" then
+    if hasItemRef then
         local ok, reserveEntry
         if module.AddPlayerReserve then
             ok, reserveEntry = module:AddPlayerReserve(target, itemRef)

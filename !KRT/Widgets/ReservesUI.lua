@@ -20,6 +20,7 @@ local EditBoxes = UI.EditBoxes
 local Tooltips = UI.Tooltips
 local Events = feature.Events
 local C = feature.C
+local Colors = feature.Colors
 local Options = feature.Options
 local Bus = feature.Bus
 local Services = feature.Services
@@ -31,8 +32,23 @@ local tinsert, twipe = table.insert, table.wipe
 local pairs, type = pairs, type
 local format = string.format
 local tostring, tonumber = tostring, tonumber
+local ChatEdit_InsertLink = ChatEdit_InsertLink
+local GetItemIcon = GetItemIcon
 local GetNumRaidMembers = GetNumRaidMembers
+local IsModifiedClick = IsModifiedClick
 local UnitInRaid = UnitInRaid
+
+local function getReservesOptions()
+    return Options and Options.Get and Options.Get("Reserves") or nil
+end
+
+local function isWidgetChecked(widget)
+    if not widget or not widget.GetChecked then
+        return false
+    end
+    local checked = widget:GetChecked()
+    return checked == true or checked == 1
+end
 
 local InternalEvents = Events.Internal
 local registry = feature.ModuleRegistry
@@ -42,6 +58,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Init",
             "Modules/ModuleRegistry",
             "Modules/C",
+            "Modules/Colors",
             "Modules/Events",
             "Modules/Bus",
             "Modules/UI/Facade",
@@ -67,20 +84,26 @@ do
 
     -- ----- Internal state ----- --
 
-    local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local getFrame = makeModuleFrameGetter(module, "KRTReserveListFrame")
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows = {}
     local rowsByItemID = {}
+    local collapsedItems = {}
+    local isEditMode = false
+    local reserveHeaderHeight = 30
+    local reservePlayerRowHeight = 24
     local lastQueryAttemptAt = 0
     local CLEAR_SAVED_RESERVES_POPUP_KEY = "KRT_RESERVES_CLEAR_SAVED"
-    local reserveRowStyle = {
-        odd = { 0.04, 0.06, 0.09, 0.30 },
-        even = { 0.08, 0.10, 0.14, 0.36 },
-        separator = { 1.0, 1.0, 1.0, 0.10 },
-    }
+    local REMOVE_RESERVE_ROW_POPUP_KEY = "KRT_RESERVES_REMOVE_ROW"
+    local APPLY_RESERVE_EDITS_POPUP_KEY = "KRT_RESERVES_APPLY_EDITS"
     local queryCooldownSeconds = tonumber(C.RESERVES_QUERY_COOLDOWN_SECONDS) or 2
+    local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
+    local collapseButtonSize = 16
+    local collapseExpandedTexture = "Interface\\Buttons\\UI-MinusButton-Up"
+    local collapseCollapsedTexture = "Interface\\Buttons\\UI-PlusButton-Up"
+    local collapseExpandedPushedTexture = "Interface\\Buttons\\UI-MinusButton-Down"
+    local collapseCollapsedPushedTexture = "Interface\\Buttons\\UI-PlusButton-Down"
 
     -- ----- Private helpers ----- --
     local isDebugEnabled = Options.IsDebugEnabled or function()
@@ -91,197 +114,463 @@ do
         return Reserves and Reserves.HasData and Reserves:HasData() or false
     end
 
+    local function isPlusReserveMode()
+        return Reserves and Reserves.IsPlusSystem and Reserves:IsPlusSystem() or false
+    end
+
+    local function applyCollapseButtonState(button, collapsed)
+        if not button then
+            return
+        end
+
+        if collapsed then
+            if button.SetNormalTexture then
+                button:SetNormalTexture(collapseCollapsedTexture)
+            end
+            if button.SetPushedTexture then
+                button:SetPushedTexture(collapseCollapsedPushedTexture)
+            end
+        else
+            if button.SetNormalTexture then
+                button:SetNormalTexture(collapseExpandedTexture)
+            end
+            if button.SetPushedTexture then
+                button:SetPushedTexture(collapseExpandedPushedTexture)
+            end
+        end
+        if button.Show then
+            button:Show()
+        end
+    end
+
+    local function hideItemTooltip()
+        if Tooltips and Tooltips.Hide then
+            Tooltips.Hide()
+        elseif GameTooltip then
+            GameTooltip:Hide()
+        end
+    end
+
+    local function showItemTooltip(owner, row)
+        if not owner or not row or not GameTooltip then
+            return
+        end
+
+        local link = row._itemLink
+        if (not link or link == "") and row._itemId then
+            link = "item:" .. tostring(row._itemId)
+        end
+
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        if link and link ~= "" then
+            GameTooltip:SetHyperlink(link)
+        elseif row._tooltipTitle then
+            GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
+        end
+        GameTooltip:Show()
+    end
+
+    local function insertHeaderItemLink(row)
+        local link = row and row._itemLink
+        if link and link ~= "" and type(IsModifiedClick) == "function" and IsModifiedClick("CHATLINK") and type(ChatEdit_InsertLink) == "function" then
+            ChatEdit_InsertLink(link)
+            return true
+        end
+        return false
+    end
+
+    local function clampNumber(value, minValue, maxValue)
+        if value < minValue then
+            return minValue
+        end
+        if value > maxValue then
+            return maxValue
+        end
+        return value
+    end
+
+    local function getRaidMemberCount()
+        if type(GetNumRaidMembers) == "function" then
+            local count = tonumber(GetNumRaidMembers()) or 0
+            return count > 0 and count or 0
+        end
+        return 0
+    end
+
+    local function setPlayerNameAnchor(row)
+        if not row or not row.nameText then
+            return
+        end
+
+        row.nameText:ClearAllPoints()
+        if row.editSlot then
+            row.nameText:SetPoint("LEFT", row.editSlot, "RIGHT", 8, 0)
+            return
+        end
+        row.nameText:SetPoint("LEFT", row, "LEFT", 64, 0)
+    end
+
     function uiState.AcquireRefs(frame)
         return {
             whisperHelpButton = Frames.GetRef(frame, "WhisperHelpButton"),
             clearBtn = Frames.GetRef(frame, "ClearBtn"),
             editButton = Frames.GetRef(frame, "EditButton"),
             queryButton = Frames.GetRef(frame, "QueryButton"),
+            softResHelpText = Frames.GetRef(frame, "SoftResHelpText"),
+            softResStatusText = Frames.GetRef(frame, "SoftResStatusText"),
+            softResAccept = Frames.GetRef(frame, "SoftResAccept"),
+            softResResponseWisp = Frames.GetRef(frame, "SoftResResponseWisp"),
+            softResAcceptStr = Frames.GetRef(frame, "SoftResAcceptStr"),
+            softResResponseWispStr = Frames.GetRef(frame, "SoftResResponseWispStr"),
             scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"],
             scrollChild = (frame.ScrollFrame and frame.ScrollFrame.ScrollChild) or _G["KRTReserveListFrameScrollChild"],
         }
     end
 
-    local function clamp(v, lo, hi)
-        if v < lo then
-            return lo
-        end
-        if v > hi then
-            return hi
-        end
-        return v
-    end
-
-    local function setupReserveRowTooltip(row)
+    local function setPlayerEditState(row)
         if not row then
             return
         end
-
-        local function showItemTooltip(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            local link = row._itemLink
-            if (not link or link == "") and row._itemId then
-                link = "item:" .. tostring(row._itemId)
+        local isPlusMode = isPlusReserveMode()
+        local currentValue = isPlusMode and (tonumber(row._plus) or 0) or (tonumber(row._quantity) or 1)
+        local visibleValue = tostring(currentValue)
+        if row.removeButton then
+            if isEditMode then
+                row.removeButton:Show()
+            else
+                row.removeButton:Hide()
             end
-            if link then
-                GameTooltip:SetHyperlink(link)
-            elseif row._tooltipTitle then
-                GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
-            end
-            GameTooltip:Show()
+            Primitives.SetEnabled(row.removeButton, isEditMode)
         end
-
-        local function showPlayersTooltip(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(row._tooltipTitle or L.StrReservesTooltipTitle, 1, 1, 1)
-            local lines = row._playersTooltipLines
-            if type(lines) == "table" then
-                for i = 1, #lines do
-                    GameTooltip:AddLine(lines[i], 0.9, 0.9, 0.9, true)
+        if row.quantityEdit then
+            if isEditMode then
+                if row.quantityText then
+                    row.quantityText:Hide()
                 end
-            elseif row._playersTextFull and row._playersTextFull ~= "" then
-                GameTooltip:AddLine(row._playersTextFull, 0.9, 0.9, 0.9, true)
+                row.quantityEdit:Show()
+                row.quantityEdit:SetNumber(currentValue)
+                row.quantityEdit._krtReserveEditBase = visibleValue
+                row.quantityEdit._krtReserveHasMode = isPlusMode and "plus" or "multi"
+            else
+                if row.quantityText then
+                    row.quantityText:Show()
+                end
+                row.quantityEdit:Hide()
             end
-            GameTooltip:Show()
         end
-
-        if row.iconBtn then
-            row.iconBtn:SetScript("OnEnter", showItemTooltip)
-            row.iconBtn:SetScript("OnLeave", Tooltips.Hide)
-        end
-
-        if row.textBlock then
-            row.textBlock:EnableMouse(false)
-            local hotspotFrameLevel = row.textBlock and (row.textBlock:GetFrameLevel() + 2) or nil
-
-            if row._nameHotspot then
-                if hotspotFrameLevel then
-                    row._nameHotspot:SetFrameLevel(hotspotFrameLevel)
-                end
-                row._nameHotspot:SetScript("OnEnter", showItemTooltip)
-                row._nameHotspot:SetScript("OnLeave", Tooltips.Hide)
-            end
-
-            if row._playersHotspot then
-                if hotspotFrameLevel then
-                    row._playersHotspot:SetFrameLevel(hotspotFrameLevel)
-                end
-                row._playersHotspot:SetScript("OnEnter", showPlayersTooltip)
-                row._playersHotspot:SetScript("OnLeave", Tooltips.Hide)
+        if row.quantityText then
+            if not isEditMode then
+                row.quantityText:Show()
             end
         end
     end
 
-    local function updateReserveRowHotspots(row)
-        if not row or not row.textBlock then
+    local function applyReservePlayerRowData(row, info, itemInfo)
+        if not row or not info then
             return
         end
-        local maxW = row.textBlock:GetWidth() or 0
-        if maxW <= 0 then
-            maxW = 200
-        end
-        local pad = 8
-
-        if row._nameHotspot and row.nameText then
-            local text = row.nameText:GetText() or ""
-            if text ~= "" then
-                local width = row.nameText.GetStringWidth and row.nameText:GetStringWidth() or 0
-                row._nameHotspot:SetWidth(clamp(width + pad, 2, maxW))
-                row._nameHotspot:EnableMouse(true)
-            else
-                row._nameHotspot:SetWidth(2)
-                row._nameHotspot:EnableMouse(false)
+        local playerName = type(info) == "table" and info.name or info
+        local displayName = type(info) == "table" and (info.displayName or info.name) or playerName
+        local className = type(info) == "table" and info.class or nil
+        if (not className or className == "" or className == "UNKNOWN") and playerName then
+            local raidService = Services and Services.Raid
+            if raidService and type(raidService.GetPlayerClass) == "function" then
+                local rosterClass = raidService:GetPlayerClass(playerName)
+                if rosterClass and rosterClass ~= "" and rosterClass ~= "UNKNOWN" then
+                    className = rosterClass
+                end
             end
         end
+        local quantity = type(info) == "table" and info.quantity or 1
+        local plus = type(info) == "table" and tonumber(info.plus) or 0
+        local checked = type(info) == "table" and info.checked or true
+        local itemData = itemInfo or info
 
-        if row._playersHotspot and row.playerText then
-            local text = row.playerText:GetText() or ""
-            if text ~= "" then
-                local width = row.playerText.GetStringWidth and row.playerText:GetStringWidth() or 0
-                row._playersHotspot:SetWidth(clamp(width + pad, 2, maxW))
-                row._playersHotspot:EnableMouse(true)
+        row._itemId = itemData.itemId
+        row._itemLink = itemData.itemLink
+        row._itemName = itemData.itemName
+        row._playerName = playerName
+        row._playerChecked = checked
+        row._quantity = quantity
+        row._plus = plus
+        row._quantityPlayer = quantity
+
+        if row.nameText then
+            row.nameText:SetText(displayName or "?")
+            if Colors and Colors.GetClassColor then
+                local r, g, b = Colors.GetClassColor(className)
+                row.nameText:SetTextColor(r, g, b)
             else
-                row._playersHotspot:SetWidth(2)
-                row._playersHotspot:EnableMouse(false)
+                row.nameText:SetTextColor(1, 1, 1)
+            end
+        end
+        if row.quantityText then
+            local isPlusMode = isPlusReserveMode()
+            row.quantityText:SetText(tostring(isPlusMode and (plus or 0) or (quantity or 1)))
+        end
+        if row.quantityEdit then
+            local isPlusMode = isPlusReserveMode()
+            row.quantityEdit:SetText(tostring(isPlusMode and (plus or 0) or (quantity or 1)))
+            row.quantityEdit._krtReserveEditBase = tostring(isPlusMode and (plus or 0) or (quantity or 1))
+            row.quantityEdit._krtReserveHasMode = isPlusMode and "plus" or "multi"
+        end
+
+        if row.removeButton then
+            row.removeButton:SetText("X")
+            row.removeButton._playerName = playerName
+            row.removeButton._itemId = itemData.itemId
+        end
+        setPlayerEditState(row)
+    end
+
+    local function restoreRowEditValue(row)
+        if not row or not row.quantityEdit then
+            return
+        end
+        local baseline = row.quantityEdit._krtReserveEditBase or "1"
+        row.quantityEdit:SetText(tostring(baseline))
+        row.quantityEdit._krtReserveEditValue = tostring(baseline)
+    end
+
+    local function getReserveRemoveLabel()
+        local label = L.BtnDelete
+        if label == "BtnDelete" then
+            label = L.BtnRemove
+            if label == "BtnRemove" then
+                label = "Remove"
+            end
+        end
+        return label
+    end
+
+    local function showReserveConfirm(key, text, onAccept, cancels, options)
+        if not Popups then
+            return false
+        end
+        if Popups.IsDefined and Popups.IsDefined(key) and Popups.DefineConfirm then
+            Popups.DefineConfirm(key, text, onAccept, cancels, options)
+        end
+        if Popups.ShowConfirm then
+            return Popups.ShowConfirm(key, text, onAccept, cancels, options)
+        end
+        return false
+    end
+
+    local function clearReserveRowEditFocus(editBox)
+        if editBox then
+            editBox:ClearFocus()
+        end
+    end
+
+    local function buildRowEditCommit(row)
+        if not row or not row.quantityEdit or not Reserves then
+            return nil
+        end
+
+        local isPlusMode = isPlusReserveMode()
+        local raw = row.quantityEdit:GetText()
+        local nextValue = tonumber(raw)
+        if not nextValue then
+            restoreRowEditValue(row)
+            return nil, "invalid_value"
+        end
+        nextValue = math.floor(nextValue)
+        if isPlusMode then
+            if nextValue < 0 then
+                nextValue = 0
+            end
+            row.quantityEdit:SetText(tostring(nextValue))
+            return {
+                editBox = row.quantityEdit,
+                itemId = row._itemId,
+                playerName = row._playerName,
+                value = nextValue,
+                isPlusMode = true,
+            }
+        end
+
+        if nextValue < 1 then
+            nextValue = 1
+        end
+        row.quantityEdit:SetText(tostring(nextValue))
+        return {
+            editBox = row.quantityEdit,
+            itemId = row._itemId,
+            playerName = row._playerName,
+            value = nextValue,
+            isPlusMode = false,
+        }
+    end
+
+    local function applyRowEditCommit(edit)
+        if not edit or not Reserves then
+            return false
+        end
+        if edit.isPlusMode then
+            return Reserves:SetPlayerReservePlus(edit.playerName, edit.itemId, edit.value)
+        end
+        return Reserves:SetPlayerReserveQuantity(edit.playerName, edit.itemId, edit.value)
+    end
+
+    local function commitRowEdit(row)
+        local edit, reason = buildRowEditCommit(row)
+        if not edit then
+            return false, reason
+        end
+        return applyRowEditCommit(edit)
+    end
+
+    local function collectVisibleReserveEdits()
+        local edits = {}
+        for i = 1, #reserveItemRows do
+            local row = reserveItemRows[i]
+            local editBox = row and row.quantityEdit
+            if editBox then
+                local nextValue = tostring(editBox:GetText() or "")
+                local baseValue = tostring(editBox._krtReserveEditBase or "")
+                if nextValue ~= baseValue then
+                    local edit = buildRowEditCommit(row)
+                    if edit then
+                        edits[#edits + 1] = edit
+                    end
+                end
+            end
+        end
+        return edits
+    end
+
+    local function applyVisibleReserveEdits(edits)
+        for i = 1, #edits do
+            local edit = edits[i]
+            applyRowEditCommit(edit)
+            if edit.editBox and edit.editBox._krtReserveEditBase then
+                edit.editBox._krtReserveEditBase = tostring(edit.value)
             end
         end
     end
 
-    local function applyReserveRowData(row, info, index, isFirstInGroup)
+    local function confirmRemovePlayerReserveFromUI(playerName, itemId)
+        if not playerName or not itemId then
+            return false
+        end
+
+        local options = {
+            button1 = getReserveRemoveLabel(),
+            button2 = L.BtnCancel,
+        }
+
+        local function onAccept()
+            if Reserves and Reserves.RemovePlayerReserve then
+                Reserves:RemovePlayerReserve(playerName, itemId)
+                module:RequestRefresh("remove_reserve")
+            end
+        end
+
+        local popupText = format(L.StrConfirmRemoveReserveRow, tostring(playerName), tostring(itemId))
+        if showReserveConfirm(REMOVE_RESERVE_ROW_POPUP_KEY, popupText, onAccept, REMOVE_RESERVE_ROW_POPUP_KEY, options) then
+            return true
+        end
+
+        onAccept()
+        return true
+    end
+
+    local function confirmApplyVisibleReserveEditsFromUI(edits, editButton)
+        if #edits == 0 then
+            return false
+        end
+
+        local options = {
+            button1 = L.BtnSave,
+            button2 = L.BtnCancel,
+        }
+
+        local function onAccept()
+            applyVisibleReserveEdits(edits)
+            isEditMode = false
+            if editButton then
+                editButton._krtReserveEditMode = false
+            end
+            module:RequestRefresh("commit_reserve_edits")
+        end
+
+        local popupText = format(L.StrConfirmApplyReserveEdits, #edits)
+        if showReserveConfirm(APPLY_RESERVE_EDITS_POPUP_KEY, popupText, onAccept, APPLY_RESERVE_EDITS_POPUP_KEY, options) then
+            return true
+        end
+
+        onAccept()
+        return true
+    end
+
+    local function applyReserveHeaderData(row, info, isCollapsed)
         if not row or not info then
             return
         end
         local itemIdLabel = format(L.StrReservesItemIdLabel, tostring(info.itemId or "?"))
         local itemFallback = format(L.StrReservesItemFallback, tostring(info.itemId or "?"))
-        local droppedBy = (info.source and info.source ~= "") and format(L.StrReservesTooltipDroppedBy, info.source) or nil
+        local icon = info.itemIcon
+        if (type(icon) ~= "string" or icon == "") and info.itemId and type(GetItemIcon) == "function" then
+            icon = GetItemIcon(info.itemId)
+        end
+        if type(icon) ~= "string" or icon == "" then
+            icon = fallbackIcon
+        end
 
         row._itemId = info.itemId
         row._itemLink = info.itemLink
         row._itemName = info.itemName
-        row._source = info.source
         row._tooltipTitle = info.itemLink or info.itemName or itemIdLabel
-        row._tooltipSource = droppedBy
         row._playersTooltipLines = info.playersTooltipLines
         row._playersTextFull = info.playersTextFull or info.playersText
 
-        local isEvenRow = (index % 2 == 0)
-        if row.background then
-            local bg = isEvenRow and reserveRowStyle.even or reserveRowStyle.odd
-            row.background:SetVertexColor(bg[1], bg[2], bg[3], bg[4])
-        end
-        if row.separator then
-            local sepAlpha = isEvenRow and 0.1 or reserveRowStyle.separator[4]
-            row.separator:SetVertexColor(reserveRowStyle.separator[1], reserveRowStyle.separator[2], reserveRowStyle.separator[3], sepAlpha)
-            row.separator:Show()
-        end
-        if row.topSeparator then
-            row.topSeparator:SetVertexColor(reserveRowStyle.separator[1], reserveRowStyle.separator[2], reserveRowStyle.separator[3], reserveRowStyle.separator[4])
-            if isFirstInGroup then
-                row.topSeparator:Show()
-            else
-                row.topSeparator:Hide()
-            end
-        end
-
+        local collapsed = isCollapsed == true
         if row.iconTexture then
-            local icon = info.itemIcon
-            if not icon and info.itemId then
-                local fetchedIcon = GetItemIcon(info.itemId)
-                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
-                    info.itemIcon = fetchedIcon
-                    icon = fetchedIcon
-                end
-            end
-            if type(icon) ~= "string" or icon == "" then
-                icon = fallbackIcon
-                info.itemIcon = icon
-            end
             row.iconTexture:SetTexture(icon)
+            if row.iconTexture.SetTexCoord then
+                row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
             row.iconTexture:Show()
         end
-
         if row.nameText then
             row.nameText:SetText(info.itemLink or info.itemName or itemFallback)
+            if row.nameText.GetStringWidth and row.nameText.SetWidth then
+                row.nameText:SetWidth(clampNumber((row.nameText:GetStringWidth() or 0) + 6, 60, 220))
+            end
         end
-        if row.playerText then
-            row.playerText:SetText(info.playersText or "")
+        if row.itemNameHotspot and row.nameText and row.nameText.GetWidth then
+            row.itemNameHotspot:SetWidth(row.nameText:GetWidth() or 170)
         end
-        if row.quantityText then
-            row.quantityText:Hide()
+        if row.collapseText then
+            row.collapseText:SetText("")
+            row.collapseText:Hide()
         end
-
-        updateReserveRowHotspots(row)
+        applyCollapseButtonState(row.collapseButton, collapsed)
+        if row.line then
+            row.line:Show()
+        end
     end
 
     local function reserveHeaderOnClick(self)
-        local source = self and self._source
-        if not source then
+        local itemId = self and self._itemId
+        if not itemId then
             return
         end
-        if Reserves and Reserves.ToggleSourceCollapsed then
-            Reserves:ToggleSourceCollapsed(source)
-        end
+        collapsedItems[itemId] = not (collapsedItems[itemId] == true)
         module:RequestRefresh()
+    end
+
+    local function reserveHeaderHotspotOnEnter(self)
+        showItemTooltip(self, self and self._krtReserveHeader)
+    end
+
+    local function reserveHeaderHotspotOnLeave()
+        hideItemTooltip()
+    end
+
+    local function reserveHeaderHotspotOnClick(self)
+        local header = self and self._krtReserveHeader
+        insertHeaderItemLink(header)
     end
 
     function uiState.Localize()
@@ -317,6 +606,18 @@ do
         if whisperHelpButton then
             whisperHelpButton:SetText(L.BtnSpamSoftResWhisper)
         end
+        local softResAcceptLabel = frameName and _G[frameName .. "SoftResAcceptStr"]
+        if softResAcceptLabel then
+            softResAcceptLabel:SetText(L.StrReserveListAcceptSR)
+        end
+        local softResResponseWispLabel = frameName and _G[frameName .. "SoftResResponseWispStr"]
+        if softResResponseWispLabel then
+            softResResponseWispLabel:SetText(L.StrReserveListResponseWisp)
+        end
+        local softResHelpText = frameName and _G[frameName .. "SoftResHelpText"]
+        if softResHelpText then
+            softResHelpText:SetText(L.StrReserveListWhisperHelp)
+        end
         uiState.Localized = true
     end
 
@@ -326,6 +627,9 @@ do
             return
         end
         local hasData = hasReserveData()
+        if not hasData then
+            isEditMode = false
+        end
         local clearBtn = _G[frameName .. "ClearBtn"]
         if clearBtn then
             clearBtn:SetText(L.BtnClear)
@@ -341,23 +645,38 @@ do
         if editButton then
             editButton:SetText(L.BtnEdit)
             editButton:Show()
-            Primitives.SetEnabled(editButton, false)
+            Primitives.SetEnabled(editButton, hasData)
+            if Primitives.SetHighlighted then
+                Primitives.SetHighlighted(editButton, isEditMode)
+            elseif isEditMode and editButton.LockHighlight then
+                editButton:LockHighlight()
+            elseif editButton.UnlockHighlight then
+                editButton:UnlockHighlight()
+            end
+            editButton._krtReserveEditMode = isEditMode
         end
         local queryButton = _G[frameName .. "QueryButton"]
         if queryButton then
             Primitives.SetEnabled(queryButton, hasData)
         end
-    end
 
-    local function setupReserveIcon(row)
-        if not row or not row.iconTexture or not row.iconBtn then
-            return
+        local reservesNs = Options and Options.Get and Options.Get("Reserves") or nil
+        local softResAccept = _G[frameName .. "SoftResAccept"]
+        if softResAccept and softResAccept.SetChecked and reservesNs then
+            local value = reservesNs:Get("softResWhisperAdds")
+            if value == nil then
+                value = false
+            end
+            softResAccept:SetChecked(value == true)
         end
-        row.iconTexture:ClearAllPoints()
-        row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
-        row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
-        row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        row.iconTexture:SetDrawLayer("OVERLAY")
+        local softResResponseWisp = _G[frameName .. "SoftResResponseWisp"]
+        if softResResponseWisp and softResResponseWisp.SetChecked and reservesNs then
+            local value = reservesNs:Get("softResWhisperReplies")
+            if value == nil then
+                value = false
+            end
+            softResResponseWisp:SetChecked(value == true)
+        end
     end
 
     local function setupReserveRowDecor(row)
@@ -376,7 +695,7 @@ do
         row._decorInitialized = true
     end
 
-    local function createReserveHeader(parent, source, yOffset, index)
+    local function createReserveHeader(parent, info, yOffset, index)
         local frameName = uiState.FrameName
         if not frameName then
             return nil
@@ -385,68 +704,146 @@ do
         local header = _G[headerName] or CreateFrame("Button", headerName, parent, "KRTReserveHeaderTemplate")
         header:ClearAllPoints()
         header:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
-        header._source = source
+        header._itemId = info.itemId
         if not header._initialized then
-            header.label = _G[headerName .. "Label"]
-            header:SetScript("OnClick", reserveHeaderOnClick)
+            header.itemIconButton = _G[headerName .. "ItemIcon"]
+            header.iconTexture = _G[headerName .. "ItemIconIconTexture"]
+            header.itemIconNormalTexture = _G[headerName .. "ItemIconNormalTexture"]
+            header.nameText = _G[headerName .. "Name"]
+            header.line = _G[headerName .. "Line"]
+            header.collapseText = _G[headerName .. "Collapse"]
+            header.collapseButton = _G[headerName .. "CollapseButton"] or CreateFrame("Button", headerName .. "CollapseButton", header)
+            header.itemIconHotspot = header.itemIconButton
+            header.itemNameHotspot = _G[headerName .. "ItemNameHotspot"]
+            if header.collapseText then
+                header.collapseText:SetWidth(collapseButtonSize)
+                header.collapseText:SetHeight(collapseButtonSize)
+                header.collapseText:SetText("")
+                header.collapseText:Hide()
+            end
+            if header.collapseButton then
+                header.collapseButton:ClearAllPoints()
+                if header.collapseText then
+                    header.collapseButton:SetPoint("CENTER", header.collapseText, "CENTER", 0, 0)
+                else
+                    header.collapseButton:SetPoint("RIGHT", header, "RIGHT", -2, 0)
+                end
+                header.collapseButton:SetWidth(collapseButtonSize)
+                header.collapseButton:SetHeight(collapseButtonSize)
+                header.collapseButton:SetScript("OnClick", reserveHeaderOnClick)
+            end
+            if header.iconTexture then
+                header.iconTexture:SetWidth(26)
+                header.iconTexture:SetHeight(26)
+            end
+            if header.itemIconNormalTexture then
+                header.itemIconNormalTexture:SetWidth(32)
+                header.itemIconNormalTexture:SetHeight(32)
+            end
+            if header.itemIconHotspot then
+                header.itemIconHotspot._krtReserveHeader = header
+                header.itemIconHotspot:SetScript("OnEnter", reserveHeaderHotspotOnEnter)
+                header.itemIconHotspot:SetScript("OnLeave", reserveHeaderHotspotOnLeave)
+                header.itemIconHotspot:SetScript("OnClick", reserveHeaderHotspotOnClick)
+            end
+            if header.itemNameHotspot then
+                header.itemNameHotspot._krtReserveHeader = header
+                header.itemNameHotspot:SetScript("OnEnter", reserveHeaderHotspotOnEnter)
+                header.itemNameHotspot:SetScript("OnLeave", reserveHeaderHotspotOnLeave)
+                header.itemNameHotspot:SetScript("OnClick", reserveHeaderHotspotOnClick)
+            end
+            header:SetScript("OnClick", nil)
             header._initialized = true
         end
 
-        if header.label then
-            local collapsed = Reserves:IsSourceCollapsed(source)
-            local prefix = collapsed and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
-            header.label:SetText(prefix .. source)
+        if header.collapseButton then
+            header.collapseButton._itemId = info.itemId
         end
+        local collapsed = collapsedItems[info.itemId] == true
+        applyReserveHeaderData(header, info, collapsed)
 
         header:Show()
         return header
     end
 
-    local function createReserveRow(parent, info, yOffset, index, isFirstInGroup)
+    local function createReserveRow(parent, itemInfo, playerInfo, yOffset, index)
         local frameName = uiState.FrameName
         if not frameName then
             return nil
         end
         local rowName = frameName .. "ReserveRow" .. index
-        local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
+        local row = _G[rowName] or CreateFrame("Button", rowName, parent, "KRTReservePlayerRowTemplate")
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
-        row._rawID = info.itemId
+        row._rawID = itemInfo.itemId
 
-        if not row._initialized then
+        if not row._initialized or not row.nameText or not row.quantityText or not row.quantityEdit or not row.removeButton or not row.editSlot then
             row.background = _G[rowName .. "Background"]
-            row.iconBtn = _G[rowName .. "IconBtn"]
-            row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
-            row.textBlock = _G[rowName .. "TextBlock"]
-            row._nameHotspot = _G[rowName .. "NameHotspot"]
-            row._playersHotspot = _G[rowName .. "PlayersHotspot"]
-            setupReserveIcon(row)
             setupReserveRowDecor(row)
-            if row.textBlock and row.iconBtn then
-                row.textBlock:SetFrameLevel(row.iconBtn:GetFrameLevel() + 1)
-            end
-            row.nameText = _G[rowName .. "TextBlockName"]
-            row.sourceText = _G[rowName .. "TextBlockSource"]
-            row.playerText = _G[rowName .. "TextBlockPlayers"]
+            row.nameText = _G[rowName .. "Name"]
             row.quantityText = _G[rowName .. "Quantity"]
-            setupReserveRowTooltip(row)
-            if row.sourceText then
-                row.sourceText:SetText("")
-                row.sourceText:Hide()
+            row.quantityEdit = _G[rowName .. "QuantityEdit"]
+            row.removeButton = _G[rowName .. "RemoveBtn"]
+            row.editSlot = _G[rowName .. "EditSlot"]
+            if row.removeButton then
+                row.removeButton:ClearAllPoints()
+                row.removeButton:SetPoint("LEFT", row, "LEFT", 40, 0)
+                row.removeButton:SetText(getReserveRemoveLabel())
+                row.removeButton:SetScript("OnEnter", nil)
+                row.removeButton:SetScript("OnLeave", nil)
+                row.removeButton:SetScript("OnClick", function()
+                    local playerName = row._playerName
+                    local itemId = row._itemId
+                    if not isEditMode or not playerName or not itemId then
+                        return
+                    end
+                    confirmRemovePlayerReserveFromUI(playerName, itemId)
+                end)
             end
+            if row.quantityEdit then
+                row.quantityEdit:SetScript("OnEnterPressed", function(edit)
+                    if not edit then
+                        return
+                    end
+                    commitRowEdit(edit._krtReserveRow)
+                    clearReserveRowEditFocus(edit)
+                end)
+                row.quantityEdit:SetScript("OnEscapePressed", function(edit)
+                    if not edit then
+                        return
+                    end
+                    restoreRowEditValue(edit._krtReserveRow)
+                    clearReserveRowEditFocus(edit)
+                end)
+            end
+            if row.nameText then
+                row.nameText:ClearAllPoints()
+                row.nameText:SetWidth(190)
+            end
+            if row.quantityEdit then
+                row.quantityEdit._krtReserveRow = row
+            end
+            setPlayerNameAnchor(row)
             row._initialized = true
         end
 
-        applyReserveRowData(row, info, index, isFirstInGroup)
+        applyReservePlayerRowData(row, playerInfo, itemInfo)
+        if row.quantityEdit then
+            row.quantityEdit._krtReserveRow = row
+        end
         row:Show()
-        rowsByItemID[info.itemId] = rowsByItemID[info.itemId] or {}
-        tinsert(rowsByItemID[info.itemId], row)
+        rowsByItemID[itemInfo.itemId] = rowsByItemID[itemInfo.itemId] or {}
+        tinsert(rowsByItemID[itemInfo.itemId], row)
         return row
     end
 
     local function renderReserveListUI()
         local frame = getFrame()
         if not frame or not scrollChild or not uiState.FrameName then
+            return
+        end
+        local getDisplayList = Reserves and Reserves.GetDisplayList
+        if type(getDisplayList) ~= "function" then
             return
         end
 
@@ -461,40 +858,67 @@ do
         end
         twipe(reserveHeaders)
 
-        local rowHeight = C.RESERVES_ROW_HEIGHT
         local yOffset = 0
         local rowIndex = 0
         local headerIndex = 0
-        local seenSources = {}
-        local firstRenderedRowBySource = {}
-        local displayList = Reserves:GetDisplayList()
+        local displayList = getDisplayList(Reserves)
+        local reservedPlayerMap = {}
 
         for i = 1, #displayList do
             local entry = displayList[i]
-            local source = entry.source
-
-            if not seenSources[source] then
-                seenSources[source] = true
-                headerIndex = headerIndex + 1
-                local header = createReserveHeader(scrollChild, source, yOffset, headerIndex)
-                reserveHeaders[#reserveHeaders + 1] = header
-                yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
-            end
-
-            local collapsed = Reserves:IsSourceCollapsed(source)
-            if not collapsed then
-                rowIndex = rowIndex + 1
-                local isFirstInGroup = not firstRenderedRowBySource[source]
-                local row = createReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
-                firstRenderedRowBySource[source] = true
-                reserveItemRows[#reserveItemRows + 1] = row
-                yOffset = yOffset + rowHeight
+            local players = entry and entry.players
+            if type(players) == "table" then
+                for j = 1, #players do
+                    local playerInfo = players[j]
+                    local playerName = type(playerInfo) == "table" and (playerInfo.name or playerInfo.playerName or playerInfo.playerNameDisplay) or playerInfo
+                    if type(playerName) == "string" and playerName ~= "" then
+                        reservedPlayerMap[playerName] = true
+                    end
+                end
             end
         end
 
-        scrollChild:SetHeight(yOffset)
+        for i = 1, #displayList do
+            local entry = displayList[i]
+            if entry and entry.itemId then
+                headerIndex = headerIndex + 1
+                local header = createReserveHeader(scrollChild, entry, yOffset, headerIndex)
+                reserveHeaders[#reserveHeaders + 1] = header
+                yOffset = yOffset + reserveHeaderHeight
+
+                local players = entry.players or {}
+                if collapsedItems[entry.itemId] ~= true then
+                    for j = 1, #players do
+                        rowIndex = rowIndex + 1
+                        local playerEntry = players[j]
+                        local playerRow = createReserveRow(scrollChild, entry, playerEntry, yOffset, rowIndex)
+                        reserveItemRows[#reserveItemRows + 1] = playerRow
+                        yOffset = yOffset + reservePlayerRowHeight
+                    end
+                end
+            end
+        end
+
+        if scrollFrame and scrollFrame.GetHeight then
+            scrollChild:SetHeight(math.max(yOffset, scrollFrame:GetHeight() or 0))
+        else
+            scrollChild:SetHeight(yOffset)
+        end
         if scrollFrame then
             scrollFrame:SetVerticalScroll(0)
+            if scrollFrame.UpdateScrollChildRect then
+                scrollFrame:UpdateScrollChildRect()
+            end
+        end
+
+        local frameName = uiState.FrameName
+        local statusText = frameName and _G[frameName .. "SoftResStatusText"]
+        if statusText then
+            local reservedPlayerCount = 0
+            for _ in pairs(reservedPlayerMap) do
+                reservedPlayerCount = reservedPlayerCount + 1
+            end
+            statusText:SetText(format(L.StrReserveListStatus, getRaidMemberCount(), reservedPlayerCount))
         end
     end
 
@@ -630,7 +1054,25 @@ do
         end
 
         if refs.editButton then
-            refs.editButton:SetScript("OnClick", function() end)
+            refs.editButton:SetScript("OnClick", function()
+                if not hasReserveData() then
+                    return
+                end
+                if isEditMode then
+                    local edits = collectVisibleReserveEdits()
+                    if #edits > 0 then
+                        if confirmApplyVisibleReserveEditsFromUI(edits, refs.editButton) then
+                            return
+                        end
+                    else
+                        isEditMode = false
+                    end
+                else
+                    isEditMode = true
+                end
+                refs.editButton._krtReserveEditMode = isEditMode
+                module:RequestRefresh("toggle_edit_mode")
+            end)
         end
 
         if refs.queryButton then
@@ -643,6 +1085,34 @@ do
             end)
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
+            end
+        end
+
+        if refs.softResAccept then
+            refs.softResAccept:SetScript("OnClick", function(self)
+                local reservesNs = getReservesOptions()
+                if not reservesNs or not reservesNs.Set then
+                    return
+                end
+                reservesNs:Set("softResWhisperAdds", isWidgetChecked(self))
+                module:RequestRefresh("soft_reserve_add_option")
+            end)
+            if Tooltips and Tooltips.Bind then
+                Tooltips.Bind(refs.softResAccept, L.StrReserveListAcceptSRTooltipText, "ANCHOR_RIGHT", L.StrReserveListAcceptSRTooltipTitle)
+            end
+        end
+
+        if refs.softResResponseWisp then
+            refs.softResResponseWisp:SetScript("OnClick", function(self)
+                local reservesNs = getReservesOptions()
+                if not reservesNs or not reservesNs.Set then
+                    return
+                end
+                reservesNs:Set("softResWhisperReplies", isWidgetChecked(self))
+                module:RequestRefresh("soft_reserve_reply_option")
+            end)
+            if Tooltips and Tooltips.Bind then
+                Tooltips.Bind(refs.softResResponseWisp, L.StrReserveListResponseWispTooltipText, "ANCHOR_RIGHT", L.StrReserveListResponseWispTooltipTitle)
             end
         end
     end
@@ -730,10 +1200,6 @@ do
             status = _G["KRTImportWindowStatus"],
             frame = frame,
         }
-    end
-
-    local function getReservesOptions()
-        return Options and Options.Get and Options.Get("Reserves") or nil
     end
 
     local function getImportModeString()

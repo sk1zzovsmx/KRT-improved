@@ -126,6 +126,7 @@ globals = {
 	"KRTRaidAttendancePlayerRowTemplate",
 	"KRTRaidAttendanceInspectItemIconButtonTemplate",
 	"KRTReserveHeaderTemplate",
+	"KRTReservePlayerRowTemplate",
 	"KRTReserveRowTemplate",
 	"KRTScrollFrameTemplate",
 	"KRTSelectPlayerTemplate",

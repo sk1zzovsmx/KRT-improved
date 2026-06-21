@@ -10791,12 +10791,14 @@ end)
 test("reserve list clear edit and spam actions follow state contract", function()
     local h = newHarness()
     local hasData = false
+    local displayList = {}
     local clearCount = 0
     local raidMemberCount = 0
     local uiCalls = {}
     local announcements = {}
     local popupCalls = {}
     local registeredApis = {}
+    local tooltipBindings = {}
 
     h.addon.L.BtnClear = "Clear"
     h.addon.L.BtnEdit = "Edit"
@@ -10804,6 +10806,14 @@ test("reserve list clear edit and spam actions follow state contract", function(
     h.addon.L.BtnQueryItem = "Query Item"
     h.addon.L.BtnClose = "Close"
     h.addon.L.BtnSpamSoftResWhisper = "Spam SR"
+    h.addon.L.StrReserveListAcceptSR = "Accept SR"
+    h.addon.L.StrReserveListResponseWisp = "Response Wisp"
+    h.addon.L.StrReserveListWhisperHelp = "Whisper ML +sr to see reserves.\n" .. "Whisper ML +sr [itemLink] to add one."
+    h.addon.L.StrReserveListAcceptSRTooltipTitle = "Accept SR"
+    h.addon.L.StrReserveListAcceptSRTooltipText = "Allows players to whisper +sr [itemLink] or +softres [itemLink] to add a reserve. This changes local reserve data."
+    h.addon.L.StrReserveListResponseWispTooltipTitle = "Response Wisp"
+    h.addon.L.StrReserveListResponseWispTooltipText = "Allows players to whisper +sr or +softres to receive their current reserves. This does not change reserve data."
+    h.addon.L.StrReserveListStatus = "Players: %d - Reserved Players: %d"
     h.addon.L.ChatSoftResWhisperHelpQuery = "SoftRes: To see your reserves /w %s +sr or /w %s +softres"
     h.addon.L.ChatSoftResWhisperHelpAdd = "SoftRes: To add one with /w %s +sr [item link] or /w %s +softres [item link]"
     h.addon.L.StrConfirmClearReserves = "Clear all saved loot reserve data?"
@@ -10827,10 +10837,7 @@ test("reserve list clear edit and spam actions follow state contract", function(
             return true
         end,
         GetDisplayList = function()
-            return {}
-        end,
-        IsSourceCollapsed = function()
-            return false
+            return displayList
         end,
         QueryMissingItems = function()
             return false, 0
@@ -10874,6 +10881,16 @@ test("reserve list clear edit and spam actions follow state contract", function(
             options = options,
         }
         return true
+    end
+    h.addon.UI.Tooltips.Bind = function(frame, text, anchor, title)
+        tooltipBindings[#tooltipBindings + 1] = {
+            frame = frame,
+            text = text,
+            anchor = anchor,
+            title = title,
+        }
+        frame:SetScript("OnEnter", function() end)
+        frame:SetScript("OnLeave", function() end)
     end
 
     h.addon.UI.Scaffold.DefineModule = function(cfg)
@@ -10948,6 +10965,37 @@ test("reserve list clear edit and spam actions follow state contract", function(
     local editButton = h.makeFrame(true, "KRTReserveListFrameEditButton")
     local queryButton = h.makeFrame(true, "KRTReserveListFrameQueryButton")
     local whisperHelpButton = h.makeFrame(true, "KRTReserveListFrameWhisperHelpButton")
+    local softResHelpText = h.makeFrame(true, "KRTReserveListFrameSoftResHelpText")
+    local softResStatusText = h.makeFrame(true, "KRTReserveListFrameSoftResStatusText")
+    local softResAcceptCheck = h.makeFrame(true, "KRTReserveListFrameSoftResAccept")
+    local softResResponseWispCheck = h.makeFrame(true, "KRTReserveListFrameSoftResResponseWisp")
+    local softResAcceptLabel = h.makeFrame(true, "KRTReserveListFrameSoftResAcceptStr")
+    local responseWispLabel = h.makeFrame(true, "KRTReserveListFrameSoftResResponseWispStr")
+    local function setGetChecked(widget)
+        return function()
+            return widget and widget._krtChecked == true and 1 or nil
+        end
+    end
+    local function setSetChecked(widget)
+        return function(_, value)
+            widget._krtChecked = value == true or value == 1
+        end
+    end
+    local function setClick(widget)
+        return function()
+            if widget.OnClick then
+                widget:OnClick("LeftButton")
+            end
+        end
+    end
+    softResAcceptCheck._krtChecked = false
+    softResResponseWispCheck._krtChecked = false
+    softResAcceptCheck.GetChecked = setGetChecked(softResAcceptCheck)
+    softResResponseWispCheck.GetChecked = setGetChecked(softResResponseWispCheck)
+    softResAcceptCheck.SetChecked = setSetChecked(softResAcceptCheck)
+    softResResponseWispCheck.SetChecked = setSetChecked(softResResponseWispCheck)
+    softResAcceptCheck.Click = setClick(softResAcceptCheck)
+    softResResponseWispCheck.Click = setClick(softResResponseWispCheck)
 
     scrollFrame.ScrollChild = scrollChild
     scrollFrame.SetVerticalScroll = function(self, value)
@@ -10961,7 +11009,21 @@ test("reserve list clear edit and spam actions follow state contract", function(
     _G.KRTReserveListFrameEditButton = editButton
     _G.KRTReserveListFrameQueryButton = queryButton
     _G.KRTReserveListFrameWhisperHelpButton = whisperHelpButton
+    _G.KRTReserveListFrameSoftResHelpText = softResHelpText
+    _G.KRTReserveListFrameSoftResStatusText = softResStatusText
+    _G.KRTReserveListFrameSoftResAccept = softResAcceptCheck
+    _G.KRTReserveListFrameSoftResResponseWisp = softResResponseWispCheck
+    _G.KRTReserveListFrameSoftResAcceptStr = softResAcceptLabel
+    _G.KRTReserveListFrameSoftResResponseWispStr = responseWispLabel
 
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", false, {
+        softResWhisperAdds = false,
+        softResWhisperReplies = false,
+    })
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", false, {
+        softResWhisperAdds = false,
+        softResWhisperReplies = false,
+    })
     h:load("!KRT/Widgets/ReservesUI.lua")
     local module = h.addon.Widgets.ReservesUI
 
@@ -10972,6 +11034,35 @@ test("reserve list clear edit and spam actions follow state contract", function(
     assertEqual(editButton:GetText(), "Edit", "expected edit action to be labeled Edit")
     assertEqual(editButton:IsEnabled(), false, "expected edit action to stay disabled with no data")
     assertEqual(whisperHelpButton:GetText(), "Spam SR", "expected footer action to advertise SoftRes whispers")
+    assertTrue(softResHelpText ~= nil, "expected softres help text control stub")
+    assertTrue(softResStatusText ~= nil, "expected softres status text control stub")
+    assertTrue(softResAcceptCheck ~= nil, "expected accept SR option checkbox stub")
+    assertTrue(softResResponseWispCheck ~= nil, "expected Response Wisp checkbox stub")
+    assertTrue(softResAcceptLabel ~= nil, "expected Accept SR label")
+    assertTrue(responseWispLabel ~= nil, "expected Response Wisp label")
+    assertEqual(softResHelpText:GetText(), h.addon.L.StrReserveListWhisperHelp, "expected reserve whisper help text")
+    assertEqual(softResStatusText:GetText(), "Players: 0 - Reserved Players: 0", "expected softres status line for empty data")
+    assertEqual(softResAcceptLabel:GetText(), "Accept SR", "expected Accept SR label")
+    assertEqual(responseWispLabel:GetText(), "Response Wisp", "expected Response Wisp label")
+    assertEqual(tooltipBindings[1].frame, softResAcceptCheck, "expected accept SR tooltip binding")
+    assertEqual(tooltipBindings[1].anchor, "ANCHOR_RIGHT", "expected accept SR tooltip anchor")
+    assertEqual(tooltipBindings[1].title, h.addon.L.StrReserveListAcceptSRTooltipTitle, "expected accept SR tooltip title")
+    assertEqual(tooltipBindings[1].text, h.addon.L.StrReserveListAcceptSRTooltipText, "expected accept SR tooltip text")
+    assertEqual(tooltipBindings[2].frame, softResResponseWispCheck, "expected response Wisp tooltip binding")
+    assertEqual(tooltipBindings[2].anchor, "ANCHOR_RIGHT", "expected response Wisp tooltip anchor")
+    assertEqual(tooltipBindings[2].title, h.addon.L.StrReserveListResponseWispTooltipTitle, "expected response Wisp tooltip title")
+    assertEqual(tooltipBindings[2].text, h.addon.L.StrReserveListResponseWispTooltipText, "expected response Wisp tooltip text")
+    assertEqual(softResAcceptCheck:GetChecked(), nil, "expected add whisper option default false")
+    assertEqual(softResResponseWispCheck:GetChecked(), nil, "expected replies option default false")
+    softResAcceptCheck:SetChecked(true)
+    softResAcceptCheck:Click()
+    softResResponseWispCheck:SetChecked(false)
+    softResResponseWispCheck:Click()
+    assertEqual(getHarnessOption(h, "Reserves", "softResWhisperAdds"), true, "expected accept SR option to persist")
+    assertTrue(getHarnessOption(h, "Reserves", "softResWhisperReplies") ~= true, "expected response whisper option to stay disabled")
+    softResResponseWispCheck:SetChecked(1)
+    softResResponseWispCheck:Click()
+    assertEqual(getHarnessOption(h, "Reserves", "softResWhisperReplies"), true, "expected numeric checkbox state to persist")
 
     clearButton.OnClick(clearButton)
     whisperHelpButton.OnClick(whisperHelpButton)
@@ -10981,11 +11072,16 @@ test("reserve list clear edit and spam actions follow state contract", function(
 
     assertEqual(#uiCalls, 0, "expected no import action with clear/edit controls")
     assertEqual(#announcements, 0, "expected SoftRes whisper help button to stay silent outside raid")
+    assertEqual(softResStatusText:GetText(), "Players: 0 - Reserved Players: 0", "expected softres status line to stay zero with no data")
 
     raidMemberCount = 10
+    module:RequestRefresh("status_counts")
     whisperHelpButton.OnClick(whisperHelpButton)
 
     assertEqual(#announcements, 2, "expected SoftRes whisper help button to announce two lines")
+    assertEqual(softResStatusText:GetText(), "Players: 10 - Reserved Players: 0", "expected status line to show raid size with no reserves")
+    assertEqual(softResAcceptCheck:IsEnabled(), true, "expected add whisper checkbox available")
+    assertEqual(softResResponseWispCheck:IsEnabled(), true, "expected response whisper checkbox available")
     assertEqual(announcements[1].channel, "RAID", "expected SoftRes whisper help to use raid chat")
     assertEqual(announcements[2].channel, "RAID", "expected SoftRes add help to use raid chat")
     local expectedSoftResQuery = "SoftRes: To see your reserves /w Masterlooter +sr or /w Masterlooter +softres"
@@ -11003,7 +11099,26 @@ test("reserve list clear edit and spam actions follow state contract", function(
     assertTrue(clearButton:IsShown(), "expected clear reserves button to stay visible when data exists")
     assertTrue(clearButton:IsEnabled(), "expected clear action to be enabled with data")
     assertEqual(editButton:GetText(), "Edit", "expected edit action label to stay Edit with data")
-    assertEqual(editButton:IsEnabled(), false, "expected edit action to stay disabled with data")
+    assertEqual(editButton:IsEnabled(), true, "expected edit action to enable with data")
+    displayList = {
+        {
+            itemId = 1201,
+            players = { { name = "Alice" }, { name = "Bob" } },
+        },
+        {
+            itemId = 1202,
+            players = { { name = "Alice" } },
+        },
+    }
+    hasData = true
+    module:RequestRefresh("status_counts")
+    assertEqual(softResStatusText:GetText(), "Players: 10 - Reserved Players: 2", "expected reserve status count from non-empty display list")
+
+    editButton.OnClick(editButton)
+    assertEqual(editButton:GetText(), "Edit", "expected edit toggle to keep the Edit label while active")
+    assertEqual(editButton._krtReserveEditMode, true, "expected edit action to toggle edit mode on")
+    editButton.OnClick(editButton)
+    assertEqual(editButton._krtReserveEditMode, false, "expected edit action to toggle edit mode off")
 
     clearButton.OnClick(clearButton)
 
@@ -11019,7 +11134,557 @@ test("reserve list clear edit and spam actions follow state contract", function(
     end
     assertEqual(clearCount, 1, "expected data reserves action to clear saved data after confirmation")
     assertEqual(#uiCalls, 0, "expected data reserves action not to open import")
-    assertEqual(editButton:IsEnabled(), false, "expected edit action to remain disabled after clearing")
+    assertEqual(editButton:IsEnabled(), true, "expected edit action to stay available until refreshed data changes")
+end)
+
+test("reserves ui edit actions commit and remove through service APIs", function()
+    local h = newHarness()
+    local setQuantityCount = 0
+    local removeCount = 0
+    local popupCalls = {}
+
+    local frame = h.makeFrame(true, "KRTReserveListFrame")
+    local scrollFrame = h.makeFrame(true, "KRTReserveListFrameScrollFrame")
+    local scrollChild = h.makeFrame(true, "KRTReserveListFrameScrollChild")
+    local clearButton = h.makeFrame(true, "KRTReserveListFrameClearBtn")
+    local editButton = h.makeFrame(true, "KRTReserveListFrameEditButton")
+    local queryButton = h.makeFrame(true, "KRTReserveListFrameQueryButton")
+    local whisperHelpButton = h.makeFrame(true, "KRTReserveListFrameWhisperHelpButton")
+    local softResHelpText = h.makeFrame(true, "KRTReserveListFrameSoftResHelpText")
+    local softResAcceptCheck = h.makeFrame(true, "KRTReserveListFrameSoftResAccept")
+    local softResResponseWispCheck = h.makeFrame(true, "KRTReserveListFrameSoftResResponseWisp")
+    local softResAcceptLabel = h.makeFrame(true, "KRTReserveListFrameSoftResAcceptStr")
+    local responseWispLabel = h.makeFrame(true, "KRTReserveListFrameSoftResResponseWispStr")
+
+    local rowName = "KRTReserveListFrameReserveRow1"
+    local secondRowName = "KRTReserveListFrameReserveRow2"
+    local headerName = "KRTReserveListFrameReserveHeader1"
+    _G[rowName .. "Name"] = h.makeFrame(true, rowName .. "Name")
+    _G[rowName .. "Quantity"] = h.makeFrame(true, rowName .. "Quantity")
+    _G[rowName .. "QuantityEdit"] = h.makeFrame(true, rowName .. "QuantityEdit")
+    _G[rowName .. "RemoveBtn"] = h.makeFrame(true, rowName .. "RemoveBtn")
+    _G[secondRowName .. "Name"] = h.makeFrame(true, secondRowName .. "Name")
+    _G[secondRowName .. "Quantity"] = h.makeFrame(true, secondRowName .. "Quantity")
+    _G[secondRowName .. "QuantityEdit"] = h.makeFrame(true, secondRowName .. "QuantityEdit")
+    _G[secondRowName .. "RemoveBtn"] = h.makeFrame(true, secondRowName .. "RemoveBtn")
+    _G[headerName .. "CollapseButton"] = h.makeFrame(true, headerName .. "CollapseButton")
+    if type(_G[headerName .. "CollapseButton"].SetPushedTexture) ~= "function" then
+        _G[headerName .. "CollapseButton"].SetPushedTexture = function() end
+    end
+    if type(_G[headerName .. "CollapseButton"].SetNormalTexture) ~= "function" then
+        _G[headerName .. "CollapseButton"].SetNormalTexture = function() end
+    end
+
+    scrollFrame.ScrollChild = scrollChild
+    scrollFrame.SetVerticalScroll = function(self, value)
+        self._verticalScroll = value
+    end
+    frame.ScrollFrame = scrollFrame
+    _G.KRTReserveListFrame = frame
+    _G.KRTReserveListFrameScrollFrame = scrollFrame
+    _G.KRTReserveListFrameScrollChild = scrollChild
+    _G.KRTReserveListFrameClearBtn = clearButton
+    _G.KRTReserveListFrameEditButton = editButton
+    _G.KRTReserveListFrameQueryButton = queryButton
+    _G.KRTReserveListFrameWhisperHelpButton = whisperHelpButton
+    _G.KRTReserveListFrameSoftResHelpText = softResHelpText
+    _G.KRTReserveListFrameSoftResAccept = softResAcceptCheck
+    _G.KRTReserveListFrameSoftResResponseWisp = softResResponseWispCheck
+    _G.KRTReserveListFrameSoftResAcceptStr = softResAcceptLabel
+    _G.KRTReserveListFrameSoftResResponseWispStr = responseWispLabel
+
+    _G.KRT_Reserves = {
+        Alice = {
+            playerNameDisplay = "Alice",
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", itemLink = "|cff0070dd|Hitem:1201:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r", quantity = 2 },
+            },
+        },
+        Bob = {
+            playerNameDisplay = "Bob",
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", itemLink = "|cff0070dd|Hitem:1201:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r", quantity = 2 },
+            },
+        },
+    }
+    h.addon.UI.Widgets.IsEnabled = function()
+        return true
+    end
+    h.addon.L.BtnCancel = "Cancel"
+    h.addon.L.BtnDelete = "Delete"
+    h.addon.L.BtnSave = "Save"
+    h.addon.L.StrConfirmApplyReserveEdits = "Apply %d reserve edit change(s)?"
+    h.addon.L.StrConfirmRemoveReserveRow = "Remove reserve for %s on item %s?"
+    h.addon.UI.Widgets.IsRegistered = function(widgetId)
+        return widgetId == "Reserves"
+    end
+    local definedConfirmPopups = {}
+    h.addon.UI.Popups.IsDefined = function(key)
+        return definedConfirmPopups[key] ~= nil
+    end
+    h.addon.UI.Popups.DefineConfirm = function(key, text, onAccept, cancelId, options)
+        definedConfirmPopups[key] = {
+            key = key,
+            text = text,
+            onAccept = onAccept,
+            cancelId = cancelId,
+            options = options,
+        }
+        return true
+    end
+    h.addon.UI.Popups.ShowConfirm = function(key, text, onAccept, cancelId, options)
+        if not definedConfirmPopups[key] then
+            h.addon.UI.Popups.DefineConfirm(key, text, onAccept, cancelId, options)
+        end
+        popupCalls[#popupCalls + 1] = definedConfirmPopups[key]
+        return true
+    end
+    local scaffold = h.addon.UI.Scaffold
+    local ensureModuleState = scaffold.EnsureModuleState
+    if type(ensureModuleState) ~= "function" then
+        ensureModuleState = function(module)
+            module.__krtUiState = module.__krtUiState or {}
+            return module.__krtUiState
+        end
+        scaffold.EnsureModuleState = ensureModuleState
+    end
+    scaffold.DefineModule = function(cfg)
+        local module = cfg.module
+        local uiState = ensureModuleState(module)
+
+        function module:BindUI()
+            if uiState.Bound then
+                return self.frame, self.refs
+            end
+
+            local frame = cfg.getFrame()
+            uiState.FrameName = frame and frame.GetName and frame:GetName() or uiState.FrameName
+            uiState.Loaded = uiState.FrameName ~= nil
+            self.frame = frame
+            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, uiState.FrameName) or {}
+
+            if cfg.bind then
+                cfg.bind(uiState.FrameName, frame, self.refs)
+            end
+            if cfg.localize then
+                cfg.localize(uiState.FrameName, frame, self.refs)
+                uiState.Localized = true
+            end
+
+            uiState.Bound = true
+            return self.frame, self.refs
+        end
+
+        function module:EnsureUI()
+            if not uiState.Bound then
+                self:BindUI()
+            end
+            return self.frame
+        end
+
+        function module:RequestRefresh(reason)
+            self:EnsureUI()
+            uiState.Dirty = true
+            uiState.Reason = reason
+            if cfg.refresh then
+                return cfg.refresh(uiState.FrameName, self.frame, self.refs, true, reason)
+            end
+            return nil
+        end
+
+        function module:Toggle()
+            local frame = self:EnsureUI()
+            if not frame then
+                return nil
+            end
+            if frame:IsShown() then
+                frame:Hide()
+            else
+                frame:Show()
+            end
+            return frame:IsShown()
+        end
+
+        function module:Hide()
+            local frame = self:EnsureUI()
+            if frame then
+                frame:Hide()
+            end
+        end
+    end
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Service = h.addon.Services.Reserves
+    if Service.Load then
+        Service:Load()
+    end
+    local wrappedSetQuantity = Service.SetPlayerReserveQuantity
+    Service.SetPlayerReserveQuantity = function(_, player, itemId, quantity)
+        setQuantityCount = setQuantityCount + 1
+        return wrappedSetQuantity(Service, player, itemId, quantity)
+    end
+    local wrappedRemove = Service.RemovePlayerReserve
+    Service.RemovePlayerReserve = function(_, player, itemId)
+        removeCount = removeCount + 1
+        return wrappedRemove(Service, player, itemId)
+    end
+
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", false, {
+        softResWhisperAdds = false,
+        softResWhisperReplies = false,
+    })
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", false, {
+        softResWhisperAdds = false,
+        softResWhisperReplies = false,
+    })
+    h:load("!KRT/Widgets/ReservesUI.lua")
+    local module = h.addon.Widgets.ReservesUI
+    module:RequestRefresh("rows")
+
+    local function findReserveRow(playerName)
+        local target = playerName and string.lower(tostring(playerName)) or nil
+        if not target then
+            return nil
+        end
+        for i = 1, 4 do
+            local row = _G["KRTReserveListFrameReserveRow" .. tostring(i)]
+            local rowName = row and row._playerName
+            if rowName and string.lower(tostring(rowName)) == target then
+                return row
+            end
+        end
+        return nil
+    end
+
+    local row = findReserveRow("Alice")
+    local secondRow = findReserveRow("Bob")
+    assertTrue(row ~= nil, "expected Alice reserve row to be rendered")
+    assertTrue(secondRow ~= nil, "expected Bob reserve row to be rendered")
+    local rowEdit = row.quantityEdit
+    local secondRowEdit = secondRow.quantityEdit
+    assertTrue(rowEdit ~= nil, "expected reserve edit box to be wired")
+    assertTrue(secondRowEdit ~= nil, "expected second reserve edit box to be wired")
+    local rowRemove = row.removeButton
+    assertTrue(rowRemove ~= nil, "expected reserve remove button to be wired")
+
+    editButton.OnClick(editButton)
+    rowEdit:SetText("5")
+    rowEdit.OnEnterPressed(rowEdit)
+    assertEqual(setQuantityCount, 1, "expected Enter to commit row edit value")
+
+    rowEdit:SetText("9")
+    secondRowEdit:SetText("8")
+    editButton.OnClick(editButton)
+    assertEqual(#popupCalls, 1, "expected edit-off with changed rows to request confirmation")
+    assertEqual(popupCalls[1].key, "KRT_RESERVES_APPLY_EDITS", "expected edit confirmation popup key")
+    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmApplyReserveEdits:format(2), "expected edit confirmation text")
+    assertEqual(popupCalls[1].options.button1, h.addon.L.BtnSave, "expected edit confirmation save button")
+    assertEqual(popupCalls[1].options.button2, h.addon.L.BtnCancel, "expected edit confirmation cancel button")
+    assertEqual(editButton._krtReserveEditMode, true, "expected edit mode to remain active before acceptance")
+    assertEqual(setQuantityCount, 1, "expected edits to wait for confirmation")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].quantity, 5, "expected row edits already accepted via Enter to persist")
+    assertEqual(_G.KRT_Reserves.Bob.reserves[1].quantity, 2, "expected edit-off changes for non-enter path to wait for confirmation")
+    assertEqual(type(popupCalls[1].onAccept), "function", "expected an accept callback")
+    if type(popupCalls[1].onAccept) == "function" then
+        popupCalls[1].onAccept()
+    end
+    assertEqual(setQuantityCount, 3, "expected toggling edit mode off to commit all visible row edit values after acceptance")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].quantity, 9, "expected edit-off commit to persist quantity")
+    assertEqual(_G.KRT_Reserves.Bob.reserves[1].quantity, 8, "expected edit-off commit to preserve later row edits across refreshes")
+    assertEqual(editButton._krtReserveEditMode, false, "expected edit mode to exit after acceptance")
+
+    popupCalls = {}
+    editButton.OnClick(editButton)
+    secondRow = findReserveRow("Bob")
+    assertTrue(secondRow ~= nil, "expected Bob row after confirmed edit refresh")
+    secondRowEdit = secondRow.quantityEdit
+    secondRowEdit:SetText("7")
+    editButton.OnClick(editButton)
+    assertEqual(#popupCalls, 1, "expected second edit-off confirmation to reuse a refreshed popup callback")
+    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmApplyReserveEdits:format(1), "expected second edit confirmation text to be refreshed")
+    assertEqual(setQuantityCount, 3, "expected second edit-off changes to wait for confirmation")
+    popupCalls[1].onAccept()
+    assertEqual(setQuantityCount, 4, "expected second edit-off confirmation to apply the current pending edit")
+    assertEqual(_G.KRT_Reserves.Bob.reserves[1].quantity, 7, "expected second edit-off confirmation to apply Bob's current value")
+    assertEqual(editButton._krtReserveEditMode, false, "expected edit mode to exit after second acceptance")
+
+    popupCalls = {}
+    editButton.OnClick(editButton)
+    editButton.OnClick(editButton)
+    assertEqual(#popupCalls, 0, "expected edit mode off to skip confirmation with no changed edits")
+    assertEqual(editButton._krtReserveEditMode, false, "expected edit mode to toggle off when no row edits changed")
+
+    removeCount = 0
+    row = findReserveRow("Alice")
+    rowRemove = row.removeButton
+    rowRemove.OnClick(rowRemove)
+    assertEqual(removeCount, 0, "expected remove action inactive while edit mode is off")
+
+    editButton.OnClick(editButton)
+    assertEqual(editButton._krtReserveEditMode, true, "expected edit mode to enable before remove confirmation")
+    row = findReserveRow("Alice")
+    rowEdit = row.quantityEdit
+    rowRemove = row.removeButton
+    rowEdit:SetText("bad")
+    rowEdit.OnEscapePressed(rowEdit)
+    assertEqual(rowEdit:GetText(), "9", "expected escape to restore committed row value")
+    popupCalls = {}
+
+    rowRemove.OnClick(rowRemove)
+    assertEqual(#popupCalls, 1, "expected remove action to request confirmation while edit mode is on")
+    assertEqual(popupCalls[1].key, "KRT_RESERVES_REMOVE_ROW", "expected remove confirmation popup key")
+    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmRemoveReserveRow:format("Alice", "1201"), "expected remove confirmation text")
+    assertEqual(popupCalls[1].options.button1, h.addon.L.BtnDelete, "expected remove confirmation button text")
+    assertEqual(popupCalls[1].options.button2, h.addon.L.BtnCancel, "expected remove confirmation cancel text")
+    assertEqual(removeCount, 0, "expected remove action to wait for confirmation")
+    popupCalls[1].onAccept()
+    assertEqual(removeCount, 1, "expected remove action to call service API after confirmation")
+    assertEqual(_G.KRT_Reserves.Alice, nil, "expected removal to clear player container for last reserve")
+    assertTrue(_G.KRT_Reserves.Bob ~= nil, "expected removing one player reserve to preserve other players")
+
+    popupCalls = {}
+    local bobRow = findReserveRow("Bob")
+    assertTrue(bobRow ~= nil, "expected Bob row after confirmed Alice remove refresh")
+    bobRow.removeButton.OnClick(bobRow.removeButton)
+    assertEqual(#popupCalls, 1, "expected second remove confirmation to reuse a refreshed popup callback")
+    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmRemoveReserveRow:format("Bob", "1201"), "expected second remove confirmation text to be refreshed")
+    assertEqual(removeCount, 1, "expected second remove action to wait for confirmation")
+    popupCalls[1].onAccept()
+    assertEqual(removeCount, 2, "expected second remove confirmation to remove the current player")
+    assertEqual(_G.KRT_Reserves.Bob, nil, "expected refreshed remove confirmation to remove Bob")
+end)
+
+test("reserves ui keeps player-name alignment with fixed delete slot", function()
+    local h = newHarness()
+
+    local frame = h.makeFrame(true, "KRTReserveListFrame")
+    local scrollFrame = h.makeFrame(true, "KRTReserveListFrameScrollFrame")
+    local scrollChild = h.makeFrame(true, "KRTReserveListFrameScrollChild")
+    local clearButton = h.makeFrame(true, "KRTReserveListFrameClearBtn")
+    local editButton = h.makeFrame(true, "KRTReserveListFrameEditButton")
+    local queryButton = h.makeFrame(true, "KRTReserveListFrameQueryButton")
+    local whisperHelpButton = h.makeFrame(true, "KRTReserveListFrameWhisperHelpButton")
+    local softResHelpText = h.makeFrame(true, "KRTReserveListFrameSoftResHelpText")
+    local softResAcceptCheck = h.makeFrame(true, "KRTReserveListFrameSoftResAccept")
+    local softResResponseWispCheck = h.makeFrame(true, "KRTReserveListFrameSoftResResponseWisp")
+    local softResAcceptLabel = h.makeFrame(true, "KRTReserveListFrameSoftResAcceptStr")
+    local responseWispLabel = h.makeFrame(true, "KRTReserveListFrameSoftResResponseWispStr")
+
+    local rowName = "KRTReserveListFrameReserveRow1"
+    local secondRowName = "KRTReserveListFrameReserveRow2"
+    local headerName = "KRTReserveListFrameReserveHeader1"
+    _G[rowName .. "Name"] = h.makeFrame(true, rowName .. "Name")
+    _G[rowName .. "Quantity"] = h.makeFrame(true, rowName .. "Quantity")
+    _G[rowName .. "QuantityEdit"] = h.makeFrame(true, rowName .. "QuantityEdit")
+    _G[rowName .. "RemoveBtn"] = h.makeFrame(true, rowName .. "RemoveBtn")
+    _G[rowName .. "EditSlot"] = h.makeFrame(true, rowName .. "EditSlot")
+
+    _G[secondRowName .. "Name"] = h.makeFrame(true, secondRowName .. "Name")
+    _G[secondRowName .. "Quantity"] = h.makeFrame(true, secondRowName .. "Quantity")
+    _G[secondRowName .. "QuantityEdit"] = h.makeFrame(true, secondRowName .. "QuantityEdit")
+    _G[secondRowName .. "EditSlot"] = h.makeFrame(true, secondRowName .. "EditSlot")
+    _G[headerName .. "CollapseButton"] = h.makeFrame(true, headerName .. "CollapseButton")
+    if type(_G[headerName .. "CollapseButton"].SetPushedTexture) ~= "function" then
+        _G[headerName .. "CollapseButton"].SetPushedTexture = function() end
+    end
+    if type(_G[headerName .. "CollapseButton"].SetNormalTexture) ~= "function" then
+        _G[headerName .. "CollapseButton"].SetNormalTexture = function() end
+    end
+
+    scrollFrame.ScrollChild = scrollChild
+    scrollFrame.SetVerticalScroll = function(self, value)
+        self._verticalScroll = value
+    end
+    frame.ScrollFrame = scrollFrame
+    _G.KRTReserveListFrame = frame
+    _G.KRTReserveListFrameScrollFrame = scrollFrame
+    _G.KRTReserveListFrameScrollChild = scrollChild
+    _G.KRTReserveListFrameClearBtn = clearButton
+    _G.KRTReserveListFrameEditButton = editButton
+    _G.KRTReserveListFrameQueryButton = queryButton
+    _G.KRTReserveListFrameWhisperHelpButton = whisperHelpButton
+    _G.KRTReserveListFrameSoftResHelpText = softResHelpText
+    _G.KRTReserveListFrameSoftResAccept = softResAcceptCheck
+    _G.KRTReserveListFrameSoftResResponseWisp = softResResponseWispCheck
+    _G.KRTReserveListFrameSoftResAcceptStr = softResAcceptLabel
+    _G.KRTReserveListFrameSoftResResponseWispStr = responseWispLabel
+
+    _G.KRT_Reserves = {
+        Alice = {
+            playerNameDisplay = "Alice",
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", itemLink = "|cff0070dd|Hitem:1201:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r", quantity = 1 },
+            },
+        },
+        Bob = {
+            playerNameDisplay = "Bob",
+            reserves = { { rawID = 1202, itemName = "Aged Core Leather", itemLink = "|cff0070dd|Hitem:1202:0:0:0:0:0:0:0|h[Aged Core Leather]|h|r", quantity = 1 } },
+        },
+    }
+
+    h.addon.UI.Widgets.IsEnabled = function()
+        return true
+    end
+    h.addon.UI.Widgets.IsRegistered = function(widgetId)
+        return widgetId == "Reserves"
+    end
+
+    local scaffold = h.addon.UI.Scaffold
+    local ensureModuleState = scaffold.EnsureModuleState
+    if type(ensureModuleState) ~= "function" then
+        ensureModuleState = function(module)
+            module.__krtUiState = module.__krtUiState or {}
+            return module.__krtUiState
+        end
+        scaffold.EnsureModuleState = ensureModuleState
+    end
+    scaffold.DefineModule = function(cfg)
+        local module = cfg.module
+        local uiState = ensureModuleState(module)
+
+        function module:BindUI()
+            if uiState.Bound then
+                return self.frame, self.refs
+            end
+
+            local frame = cfg.getFrame()
+            uiState.FrameName = frame and frame.GetName and frame:GetName() or uiState.FrameName
+            uiState.Loaded = uiState.FrameName ~= nil
+            self.frame = frame
+            self.refs = cfg.acquireRefs and cfg.acquireRefs(frame, uiState.FrameName) or {}
+
+            if cfg.bind then
+                cfg.bind(uiState.FrameName, frame, self.refs)
+            end
+            if cfg.localize then
+                cfg.localize(uiState.FrameName, frame, self.refs)
+                uiState.Localized = true
+            end
+
+            uiState.Bound = true
+            return self.frame, self.refs
+        end
+
+        function module:EnsureUI()
+            if not uiState.Bound then
+                self:BindUI()
+            end
+            return self.frame
+        end
+
+        function module:RequestRefresh(reason)
+            self:EnsureUI()
+            uiState.Dirty = true
+            uiState.Reason = reason
+            if cfg.refresh then
+                return cfg.refresh(uiState.FrameName, self.frame, self.refs, true, reason)
+            end
+            return nil
+        end
+
+        function module:Toggle()
+            local frame = self:EnsureUI()
+            if not frame then
+                return nil
+            end
+            if frame:IsShown() then
+                frame:Hide()
+            else
+                frame:Show()
+            end
+            return frame:IsShown()
+        end
+
+        function module:Hide()
+            local frame = self:EnsureUI()
+            if frame then
+                frame:Hide()
+            end
+        end
+    end
+
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Widgets/ReservesUI.lua")
+    h.addon.Services.Reserves.GetDisplayList = function()
+        return {
+            {
+                itemId = 1201,
+                itemName = "Coldsteel Dagger",
+                itemLink = "|cff0070dd|Hitem:1201:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r",
+                players = {
+                    {
+                        name = "Alice",
+                        displayName = "Alice",
+                        quantity = 1,
+                        class = "WARRIOR",
+                    },
+                },
+            },
+            {
+                itemId = 1202,
+                itemName = "Aged Core Leather",
+                itemLink = "|cff0070dd|Hitem:1202:0:0:0:0:0:0:0|h[Aged Core Leather]|h|r",
+                players = {
+                    {
+                        name = "Bob",
+                        displayName = "Bob",
+                        quantity = 1,
+                        class = "MAGE",
+                    },
+                },
+            },
+        }
+    end
+    h.addon.Services.Reserves.HasData = function()
+        return true
+    end
+
+    local module = h.addon.Widgets.ReservesUI
+    _G[rowName] = nil
+    _G[secondRowName] = nil
+    _G[headerName] = nil
+    module:RequestRefresh("reserve_edit_slot_rows")
+
+    local function findReserveRow(playerName)
+        local target = playerName and string.lower(tostring(playerName)) or nil
+        if not target then
+            return nil
+        end
+        for i = 1, 4 do
+            local row = _G["KRTReserveListFrameReserveRow" .. tostring(i)]
+            local rowName = row and row._playerName
+            if rowName and string.lower(tostring(rowName)) == target then
+                return row
+            end
+        end
+        return nil
+    end
+
+    local aliceRow = findReserveRow("Alice")
+    local bobRow = findReserveRow("Bob")
+    assertTrue(aliceRow ~= nil, "expected Alice reserve row to be rendered")
+    assertTrue(bobRow ~= nil, "expected Bob reserve row to be rendered")
+    local aliceNamePoint = aliceRow.nameText._points and aliceRow.nameText._points[1]
+    local bobNamePoint = bobRow.nameText._points and bobRow.nameText._points[1]
+    assertTrue(aliceNamePoint ~= nil, "expected Alice name point to be set")
+    assertTrue(bobNamePoint ~= nil, "expected Bob name point to be set")
+
+    assertTrue(aliceRow.editSlot ~= nil, "expected Alice edit/delete slot to be wired")
+    assertTrue(bobRow.editSlot ~= nil, "expected Bob edit/delete slot to be wired")
+
+    editButton.OnClick(editButton)
+    assertTrue(aliceRow.removeButton:IsShown(), "expected Alice remove button to show in edit mode")
+    editButton.OnClick(editButton)
+    local aliceNamePointEdit = aliceRow.nameText._points and aliceRow.nameText._points[1]
+    local bobNamePointEdit = bobRow.nameText._points and bobRow.nameText._points[1]
+    assertEqual(aliceNamePoint.point, "LEFT", "expected Alice name anchor point to stay stable")
+    assertEqual(aliceNamePoint.point, aliceNamePointEdit.point, "expected Alice name anchor point to remain stable across modes")
+    assertEqual(aliceNamePoint.x, aliceNamePointEdit.x, "expected Alice name x anchor to remain stable across modes")
+    assertEqual(bobNamePoint.point, bobNamePointEdit.point, "expected Bob name anchor point to remain stable across modes")
+    assertEqual(bobNamePoint.x, bobNamePointEdit.x, "expected Bob name x anchor to remain stable across modes")
+    assertEqual(aliceNamePointEdit.x, bobNamePointEdit.x, "expected reserve row name anchor x to remain fixed without spec icons")
 end)
 
 test("reserves import window uses compact mode and format buttons", function()
@@ -11172,6 +11837,14 @@ test("reserves import window uses compact mode and format buttons", function()
     makeButtonRegions("KRTImportWindowFormatCsvButton")
 
     h:load("!KRT/Localization/localization.en.lua")
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", false, {
+        softResWhisperAdds = false,
+        softResWhisperReplies = false,
+    })
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", false, {
+        softResWhisperAdds = false,
+        softResWhisperReplies = false,
+    })
     h:load("!KRT/Widgets/ReservesUI.lua")
     local Import = h.addon.Widgets.ReservesUI.Import
 
@@ -17497,6 +18170,61 @@ test("reserves item-info query refreshes display after async item cache resolves
     assertTrue(type(displayList[1].itemLink) == "string" and displayList[1].itemLink:find("item:1301", 1, true) ~= nil, "expected display list to use async item link")
 end)
 
+test("reserves display list exposes global item groups with structured player rows", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            playerNameDisplay = "Alice",
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 2, plus = 4, class = "mage", source = "Boss A" },
+            },
+        },
+        Bob = {
+            playerNameDisplay = "Bob",
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 1, plus = 1, class = "WARRIOR", source = "Boss B" },
+            },
+        },
+    }
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local function findPlayer(row, name)
+        for i = 1, #(row and row.players or {}) do
+            local player = row.players[i]
+            if player and player.name == name then
+                return player
+            end
+        end
+        return nil
+    end
+
+    local Service = h.addon.Services.Reserves
+    Service:Load()
+
+    local displayList = Service:GetDisplayList()
+    assertEqual(#displayList, 1, "expected matching item ids from different sources to share one global item group")
+
+    local group = displayList[1]
+    assertEqual(group.itemId, 1201, "expected item group to expose item id")
+    assertEqual(group.itemName, "Coldsteel Dagger", "expected item group to expose item name")
+    assertTrue(type(group.players) == "table", "expected item group to expose structured player rows")
+    assertEqual(#group.players, 2, "expected both reserving players under one item group")
+
+    local alice = findPlayer(group, "Alice")
+    local bob = findPlayer(group, "Bob")
+    assertTrue(alice ~= nil, "expected Alice player row")
+    assertTrue(bob ~= nil, "expected Bob player row")
+    assertEqual(alice.displayName, "Alice", "expected player row display name")
+    assertEqual(alice.class, "MAGE", "expected normalized player row class token")
+    assertEqual(alice.classColor, "ff40c7eb", "expected normalized player row class color")
+    assertEqual(alice.quantity, 2, "expected player row quantity")
+    assertEqual(alice.plus, 4, "expected player row plus")
+    assertEqual(alice.checked, true, "expected player row checked state")
+    assertEqual(bob.quantity, 1, "expected Bob quantity")
+    assertEqual(bob.plus, 1, "expected Bob plus")
+end)
+
 test("reserves display rebuild reuses item row tables", function()
     local h = newHarness()
     _G.KRT_Reserves = {
@@ -17532,7 +18260,7 @@ test("reserves display rebuild reuses item row tables", function()
 
     assertTrue(firstColdsteel ~= nil, "expected initial Coldsteel row")
     assertTrue(firstFrost ~= nil, "expected initial Frost row")
-    local firstColdsteelTooltipLines = firstColdsteel.playersTooltipLines
+    local firstColdsteelPlayers = firstColdsteel.players
 
     _G.KRT_Reserves = {
         Alice = {
@@ -17554,10 +18282,16 @@ test("reserves display rebuild reuses item row tables", function()
 
     assertTrue(secondList == firstList, "expected display list table to be reused")
     assertTrue(secondColdsteel == firstColdsteel, "expected rebuild to reuse the same item row table")
-    assertTrue(secondColdsteel.playersTooltipLines == firstColdsteelTooltipLines, "expected reused row to keep its tooltip line buffer")
-    assertTextContains(secondColdsteel.playersTextFull, "Alice", "expected reused row to keep active reserve player text")
-    assertTextContains(secondColdsteel.playersTextFull, "Cara", "expected reused row to add new reserve player text")
-    assertTextNotContains(secondColdsteel.playersTextFull, "Bob", "expected reused row to clear stale reserve player text")
+    assertTrue(secondColdsteel.players == firstColdsteelPlayers, "expected reused row to keep its player row buffer")
+
+    local seen = {}
+    for i = 1, #(secondColdsteel.players or {}) do
+        local player = secondColdsteel.players[i]
+        seen[player.name] = player
+    end
+    assertTrue(seen.Alice ~= nil, "expected reused row to keep active reserve player row")
+    assertTrue(seen.Cara ~= nil, "expected reused row to add new reserve player row")
+    assertTrue(seen.Bob == nil, "expected reused row to clear stale reserve player row")
     assertTrue(secondFrost == nil, "expected removed item row to be cleared from display list")
     assertEqual(#secondList, 1, "expected display list tail rows to be cleared")
 end)
@@ -19126,6 +19860,94 @@ test("reserves service exposes count facade for entrypoints", function()
     assertEqual(entries, 0, "expected malformed explicit reserve store to report zero entries")
 end)
 
+test("reserves service persists quantity edits and updates display rows", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            playerNameDisplay = "Alice",
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 2, plus = 1 },
+            },
+        },
+    }
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Service = h.addon.Services.Reserves
+    Service:Load()
+
+    local changed, reason = Service:SetPlayerReserveQuantity("Alice", 1201, 5)
+    assertTrue(changed == true, "expected existing reserve quantity edit to succeed")
+    assertTrue(reason == nil or reason == "no_change", "expected no error reason on successful quantity edit")
+
+    local list = Service:GetDisplayList()
+    local player = list[1] and list[1].players and list[1].players[1]
+    assertEqual(player.quantity, 5, "expected display row quantity to update after edit")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].quantity, 5, "expected persisted quantity to update")
+end)
+
+test("reserves service persists plus edits and updates display rows", function()
+    local h = newHarness()
+    setHarnessOption(h, "Reserves", "srImportMode", 1, { srImportMode = 0 })
+    _G.KRT_Reserves = {
+        Alice = {
+            playerNameDisplay = "Alice",
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 1, plus = 1 },
+            },
+        },
+    }
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Service = h.addon.Services.Reserves
+    Service:Load()
+
+    local changed = Service:SetPlayerReservePlus("Alice", 1201, 9)
+    assertTrue(changed == true, "expected existing reserve plus edit to succeed")
+
+    local list = Service:GetDisplayList()
+    local player = list[1] and list[1].players and list[1].players[1]
+    assertEqual(player.plus, 9, "expected display row plus to update after edit")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].plus, 9, "expected persisted plus to update")
+end)
+
+test("reserves service promotes synced runtime cache and removes player rows on remove", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {}
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Modules/C.lua")
+
+    local Service = h.addon.Services.Reserves
+    Service:Load()
+
+    local syncSet = Service:SetSyncedData({
+        Alice = {
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 2, plus = 1 },
+                { rawID = 1202, itemName = "Frost Edge", quantity = 1, plus = 0 },
+            },
+        },
+    }, { source = "Master", mode = "multi" })
+    assertTrue(syncSet == true, "expected runtime synced cache to load for test")
+
+    local changed = Service:SetPlayerReserveQuantity("Alice", 1201, 3)
+    assertTrue(changed == true, "expected synced cache edit to promote and change local reserve")
+    assertTrue(Service:IsLocalDataAvailable() == true, "expected edited synced cache to become local")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].rawID, 1201, "expected local data to persist after edit")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].quantity, 3, "expected edited quantity to persist")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[2].rawID, 1202, "expected non-edited synced row to persist")
+
+    local removeOk = Service:RemovePlayerReserve("Alice", 1202)
+    assertTrue(removeOk == true, "expected remove to delete player item reserve")
+    assertTrue(_G.KRT_Reserves.Alice, "expected player to remain while one reserve still exists")
+
+    local removeLast = Service:RemovePlayerReserve("Alice", 1201)
+    assertTrue(removeLast == true, "expected removing final player reserve to delete player container")
+    assertEqual(_G.KRT_Reserves.Alice, nil, "expected player container removed when no reserves remain")
+    assertTrue(Service:HasData() == false, "expected all reserve data removed after final delete")
+end)
+
 test("reserves whisper softres ignores requests while disabled", function()
     local h = newHarness()
     local sent = {}
@@ -19273,7 +20095,7 @@ test("reserves whisper softres adds an item reserve and replies with success", f
     local changed = {}
     local itemLink = h.registerItem(39717, "Inexorable Sabatons", 4, "Icon39717")
     _G.KRT_Reserves = {}
-    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", true, { softResWhisperAdds = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
@@ -19320,7 +20142,7 @@ test("reserves whisper softres stores shared source for ambiguous item reserves"
     local sent = {}
     local itemLink = h.registerItem(39717, "Inexorable Sabatons", 4, "Icon39717")
     _G.KRT_Reserves = {}
-    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", true, { softResWhisperAdds = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
@@ -19353,7 +20175,7 @@ test("reserves whisper softres reports invalid item links for add requests", fun
     local h = newHarness()
     local sent = {}
     _G.KRT_Reserves = {}
-    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", true, { softResWhisperAdds = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
@@ -19371,6 +20193,88 @@ test("reserves whisper softres reports invalid item links for add requests", fun
     assertEqual(#sent, 1, "expected invalid add request to reply once")
     assertEqual(sent[1].msg, "Shift-click an item link after +sr or +softres to add a reserve.", "expected item-link help")
     assertEqual(h.addon.Services.Reserves:HasData(), false, "expected invalid add request to avoid creating reserves")
+end)
+
+test("reserves whisper softres requires add option to add reserves", function()
+    local h = newHarness()
+    local sent = {}
+    local itemLink = h.registerItem(39717, "Inexorable Sabatons", 4, "Icon39717")
+    _G.KRT_Reserves = {}
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", false, { softResWhisperAdds = false })
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Modules/LootSources.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+    h.addon.Services.Reserves:Load()
+    h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr " .. itemLink, "Alice")
+    assertEqual(h.addon.Services.Reserves:HasData(), false, "expected add requests to be blocked when add option is disabled")
+    assertEqual(#sent, 0, "expected disabled add option to produce no add whisper response")
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", true, { softResWhisperAdds = true })
+    h:load("!KRT/Localization/localization.en.lua")
+    h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr " .. itemLink, "Alice")
+    local entries = h.addon.Services.Reserves:GetPlayerReserveEntries("Alice")
+    assertTrue(entries[1] ~= nil, "expected add requests to persist when add option is enabled")
+end)
+
+test("reserves whisper softres does not add reserves when only reply option is enabled", function()
+    local h = newHarness()
+    local sent = {}
+    local itemLink = h.registerItem(39717, "Inexorable Sabatons", 4, "Icon39717")
+    _G.KRT_Reserves = {}
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", false, { softResWhisperAdds = false })
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+    h.addon.Services.Reserves:Load()
+
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr " .. itemLink, "Alice")
+
+    assertTrue(handled == true, "expected add command to be handled when reply option is enabled")
+    assertEqual(#sent, 0, "expected add request to stay silent when add option is disabled")
+    assertEqual(h.addon.Services.Reserves:HasData(), false, "expected no reserves to be added when add option is disabled")
+end)
+
+test("reserves whisper softres replies without add option only when reply option enabled", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, itemName = "Coldsteel Dagger", quantity = 1 },
+            },
+        },
+    }
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", false, { softResWhisperAdds = false })
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Modules/C.lua")
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr", "Alice")
+
+    assertTrue(handled == true, "expected query command to be handled with replies enabled")
+    assertTrue(#sent >= 1, "expected reserve query reply to still happen when add option is disabled")
 end)
 
 test("reserves whisper softres denies normal raiders even with reserve data", function()

@@ -154,7 +154,8 @@ Canonical shape:
   `Master.announceOnDisenchant`
 - `Loot.lootWhispers`, `Loot.ignoreStacks`
 - `Rolls.countdownDuration`, `Rolls.countdownSimpleRaidMsg`, `Rolls.countdownRollsBlock`
-- `Reserves.softResWhisperReplies`, `Reserves.srImportMode`, `Reserves.nameAliases`
+- `Reserves.softResWhisperAdds`, `Reserves.softResWhisperReplies`,
+  `Reserves.srImportMode`, `Reserves.nameAliases`
 - `Minimap.minimapButton`, `Minimap.minimapPos`
 - `LootCounter.showLootCounterDuringMSRoll`
 - `UI.showTooltips`

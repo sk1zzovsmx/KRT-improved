@@ -3,52 +3,97 @@
 	<!-- ====== Reserve List Templates ====== -->
 	<Button name="KRTReserveHeaderTemplate" virtual="true">
 		<Size>
-			<AbsDimension x="320" y="28" />
+			<AbsDimension x="320" y="30" />
 		</Size>
+		<Frames>
+			<Button name="$parentItemIcon" inherits="KRTItemIconButtonTemplate" enableMouse="true">
+				<Size>
+					<AbsDimension x="26" y="26" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="3" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentItemNameHotspot" enableMouse="true">
+				<Size>
+					<AbsDimension x="170" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="34" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
 		<Layers>
-			<Layer level="ARTWORK">
-				<FontString name="$parentLabel" inherits="GameFontNormal">
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" file="Interface\Buttons\WHITE8x8">
 					<Anchors>
-						<Anchor point="CENTER" />
-					</Anchors>
-					<Font font="Fonts\\FRIZQT__.TTF" height="14" flags="OUTLINE" />
-					<Color r="1" g="0.82" b="0" a="1" />
-				</FontString>
-				<Texture name="$parentLeftLine" file="Interface\\Buttons\\WHITE8x8">
-					<Size>
-						<AbsDimension y="1" />
-					</Size>
-					<Anchors>
-						<Anchor point="RIGHT" relativeTo="$parentLabel" relativePoint="LEFT">
+						<Anchor point="TOPLEFT">
 							<Offset>
-								<AbsDimension x="-6" y="0" />
+								<AbsDimension x="-4" y="-1" />
 							</Offset>
 						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="2" y="1" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.22" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Size>
+						<AbsDimension x="170" y="18" />
+					</Size>
+					<Anchors>
 						<Anchor point="LEFT">
 							<Offset>
-								<AbsDimension x="4" y="0" />
+								<AbsDimension x="34" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
-					<Color r="1" g="1" b="1" a="0.3" />
-				</Texture>
-				<Texture name="$parentRightLine" file="Interface\\Buttons\\WHITE8x8">
+					<Color r="1" g="0.82" b="0" a="1" />
+				</FontString>
+				<FontString name="$parentCollapse" inherits="GameFontNormalSmall" justifyH="CENTER">
+					<Size>
+						<AbsDimension x="16" y="16" />
+					</Size>
+					<Anchors>
+						<Anchor point="RIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Font font="Fonts\\FRIZQT__.TTF" height="12" flags="OUTLINE" />
+					<Color r="1" g="0.82" b="0" a="1" />
+				</FontString>
+				<Texture name="$parentLine" file="Interface\Buttons\WHITE8x8">
 					<Size>
 						<AbsDimension y="1" />
 					</Size>
 					<Anchors>
-						<Anchor point="LEFT" relativeTo="$parentLabel" relativePoint="RIGHT">
+						<Anchor point="LEFT" relativeTo="$parentName" relativePoint="RIGHT">
 							<Offset>
-								<AbsDimension x="6" y="0" />
+								<AbsDimension x="8" y="0" />
 							</Offset>
 						</Anchor>
-						<Anchor point="RIGHT">
+						<Anchor point="RIGHT" relativeTo="$parentCollapse" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="-4" y="0" />
+								<AbsDimension x="-8" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
-					<Color r="1" g="1" b="1" a="0.3" />
+					<Color r="0" g="1" b="0" a="0.72" />
 				</Texture>
 			</Layer>
 		</Layers>
@@ -166,15 +211,16 @@
 		</Frames>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentBackground" file="Interface\\Buttons\\WHITE8x8">
+				<Texture name="$parentBackground" file="Interface\Buttons\WHITE8x8">
 					<Anchors>
 						<Anchor point="TOPLEFT" />
 						<Anchor point="BOTTOMRIGHT" />
 					</Anchors>
+					<Color r="0.04" g="0.06" b="0.09" a="0.30" />
 				</Texture>
 			</Layer>
 			<Layer level="BORDER">
-				<Texture name="$parentTopSeparator" file="Interface\\Buttons\\WHITE8x8" hidden="true">
+				<Texture name="$parentTopSeparator" file="Interface\Buttons\WHITE8x8" hidden="true">
 					<Size>
 						<AbsDimension y="1" />
 					</Size>
@@ -188,7 +234,7 @@
 					</Anchors>
 					<Color r="1" g="1" b="1" a="0.10" />
 				</Texture>
-				<Texture name="$parentBottomSeparator" file="Interface\\Buttons\\WHITE8x8">
+				<Texture name="$parentBottomSeparator" file="Interface\Buttons\WHITE8x8">
 					<Size>
 						<AbsDimension y="1" />
 					</Size>
@@ -218,14 +264,179 @@
 			</Layer>
 		</Layers>
 	</Frame>
+	<Button name="KRTReservePlayerRowTemplate" virtual="true">
+		<Size>
+			<AbsDimension x="320" y="24" />
+		</Size>
+		<Frames>
+			<Frame name="$parentEditSlot">
+				<Size>
+					<AbsDimension x="20" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="40" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Frame>
+			<Button name="$parentRemoveBtn" inherits="KRTActionButtonTemplate">
+				<Size>
+					<AbsDimension x="20" y="18" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="40" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<EditBox name="$parentQuantityEdit" inherits="KRTNumericInputTemplate" letters="3" hidden="true" autoFocus="false">
+				<Size>
+					<AbsDimension x="34" y="18" />
+				</Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset>
+							<AbsDimension x="-8" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</EditBox>
+		</Frames>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.04" g="0.06" b="0.09" a="0.30" />
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentTopSeparator" file="Interface\Buttons\WHITE8x8" hidden="true">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-4" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.10" />
+				</Texture>
+				<Texture name="$parentBottomSeparator" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" />
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-4" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.08" />
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString name="$parentName" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Size>
+						<AbsDimension x="190" y="16" />
+					</Size>
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentEditSlot" relativePoint="RIGHT">
+							<Offset>
+								<AbsDimension x="8" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentQuantity" inherits="GameFontNormalSmall" justifyH="RIGHT">
+					<Size>
+						<AbsDimension x="34" y="16" />
+					</Size>
+					<Anchors>
+						<Anchor point="RIGHT">
+							<Offset>
+								<AbsDimension x="-8" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Font font="Fonts\\FRIZQT__.TTF" height="11" flags="OUTLINE" />
+					<Color r="1" g="1" b="1" a="1" />
+				</FontString>
+			</Layer>
+		</Layers>
+	</Button>
 	<!-- ====== End Reserve List Templates ====== -->
 	<Frame name="KRTReserveListFrame" inherits="KRTWindowTemplate" toplevel="true" hidden="true" frameStrata="MEDIUM">
 		<Size>
-			<AbsDimension x="368" y="520" />
+			<AbsDimension x="368" y="596" />
 		</Size>
 		<Anchors>
 			<Anchor point="CENTER" />
 		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="$parentSoftResHelpText" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
+					<Size>
+						<AbsDimension x="216" y="28" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="16" y="40" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSoftResStatusText" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
+					<Size>
+						<AbsDimension x="320" y="16" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="16" y="8" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="1" />
+				</FontString>
+				<FontString name="$parentSoftResAcceptStr" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
+					<Size>
+						<AbsDimension x="74" y="16" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="278" y="53" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSoftResResponseWispStr" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
+					<Size>
+						<AbsDimension x="86" y="16" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="278" y="31" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
 		<Frames>
 			<!-- Scroll frame with scroll child -->
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
@@ -237,7 +448,7 @@
 					</Anchor>
 					<Anchor point="BOTTOMRIGHT">
 						<Offset>
-							<AbsDimension x="-32" y="50" />
+							<AbsDimension x="-32" y="116" />
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -268,7 +479,7 @@
 				<Anchors>
 					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="16" y="20" />
+							<AbsDimension x="16" y="80" />
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -280,7 +491,7 @@
 				<Anchors>
 					<Anchor point="BOTTOM" relativePoint="BOTTOM">
 						<Offset>
-							<AbsDimension x="0" y="20" />
+							<AbsDimension x="0" y="80" />
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -292,11 +503,35 @@
 				<Anchors>
 					<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT">
 						<Offset>
-							<AbsDimension x="-16" y="20" />
+							<AbsDimension x="-16" y="80" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 			</Button>
+			<CheckButton name="$parentSoftResAccept" inherits="InterfaceOptionsCheckButtonTemplate">
+				<Size>
+					<AbsDimension x="20" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="252" y="48" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<CheckButton name="$parentSoftResResponseWisp" inherits="InterfaceOptionsCheckButtonTemplate">
+				<Size>
+					<AbsDimension x="20" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="252" y="28" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
 		</Frames>
 	</Frame>
 	<!-- ====== Start of Reserve Import Window ====== -->

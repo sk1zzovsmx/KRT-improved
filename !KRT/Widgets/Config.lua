@@ -113,7 +113,6 @@ do
         "announceOnBank",
         "announceOnDisenchant",
         "lootWhispers",
-        "softResWhisperReplies",
         "countdownRollsBlock",
         "screenReminder",
         "ignoreStacks",
@@ -149,7 +148,6 @@ do
         screenReminder = "Master",
         showLootCounterDuringMSRoll = "LootCounter",
         showTooltips = "UI",
-        softResWhisperReplies = "Reserves",
         sortAscending = "Master",
         syncPushPlayer = "Logger",
         syncRequirePlayer = "Logger",
@@ -719,7 +717,6 @@ do
                 announceOnBank = false,
                 announceOnDisenchant = false,
                 lootWhispers = false,
-                softResWhisperReplies = true,
                 countdownDuration = 5,
             })
         elseif presetName == "verbose" then
@@ -731,7 +728,6 @@ do
                 announceOnBank = true,
                 announceOnDisenchant = true,
                 lootWhispers = true,
-                softResWhisperReplies = true,
                 countdownDuration = 10,
             })
         else
@@ -743,7 +739,6 @@ do
                 announceOnBank = false,
                 announceOnDisenchant = false,
                 lootWhispers = false,
-                softResWhisperReplies = true,
                 countdownDuration = 5,
             })
         end
@@ -764,7 +759,6 @@ do
         setText(frameName, "announceOnBankStr", L.StrConfigAnnounceOnBank)
         setText(frameName, "announceOnDisenchantStr", L.StrConfigAnnounceOnDisenchant)
         setText(frameName, "lootWhispersStr", L.StrConfigLootWhisper)
-        setText(frameName, "softResWhisperRepliesStr", L.StrConfigSoftResWhisperReplies)
         setText(frameName, "countdownRollsBlockStr", L.StrConfigCountdownRollsBlock)
         setText(frameName, "screenReminderStr", L.StrConfigScreenReminder)
         setText(frameName, "ignoreStacksStr", L.StrConfigIgnoreStacks)
@@ -785,7 +779,6 @@ do
         setText(frameName, "announceOnBankDesc", L.StrConfigAnnounceOnBankDesc)
         setText(frameName, "announceOnDisenchantDesc", L.StrConfigAnnounceOnDisenchantDesc)
         setText(frameName, "lootWhispersDesc", L.StrConfigLootWhisperDesc)
-        setText(frameName, "softResWhisperRepliesDesc", L.StrConfigSoftResWhisperRepliesDesc)
         setText(frameName, "countdownRollsBlockDesc", L.StrConfigCountdownRollsBlockDesc)
         setText(frameName, "screenReminderDesc", L.StrConfigScreenReminderDesc)
         setText(frameName, "ignoreStacksDesc", L.StrConfigIgnoreStacksDesc)
@@ -934,7 +927,6 @@ do
         setChecked(frameName, "announceOnBank", GetOptionByKey("announceOnBank") == true)
         setChecked(frameName, "announceOnDisenchant", GetOptionByKey("announceOnDisenchant") == true)
         setChecked(frameName, "lootWhispers", GetOptionByKey("lootWhispers") == true)
-        setChecked(frameName, "softResWhisperReplies", GetOptionByKey("softResWhisperReplies") == true)
         setChecked(frameName, "countdownRollsBlock", GetOptionByKey("countdownRollsBlock") == true)
         setChecked(frameName, "screenReminder", GetOptionByKey("screenReminder") == true)
         setChecked(frameName, "ignoreStacks", GetOptionByKey("ignoreStacks") == true)
