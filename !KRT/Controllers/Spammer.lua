@@ -19,10 +19,12 @@ local Tooltips = UI.Tooltips
 local Strings = feature.Strings
 local Services = feature.Services
 
+local SpammerSvc = Services.Spammer
+
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
-local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
+local tinsert, tremove = table.insert, table.remove
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 local find, strlen = string.find, string.len
 local gsub = string.gsub
@@ -31,11 +33,21 @@ local tostring, tonumber = tostring, tonumber
 local requireServiceMethod = Database.RequireServiceMethod
 
 local Chat = Services.Chat
+local DraftSvc = SpammerSvc and SpammerSvc.Draft or nil
 local ChatApi = {
     GetSpamRuntimeState = requireServiceMethod("Chat", Chat, "GetSpamRuntimeState"),
     StartSpamCycle = requireServiceMethod("Chat", Chat, "StartSpamCycle"),
     StopSpamCycle = requireServiceMethod("Chat", Chat, "StopSpamCycle"),
     PauseSpamCycle = requireServiceMethod("Chat", Chat, "PauseSpamCycle"),
+}
+local Draft = {
+    GetDefaultDuration = requireServiceMethod("Spammer.Draft", DraftSvc, "GetDefaultDuration"),
+    GetDefaultOutput = requireServiceMethod("Spammer.Draft", DraftSvc, "GetDefaultOutput"),
+    GetStore = requireServiceMethod("Spammer.Draft", DraftSvc, "GetStore"),
+    GetChannels = requireServiceMethod("Spammer.Draft", DraftSvc, "GetChannels"),
+    BuildOutput = requireServiceMethod("Spammer.Draft", DraftSvc, "BuildOutput"),
+    BuildPreview = requireServiceMethod("Spammer.Draft", DraftSvc, "BuildPreview"),
+    ClearDraft = requireServiceMethod("Spammer.Draft", DraftSvc, "ClearDraft"),
 }
 
 -- =========== LFM Spam Module  =========== --
@@ -47,8 +59,8 @@ do
 
     local getFrame = makeModuleFrameGetter(module, "KRTSpammer")
     -- Defaults / constants
-    local DEFAULT_DURATION_STR = "60"
-    local DEFAULT_OUTPUT = "LFM"
+    local DEFAULT_DURATION_STR = Draft.GetDefaultDuration()
+    local DEFAULT_OUTPUT = Draft.GetDefaultOutput()
 
     -- Runtime state
     local loaded = false
@@ -134,21 +146,6 @@ do
     local clearSpammer
 
     -- ----- Private helpers ----- --
-    local function getSpammerStore()
-        if type(KRT_Spammer) ~= "table" then
-            KRT_Spammer = {}
-        end
-        return KRT_Spammer
-    end
-
-    local function getSpammerChannels(store)
-        store = store or getSpammerStore()
-        if type(store.Channels) ~= "table" then
-            store.Channels = {}
-        end
-        return store.Channels
-    end
-
     function uiState.AcquireRefs(frame)
         local refs = {
             clearBtn = Frames.GetRef(frame, "ClearBtn"),
@@ -216,97 +213,11 @@ do
         return ChatApi.GetSpamRuntimeState(Chat)
     end
 
-    local function buildSpammerOutput(state, defaultOutput)
-        local baseOutput = defaultOutput or DEFAULT_OUTPUT
-        local source = (type(state) == "table") and state or {}
-        local outBuf = { baseOutput }
-
-        local name = source.name or ""
-        if name ~= "" then
-            tinsert(outBuf, " ")
-            tinsert(outBuf, name)
-        end
-
-        local needParts = {}
-        local function addNeed(count, label, class)
-            count = tonumber(count) or 0
-            if count <= 0 then
-                return
-            end
-
-            local text = count .. " " .. label
-            if class and class ~= "" then
-                text = text .. " (" .. class .. ")"
-            end
-            needParts[#needParts + 1] = text
-        end
-
-        addNeed(source.tank, L.StrTank, source.tankClass)
-        addNeed(source.healer, L.StrHealer, source.healerClass)
-        addNeed(source.melee, L.StrMelee, source.meleeClass)
-        addNeed(source.ranged, L.StrRanged, source.rangedClass)
-
-        if #needParts > 0 then
-            tinsert(outBuf, " - ")
-            tinsert(outBuf, L.StrSpammerNeedStr)
-            tinsert(outBuf, " ")
-            tinsert(outBuf, tconcat(needParts, ", "))
-        end
-
-        if source.message and source.message ~= "" then
-            tinsert(outBuf, " - ")
-            if Strings.FindAchievement then
-                tinsert(outBuf, Strings.FindAchievement(source.message))
-            else
-                tinsert(outBuf, source.message)
-            end
-        end
-
-        local output = tconcat(outBuf)
-        if output == baseOutput then
-            return output
-        end
-
-        local total = (tonumber(source.tank) or 0) + (tonumber(source.healer) or 0) + (tonumber(source.melee) or 0) + (tonumber(source.ranged) or 0)
-
-        local is25 = (name ~= "" and name:match("%f[%d]25%f[%D]")) ~= nil
-        local maxSize = is25 and 25 or 10
-        return output .. " (" .. (maxSize - total) .. "/" .. maxSize .. ")"
-    end
-
-    local function buildStateFromStore(store)
-        store = store or getSpammerStore()
-        return {
-            name = store.Name or "",
-            tank = tonumber(store.Tank) or 0,
-            tankClass = store.TankClass or "",
-            healer = tonumber(store.Healer) or 0,
-            healerClass = store.HealerClass or "",
-            melee = tonumber(store.Melee) or 0,
-            meleeClass = store.MeleeClass or "",
-            ranged = tonumber(store.Ranged) or 0,
-            rangedClass = store.RangedClass or "",
-            message = store.Message or "",
-            duration = tostring(store.Duration or DEFAULT_DURATION_STR),
-        }
-    end
-
-    local function buildPanelPreview()
-        local store = getSpammerStore()
-        local state = buildStateFromStore(store)
-        local output = buildSpammerOutput(state, DEFAULT_OUTPUT)
-        return {
-            output = output,
-            length = strlen(output),
-            duration = state.duration,
-        }
-    end
-
     -- Deterministic: sync Duration immediately from UI/SV (no waiting for preview tick)
     local function syncDurationNow()
         local value
         local frame = getFrame()
-        local store = getSpammerStore()
+        local store = Draft.GetStore()
 
         if frame and frame:IsShown() then
             local box = getNamedPart("Duration")
@@ -483,10 +394,10 @@ do
 
         local boxName = box:GetName()
         local target = gsub(boxName, frameName, "")
-        local store = getSpammerStore()
+        local store = Draft.GetStore()
 
         if find(target, "Chat") then
-            local channels = getSpammerChannels(store)
+            local channels = Draft.GetChannels(store)
 
             local channel = gsub(target, "Chat", "")
             local id = tonumber(channel) or select(1, GetChannelName(channel))
@@ -530,7 +441,7 @@ do
 
     startSpam = function()
         ensureReadyForStart()
-        local store = getSpammerStore()
+        local store = Draft.GetStore()
 
         if not addon.WithinRange(strlen(finalOutput), 4, 255) then
             return
@@ -542,7 +453,7 @@ do
             ChatApi.StartSpamCycle(Chat, {
                 duration = duration,
                 output = finalOutput,
-                channels = getSpammerChannels(store),
+                channels = Draft.GetChannels(store),
                 resetCountdown = false,
                 resetRun = false,
                 onTick = refreshSpamUi,
@@ -556,7 +467,7 @@ do
             ChatApi.StartSpamCycle(Chat, {
                 duration = duration,
                 output = finalOutput,
-                channels = getSpammerChannels(store),
+                channels = Draft.GetChannels(store),
                 resetCountdown = true,
                 resetRun = true,
                 onTick = refreshSpamUi,
@@ -583,11 +494,11 @@ do
 
     function module:RequestClear()
         clearSpammer()
-        return buildPanelPreview()
+        return Draft.BuildPreview(Draft.GetStore(), DEFAULT_OUTPUT)
     end
 
     function module:RequestPreview()
-        return buildPanelPreview()
+        return Draft.BuildPreview(Draft.GetStore(), DEFAULT_OUTPUT)
     end
 
     pauseSpam = function()
@@ -615,12 +526,8 @@ do
 
     -- Clear
     clearSpammer = function()
-        local store = getSpammerStore()
-        for k, _ in pairs(store) do
-            if k ~= "Channels" then
-                store[k] = nil
-            end
-        end
+        local store = Draft.GetStore()
+        Draft.ClearDraft(store)
 
         finalOutput = DEFAULT_OUTPUT
         resetLastState()
@@ -632,8 +539,8 @@ do
         end
 
         local durationBox = getNamedPart("Duration")
-        store.Duration = DEFAULT_DURATION_STR
         duration = DEFAULT_DURATION_STR
+        store.Duration = DEFAULT_DURATION_STR
 
         if durationBox then
             EditBoxes.Reset(durationBox)
@@ -862,7 +769,7 @@ do
         end
 
         if changed then
-            finalOutput = buildSpammerOutput(lastState, DEFAULT_OUTPUT)
+            finalOutput = Draft.BuildOutput(lastState, DEFAULT_OUTPUT)
 
             local out = getNamedPart("Output")
             if out then
@@ -894,7 +801,7 @@ do
         end
 
         duration = lastState.duration or DEFAULT_DURATION_STR
-        local store = getSpammerStore()
+        local store = Draft.GetStore()
         store.Duration = duration
 
         updateControls()
@@ -908,7 +815,7 @@ do
         end
 
         if not loaded then
-            local store = getSpammerStore()
+            local store = Draft.GetStore()
             store.Duration = store.Duration or DEFAULT_DURATION_STR
 
             resetAllChannelCheckboxes()
@@ -956,6 +863,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/Strings",
             "Modules/UI/Frames",
             "Modules/UI/Visuals",
+            "Services/Spammer/Draft",
             "Services/Chat",
         },
     })

@@ -417,23 +417,7 @@ local function countReserves()
     if type(reserves) == "table" and type(reserves.GetCounts) == "function" then
         return reserves:GetCounts()
     end
-
-    local saved = _G.KRT_Reserves
-    if type(saved) ~= "table" then
-        return 0, 0
-    end
-
-    local players = 0
-    local entries = 0
-    for _, player in pairs(saved) do
-        if type(player) == "table" then
-            players = players + 1
-            if type(player.reserves) == "table" then
-                entries = entries + #player.reserves
-            end
-        end
-    end
-    return players, entries
+    return 0, 0
 end
 
 local function getCurrentRaidSummary()

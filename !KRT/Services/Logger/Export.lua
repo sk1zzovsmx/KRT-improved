@@ -17,6 +17,13 @@ feature.EnsureServiceNamespace("Logger", "Export")
 local Logger = Services.Logger
 local Export = Logger.Export
 local Store = Logger.Store
+local Helpers = Logger.Helpers
+local formatRollTypeForExport = Helpers and Helpers.FormatRollTypeForExport or function(value)
+    return tonumber(value) or ""
+end
+local formatRollValueForExport = Helpers and Helpers.FormatRollValueForExport or function(value)
+    return tonumber(value) or ""
+end
 
 local HEADER_LOOT = {
     "raidNid",
@@ -203,8 +210,8 @@ function Export:GetLootCSV(raid, context)
                 loot.itemName or "",
                 loot.looter or "",
                 loot.looterClass or "",
-                tonumber(loot.rollType) or "",
-                tonumber(loot.rollValue) or "",
+                formatRollTypeForExport(loot.rollType),
+                formatRollValueForExport(loot.rollValue),
                 formatTimestamp(loot.time),
             }
         end
@@ -255,6 +262,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Init",
             "Modules/ModuleRegistry",
             "Services/Logger/Store",
+            "Services/Logger/Helpers",
         },
     })
     registry.SetLoaded("Services/Logger/Export")

@@ -19,21 +19,29 @@ local Primitives = UI.Primitives
 local EditBoxes = UI.EditBoxes
 local Strings = feature.Strings
 local Services = feature.Services
+local WarningsSvc = Services.Warnings
+local WarningStore = WarningsSvc and WarningsSvc.Store or nil
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
-local tconcat = table.concat
-local tinsert, tremove = table.insert, table.remove
 
 local tonumber, tostring = tonumber, tostring
-local lower = string.lower
 
 local requireServiceMethod = Database.RequireServiceMethod
 
 local Chat = Services.Chat
 local ChatApi = {
     AnnounceWarningMessage = requireServiceMethod("Chat", Chat, "AnnounceWarningMessage"),
+}
+local WarningStoreApi = {
+    GetStore = requireServiceMethod("Warnings.Store", WarningStore, "GetStore"),
+    GetWarning = requireServiceMethod("Warnings.Store", WarningStore, "GetWarning"),
+    EnsureDefaultTemplates = requireServiceMethod("Warnings.Store", WarningStore, "EnsureDefaultTemplates"),
+    BuildTemplatePreview = requireServiceMethod("Warnings.Store", WarningStore, "BuildTemplatePreview"),
+    ClearSavedWarnings = requireServiceMethod("Warnings.Store", WarningStore, "ClearSavedWarnings"),
+    DeleteWarning = requireServiceMethod("Warnings.Store", WarningStore, "DeleteWarning"),
+    SaveWarning = requireServiceMethod("Warnings.Store", WarningStore, "SaveWarning"),
 }
 
 -- =========== Warnings Frame Module  =========== --
@@ -54,65 +62,8 @@ do
     local tempName, tempContent
     local saveWarning, editWarning, deleteWarning, announceWarning
     local isEdit = false
-    local defaultWarningTemplates = {
-        {
-            name = "StrRaidWarningTemplatePullName",
-            content = "StrRaidWarningTemplatePullContent",
-            fallbackName = "Pull",
-            fallbackContent = "Pull in 10 seconds.",
-        },
-        {
-            name = "StrRaidWarningTemplateSpreadName",
-            content = "StrRaidWarningTemplateSpreadContent",
-            fallbackName = "Spread",
-            fallbackContent = "Spread out.",
-        },
-        {
-            name = "StrRaidWarningTemplateStackName",
-            content = "StrRaidWarningTemplateStackContent",
-            fallbackName = "Stack",
-            fallbackContent = "Stack on marker.",
-        },
-        {
-            name = "StrRaidWarningTemplateStopDpsName",
-            content = "StrRaidWarningTemplateStopDpsContent",
-            fallbackName = "Stop DPS",
-            fallbackContent = "Stop DPS now.",
-        },
-        {
-            name = "StrRaidWarningTemplateBloodlustName",
-            content = "StrRaidWarningTemplateBloodlustContent",
-            fallbackName = "Bloodlust",
-            fallbackContent = "Use Bloodlust/Heroism now.",
-        },
-        {
-            name = "StrRaidWarningTemplateBreakName",
-            content = "StrRaidWarningTemplateBreakContent",
-            fallbackName = "Break",
-            fallbackContent = "Break time. Be back soon.",
-        },
-    }
 
     -- ----- Private helpers ----- --
-    local function getWarningsStore()
-        if type(KRT_Warnings) ~= "table" then
-            KRT_Warnings = {}
-        end
-        return KRT_Warnings
-    end
-
-    local function getTemplateValue(template, key, fallbackKey)
-        local value = template and L[template[key]]
-        if type(value) == "string" and value ~= "" and value ~= template[key] and value ~= ("L." .. template[key]) then
-            return value
-        end
-        return template and template[fallbackKey] or ""
-    end
-
-    local function normalizeTemplateName(value)
-        local text = Strings.TrimText(value or "")
-        return text ~= "" and lower(text) or nil
-    end
 
     local function resetWarningState()
         selectedID = nil
@@ -122,76 +73,6 @@ do
         tempName = nil
         tempContent = nil
         isEdit = false
-    end
-
-    local function ensureDefaultTemplates(refreshReason)
-        local warnings = getWarningsStore()
-        local existing = {}
-        for i = 1, #warnings do
-            local key = normalizeTemplateName(warnings[i] and warnings[i].name)
-            if key then
-                existing[key] = true
-            end
-        end
-
-        local added = 0
-        for i = 1, #defaultWarningTemplates do
-            local template = defaultWarningTemplates[i]
-            local name = getTemplateValue(template, "name", "fallbackName")
-            local key = normalizeTemplateName(name)
-            if key and not existing[key] then
-                tinsert(warnings, {
-                    name = name,
-                    content = getTemplateValue(template, "content", "fallbackContent"),
-                })
-                existing[key] = true
-                added = added + 1
-            end
-        end
-
-        warningsDirty = true
-        fetched = false
-        if refreshReason ~= false and module.RequestRefresh then
-            module:RequestRefresh(refreshReason or "templates")
-        end
-        return {
-            added = added,
-            total = #warnings,
-        }
-    end
-
-    local function isDefaultTemplateWarning(warning)
-        if type(warning) ~= "table" then
-            return false
-        end
-        local warningName = normalizeTemplateName(warning.name)
-        local warningContent = tostring(warning.content or "")
-        for i = 1, #defaultWarningTemplates do
-            local template = defaultWarningTemplates[i]
-            local templateName = normalizeTemplateName(getTemplateValue(template, "name", "fallbackName"))
-            local templateContent = getTemplateValue(template, "content", "fallbackContent")
-            if warningName == templateName and warningContent == templateContent then
-                return true
-            end
-        end
-        return false
-    end
-
-    local function collectStockWarnings(warnings)
-        local stock = {}
-        if type(warnings) ~= "table" then
-            return stock
-        end
-        for i = 1, #warnings do
-            local warning = warnings[i]
-            if isDefaultTemplateWarning(warning) then
-                stock[#stock + 1] = {
-                    name = warning.name,
-                    content = warning.content,
-                }
-            end
-        end
-        return stock
     end
 
     function uiState.AcquireRefs(frame)
@@ -223,8 +104,8 @@ do
         end
         local bName = btn:GetName()
         local wID = tonumber(_G[bName .. "ID"]:GetText())
-        local warnings = getWarningsStore()
-        if warnings[wID] == nil then
+        local warning = WarningStoreApi.GetWarning(wID)
+        if warning == nil then
             return
         end
         if IsControlKeyDown() then
@@ -257,7 +138,7 @@ do
         _rowParts = { "ID", "Name" },
 
         getData = function(out)
-            local warnings = getWarningsStore()
+            local warnings = WarningStoreApi.GetStore()
             for i = 1, #warnings do
                 local w = warnings[i]
                 out[i] = { id = i, name = w and w.name or "" }
@@ -382,8 +263,7 @@ do
         local draftContent = Strings.TrimText(contentBox:GetText())
 
         if selectedID ~= nil then
-            local warnings = getWarningsStore()
-            local w = warnings[selectedID]
+            local w = WarningStoreApi.GetWarning(selectedID)
             if w == nil then
                 selectedID = nil
                 return
@@ -407,15 +287,14 @@ do
         if btn == nil or selectedID == nil then
             return
         end
-        local warnings = getWarningsStore()
-        if warnings[selectedID] == nil then
+        local deleteResult = WarningStoreApi.DeleteWarning(selectedID)
+        if deleteResult and deleteResult.deleted ~= true then
             selectedID = nil
             warningsDirty = true
             module:RequestRefresh()
             return
         end
-        tremove(warnings, selectedID)
-        local count = #warnings
+        local count = deleteResult and deleteResult.total or 0
         if count <= 0 then
             selectedID = nil
         elseif count == 1 then
@@ -429,19 +308,19 @@ do
 
     -- Announce Warning:
     function announceWarning(wID)
-        local warnings = getWarningsStore()
         if wID == nil then
             wID = (selectedID ~= nil) and selectedID or tempSelectedID
         end
 
         wID = tonumber(wID)
-        if not wID or wID <= 0 or warnings[wID] == nil then
+        local warning = WarningStoreApi.GetWarning(wID)
+        if warning == nil then
             return
         end
 
         tempSelectedID = nil -- Always clear temporary selected id:
 
-        return ChatApi.AnnounceWarningMessage(Chat, warnings[wID].content)
+        return ChatApi.AnnounceWarningMessage(Chat, warning.content)
     end
 
     function module:RequestAnnounce(wID)
@@ -449,54 +328,28 @@ do
     end
 
     function module:RequestEnsureDefaultTemplates()
-        return ensureDefaultTemplates("templates")
+        local result = WarningStoreApi.EnsureDefaultTemplates()
+        warningsDirty = true
+        fetched = false
+        if module.RequestRefresh then
+            module:RequestRefresh("templates")
+        end
+        return result
     end
 
     function module:RequestTemplatePreview()
-        local warnings = getWarningsStore()
-        local lines = {}
-        for i = 1, #warnings do
-            local warning = warnings[i]
-            if warning then
-                lines[#lines + 1] = tostring(i) .. ". " .. tostring(warning.name or "") .. ": " .. tostring(warning.content or "")
-            end
-        end
-        if #lines == 0 then
-            lines[1] = L.StrConfigRaidWarningPreviewEmpty or ""
-        end
-        return {
-            text = tconcat(lines, "\n"),
-            total = #warnings,
-        }
+        return WarningStoreApi.BuildTemplatePreview(L.StrConfigRaidWarningPreviewEmpty or "")
     end
 
     function module:RequestClearSavedWarnings(includeStock)
-        local warnings = getWarningsStore()
-        local removed = #warnings
-        local keptStock = includeStock == false and collectStockWarnings(warnings) or nil
-        for i = #warnings, 1, -1 do
-            tremove(warnings, i)
-        end
-
+        local result = WarningStoreApi.ClearSavedWarnings(includeStock)
         resetWarningState()
-        if keptStock then
-            for i = 1, #keptStock do
-                tinsert(warnings, keptStock[i])
-            end
-            removed = removed - #keptStock
-            if removed < 0 then
-                removed = 0
-            end
-        end
         warningsDirty = true
         fetched = false
         if module.RequestRefresh then
             module:RequestRefresh("clear_saved")
         end
-        return {
-            removed = removed,
-            total = #warnings,
-        }
+        return result
     end
 
     -- Localizing UI frame:
@@ -529,10 +382,10 @@ do
         if not frameName then
             return
         end
-        local warnings = getWarningsStore()
-        if selectedID and warnings[selectedID] then
-            _G[frameName .. "OutputName"]:SetText(warnings[selectedID].name)
-            _G[frameName .. "OutputContent"]:SetText(warnings[selectedID].content)
+        local warning = WarningStoreApi.GetWarning(selectedID)
+        if warning then
+            _G[frameName .. "OutputName"]:SetText(warning.name)
+            _G[frameName .. "OutputContent"]:SetText(warning.content)
             _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
         else
             _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
@@ -572,26 +425,13 @@ do
         if not frameName then
             return
         end
-        local savedID
-        local warnings = getWarningsStore()
-        wID = wID and tonumber(wID) or 0
-        wName = Strings.TrimText(wName)
-        wContent = Strings.TrimText(wContent)
-        if wName == "" then
-            wName = (isEdit and wID > 0) and wID or (#warnings + 1)
-        end
-        if wContent == "" then
+        local savedID, reason = WarningStoreApi.SaveWarning(wContent, wName, wID, isEdit)
+        if savedID == nil and reason == "empty" then
             addon:error(L.StrWarningsError)
             return
         end
-        if isEdit and wID > 0 and warnings[wID] ~= nil then
-            warnings[wID].name = wName
-            warnings[wID].content = wContent
-            savedID = wID
-            isEdit = false
-        else
-            tinsert(warnings, { name = wName, content = wContent })
-            savedID = #warnings
+        if savedID == nil then
+            return
         end
 
         EditBoxes.Reset(_G[frameName .. "Name"])
@@ -623,6 +463,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/UI/Frames",
             "Modules/UI/Visuals",
             "Modules/UI/ListController",
+            "Services/Warnings/Store",
             "Services/Chat",
         },
     })

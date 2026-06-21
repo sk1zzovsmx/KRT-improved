@@ -865,13 +865,15 @@ applyLoggerLootMutation = function(raid, it, raidID, lootNid, looter, rollType, 
         it.looter = nil
         expectedLooterNid = looterNid
     end
-    if tonumber(rollType) then
-        it.rollType = tonumber(rollType)
-        expectedRollType = tonumber(rollType)
+    local normalizedRollType = Helpers.NormalizeRollType(rollType)
+    if normalizedRollType then
+        it.rollType = normalizedRollType
+        expectedRollType = normalizedRollType
     end
-    if tonumber(rollValue) then
-        it.rollValue = tonumber(rollValue)
-        expectedRollValue = tonumber(rollValue)
+    local normalizedRollValue = Helpers.NormalizeRollValue(rollValue)
+    if normalizedRollValue then
+        it.rollValue = normalizedRollValue
+        expectedRollValue = normalizedRollValue
     end
 
     return true, expectedLooterNid, expectedRollType, expectedRollValue

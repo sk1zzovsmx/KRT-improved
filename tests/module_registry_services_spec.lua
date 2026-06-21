@@ -145,6 +145,7 @@ local directRegistryModules = {
     { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
     { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
+    { name = "Modules/LootSourceCandidates", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
 }
 
@@ -213,6 +214,29 @@ local expectedService = {
         "Modules/Comms",
     },
     events = "-- events: owns chat output helpers and LFM spam Timer ticker",
+}
+
+local expectedSpammerServices = {
+    {
+        name = "Services/Spammer/Draft",
+        path = "!KRT/Services/Spammer/Draft.lua",
+        owner = "Draft",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure spammer draft/store/preview model helpers",
+    },
+    {
+        name = "Services/Warnings/Store",
+        path = "!KRT/Services/Warnings/Store.lua",
+        owner = "Store",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure warnings saved-variable and template helpers",
+    },
 }
 
 local expectedRollServices = {
@@ -297,6 +321,8 @@ local expectedRollServices = {
             "Services/Rolls/Strategies",
             "Services/Rolls/Resolution",
             "Services/Rolls/Display",
+            "Services/Raid/State",
+            "Services/Raid/LootRecords",
         },
         forbiddenDeps = { "Services/Raid", "Services/Reserves", "Services/Loot" },
         events = "-- events: emits AddRoll through History; owns countdown facade calls",
@@ -308,7 +334,7 @@ local expectedLootServices = {
         name = "Services/Loot/Context",
         path = "!KRT/Services/Loot/Context.lua",
         owners = { { owner = "LootContext", separator = "." } },
-        deps = { "Init", "Modules/ModuleRegistry" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/LootSourceCandidates" },
         events = "-- events: no bus events; context helpers only",
         note = "-- notes: bootstrap-sensitive internal loot helpers",
     },
@@ -424,6 +450,7 @@ local expectedLootServices = {
             "Modules/Item",
             "Modules/Strings",
             "Modules/Time",
+            "Database/DBRaidQueries",
             "Services/Loot/Context",
             "Services/Loot/PendingAwards",
             "Services/Loot/PassiveGroupLoot",
@@ -460,6 +487,7 @@ local expectedRaidServices = {
             "Modules/Base64",
             "Modules/Dataset/IgnoredMobs",
             "Modules/LootSources",
+            "Database/DBRaidQueries",
             "Services/Loot/Context",
             "Services/Loot/State",
             "Services/Loot/Snapshots",
@@ -512,7 +540,15 @@ local expectedRaidServices = {
         name = "Services/Raid/LootRecords",
         path = "!KRT/Services/Raid/LootRecords.lua",
         owners = { { owner = "module", separator = ":" } },
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item", "Modules/Strings", "Services/Raid/Counts" },
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Item",
+            "Modules/Strings",
+            "Database/DBRaidQueries",
+            "Services/Raid/Counts",
+        },
     },
     {
         name = "Services/Raid/Session",
@@ -542,8 +578,8 @@ local expectedLoggerServices = {
         path = "!KRT/Services/Logger/Store.lua",
         owner = "Store",
         separator = ":",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
-        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        deps = { "Init", "Modules/ModuleRegistry", "Database/DBRaidQueries", "Modules/Strings" },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidStore" },
         registryFromFeature = true,
     },
     {
@@ -551,16 +587,7 @@ local expectedLoggerServices = {
         path = "!KRT/Services/Logger/View.lua",
         owner = "View",
         separator = ":",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/Sort", "Services/Logger/Store" },
-        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
-        registryFromFeature = true,
-    },
-    {
-        name = "Services/Logger/Export",
-        path = "!KRT/Services/Logger/Export.lua",
-        owner = "Export",
-        separator = ":",
-        deps = { "Init", "Modules/ModuleRegistry", "Services/Logger/Store" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Sort", "Services/Logger/Store", "Modules/LootSourceCandidates" },
         forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
         registryFromFeature = true,
     },
@@ -574,12 +601,30 @@ local expectedLoggerServices = {
         registryFromFeature = true,
     },
     {
+        name = "Services/Logger/Export",
+        path = "!KRT/Services/Logger/Export.lua",
+        owner = "Export",
+        separator = ":",
+        deps = { "Init", "Modules/ModuleRegistry", "Services/Logger/Store", "Services/Logger/Helpers" },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        registryFromFeature = true,
+    },
+    {
         name = "Services/Logger/Actions",
         path = "!KRT/Services/Logger/Actions.lua",
         owner = "Actions",
         separator = ":",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Base64", "Services/Logger/Store", "Services/Logger/Helpers" },
-        forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Timer",
+            "Modules/Strings",
+            "Modules/Base64",
+            "Database/DBRaidQueries",
+            "Services/Logger/Store",
+            "Services/Logger/Helpers",
+        },
+        forbiddenDeps = { "Services/Raid", "Database/DBRaidStore" },
         registryFromFeature = true,
     },
 }
@@ -835,6 +880,7 @@ local moduleTocPaths = {
     ["Modules/Comms"] = "Modules\\Comms.lua",
     ["Modules/Item"] = "Modules\\Item.lua",
     ["Modules/Strings"] = "Modules\\Strings.lua",
+    ["Modules/LootSourceCandidates"] = "Modules\\LootSourceCandidates.lua",
     ["Modules/Time"] = "Modules\\Time.lua",
     ["Modules/Base64"] = "Modules\\Base64.lua",
     ["Modules/Json"] = "Modules\\Json.lua",
@@ -892,6 +938,8 @@ local moduleTocPaths = {
     ["Services/Master/AwardCounter"] = "Services\\Master\\AwardCounter.lua",
     ["Services/Master/RollAnnouncements"] = "Services\\Master\\RollAnnouncements.lua",
     ["Services/Master/Service"] = "Services\\Master\\Service.lua",
+    ["Services/Spammer/Draft"] = "Services\\Spammer\\Draft.lua",
+    ["Services/Warnings/Store"] = "Services\\Warnings\\Store.lua",
 }
 
 local toc = read("!KRT/!KRT.toc")
@@ -941,6 +989,9 @@ for i = 1, #expectedDebugServices do
 end
 for i = 1, #expectedMasterServices do
     assertBefore(toc, "Modules\\ModuleRegistry.lua", moduleTocPaths[expectedMasterServices[i].name])
+end
+for i = 1, #expectedSpammerServices do
+    assertBefore(toc, "Modules\\ModuleRegistry.lua", moduleTocPaths[expectedSpammerServices[i].name])
 end
 
 local namespaceOptionFiles = {
@@ -1188,7 +1239,7 @@ assertBefore(toc, "Services\\Logger\\Store.lua", "Services\\Logger\\View.lua")
 assertBefore(toc, "Services\\Logger\\Store.lua", "Services\\Logger\\Export.lua")
 assertBefore(toc, "Services\\Logger\\Store.lua", "Services\\Logger\\Helpers.lua")
 assertBefore(toc, "Services\\Logger\\Store.lua", "Services\\Logger\\Actions.lua")
-assertBefore(toc, "Services\\Logger\\View.lua", "Services\\Logger\\Helpers.lua")
+assertBefore(toc, "Services\\Logger\\Helpers.lua", "Services\\Logger\\View.lua")
 assertBefore(toc, "Services\\Logger\\Helpers.lua", "Services\\Logger\\Actions.lua")
 for i = 1, #expectedLoggerServices do
     assertBefore(toc, moduleTocPaths[expectedLoggerServices[i].name], "Controllers\\Logger.lua")
@@ -1272,6 +1323,17 @@ end
 
 for i = 1, #expectedMasterServices do
     local expected = expectedMasterServices[i]
+    local expectedTocPath = moduleTocPaths[expected.name]
+    for j = 1, #expected.deps do
+        local depTocPath = moduleTocPaths[expected.deps[j]]
+        if depTocPath then
+            assertBefore(toc, depTocPath, expectedTocPath)
+        end
+    end
+end
+
+for i = 1, #expectedSpammerServices do
+    local expected = expectedSpammerServices[i]
     local expectedTocPath = moduleTocPaths[expected.name]
     for j = 1, #expected.deps do
         local depTocPath = moduleTocPaths[expected.deps[j]]
@@ -1474,6 +1536,10 @@ for i = 1, #expectedMasterServices do
     assertServiceRegistryContract(expectedMasterServices[i])
 end
 
+for i = 1, #expectedSpammerServices do
+    assertServiceRegistryContract(expectedSpammerServices[i])
+end
+
 local pending = {}
 for i = 1, #preRegistryCoreModules do
     local expected = preRegistryCoreModules[i]
@@ -1524,12 +1590,6 @@ end
 registry.AddModule(expectedService.name, { deps = expectedService.deps })
 registry.SetLoaded(expectedService.name)
 
-for i = 1, #expectedRollServices do
-    local expected = expectedRollServices[i]
-    registry.AddModule(expected.name, { deps = expected.deps })
-    registry.SetLoaded(expected.name)
-end
-
 for i = 1, #expectedLootServices do
     local expected = expectedLootServices[i]
     registry.AddModule(expected.name, { deps = expected.deps })
@@ -1538,6 +1598,12 @@ end
 
 for i = 1, #expectedRaidServices do
     local expected = expectedRaidServices[i]
+    registry.AddModule(expected.name, { deps = expected.deps })
+    registry.SetLoaded(expected.name)
+end
+
+for i = 1, #expectedRollServices do
+    local expected = expectedRollServices[i]
     registry.AddModule(expected.name, { deps = expected.deps })
     registry.SetLoaded(expected.name)
 end
@@ -1558,6 +1624,11 @@ for i = 1, #expectedLoggerServices do
 end
 for i = 1, #expectedMasterServices do
     local expected = expectedMasterServices[i]
+    registry.AddModule(expected.name, { deps = expected.deps })
+    registry.SetLoaded(expected.name)
+end
+for i = 1, #expectedSpammerServices do
+    local expected = expectedSpammerServices[i]
     registry.AddModule(expected.name, { deps = expected.deps })
     registry.SetLoaded(expected.name)
 end
@@ -1616,6 +1687,13 @@ for i = 1, #expectedMasterServices do
     local masterStatus = registry.GetStatus(expected.name)
     assert(masterStatus and masterStatus.Loaded == true, expected.name .. " must be loaded in registry")
     assertDeps(masterStatus.Deps, expected.deps, expected.name)
+end
+
+for i = 1, #expectedSpammerServices do
+    local expected = expectedSpammerServices[i]
+    local spammerStatus = registry.GetStatus(expected.name)
+    assert(spammerStatus and spammerStatus.Loaded == true, expected.name .. " must be loaded in registry")
+    assertDeps(spammerStatus.Deps, expected.deps, expected.name)
 end
 
 local negativeAddon = {

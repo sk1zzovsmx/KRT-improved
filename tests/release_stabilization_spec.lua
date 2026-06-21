@@ -5303,6 +5303,79 @@ test("logger loot view exposes compact shared source label and candidates", func
     assertTextContains(rows[1].sourceKey, "shared|", "expected logger row to expose source key for future tooltips")
 end)
 
+test("db query and logger view share loot source model for shared legacy source", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSourceCandidates.lua")
+    h:load("!KRT/Database/DBRaidQueries.lua")
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 6,
+            raidNid = 48,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {},
+            bossKills = {
+                {
+                    bossNid = 13,
+                    name = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                    sourceKind = "shared",
+                    source = "LootSources",
+                },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    bossNid = 13,
+                    itemId = 91732,
+                    itemName = "Resolver Ambiguous Charm",
+                    looterNid = 1,
+                    rollType = 1,
+                    rollValue = 88,
+                    lootSource = {
+                        kind = "shared",
+                        bossNid = 13,
+                        sourceNpcId = 0,
+                        sourceName = "Shared: Grand Widow Faerlina / Noth the Plaguebringer",
+                        sourceKey = "shared|naxxramas|boss|15953|grand widow faerlina|any;naxxramas|boss|15954|noth the plaguebringer|any",
+                        candidates = {
+                            { npcId = 15953, name = "Grand Widow Faerlina", kind = "boss", sourceKey = "naxxramas|boss|15953|grand widow faerlina|any" },
+                            { npcId = 15954, name = "Noth the Plaguebringer", kind = "boss", sourceKey = "naxxramas|boss|15954|noth the plaguebringer|any" },
+                        },
+                    },
+                },
+            },
+            nextPlayerNid = 1,
+            nextBossNid = 14,
+            nextLootNid = 102,
+        },
+    })
+
+    local raid = h.Database.EnsureRaidById(1)
+    local queryRows = h.addon.DB.RaidQueries:GetLoot(raid)
+    local viewRows = {}
+    h.addon.Services.Logger.View:FillLootList(viewRows, raid, nil, nil)
+
+    assertEqual(#queryRows, 1, "expected one DB query row")
+    assertEqual(#viewRows, 1, "expected one logger view row")
+    assertEqual(queryRows[1].sourceName, "Shared", "expected shared query source label")
+    assertEqual(viewRows[1].sourceName, queryRows[1].sourceName, "expected logger view sourceName to match DB sourceName")
+    assertEqual(viewRows[1].sourceKind, queryRows[1].sourceKind, "expected logger view sourceKind to match DB sourceKind")
+    assertEqual(viewRows[1].sourceKey, queryRows[1].sourceKey, "expected logger view sourceKey to match DB sourceKey")
+    assertTextContains(viewRows[1].sourceKind, "shared", "expected shared source kind")
+    assertTextContains(queryRows[1].sourceKind, "shared", "expected shared source kind")
+    assertTrue(type(viewRows[1].sourceCandidates) == "table", "expected logger view shared candidates")
+    assertTrue(type(queryRows[1].sourceCandidates) == "table", "expected DB query shared candidates")
+    assertEqual(#viewRows[1].sourceCandidates, 2, "expected logger view shared candidates")
+    assertEqual(viewRows[1].sourceCandidates[1].name, queryRows[1].sourceCandidates[1].name, "expected shared candidate names to match")
+    assertEqual(viewRows[1].sourceCandidates[2].sourceKey, queryRows[1].sourceCandidates[2].sourceKey, "expected shared source key to be preserved")
+    assertEqual(viewRows[1].sourceCandidates[1].sourceKey, queryRows[1].sourceCandidates[1].sourceKey, "expected candidate source keys to match")
+    assertEqual(viewRows[1].sourceCandidates[2].sourceKey, queryRows[1].sourceCandidates[2].sourceKey, "expected candidate source keys to match")
+end)
+
 test("logger loot XML exposes layout-only source column hitbox", function()
     local xml = readText("!KRT/UI/Logger.xml")
 
@@ -6367,6 +6440,7 @@ test("spammer panel preview reads the saved LFM draft", function()
         Message = "full clear",
     }
 
+    h:load("!KRT/Services/Spammer/Draft.lua")
     h:load("!KRT/Controllers/Spammer.lua")
 
     local Spammer = h.addon.Controllers.Spammer
@@ -6399,6 +6473,7 @@ test("warnings panel templates add default raid warnings without duplicates", fu
         }
     end
 
+    h:load("!KRT/Services/Warnings/Store.lua")
     h:load("!KRT/Controllers/Warnings.lua")
 
     local Warnings = h.addon.Controllers.Warnings
@@ -6426,6 +6501,7 @@ test("warnings panel seeds stock templates for fresh saved variables", function(
         }
     end
 
+    h:load("!KRT/Services/Warnings/Store.lua")
     h:load("!KRT/Controllers/Warnings.lua")
 
     assertEqual(#_G.KRT_Warnings, 6, "expected fresh saved variables to seed stock warning templates")
@@ -6448,6 +6524,7 @@ test("warnings panel clear saved warnings removes every saved message", function
         }
     end
 
+    h:load("!KRT/Services/Warnings/Store.lua")
     h:load("!KRT/Controllers/Warnings.lua")
 
     local Warnings = h.addon.Controllers.Warnings
@@ -6472,6 +6549,7 @@ test("warnings panel clear saved warnings can keep stock templates", function()
         }
     end
 
+    h:load("!KRT/Services/Warnings/Store.lua")
     h:load("!KRT/Controllers/Warnings.lua")
 
     local Warnings = h.addon.Controllers.Warnings
@@ -17909,6 +17987,7 @@ test("slash bug prints local diagnostic summary", function()
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/EntryPoints/SlashEvents.lua")
+    h:load("!KRT/Services/Reserves.lua")
 
     _G.SlashCmdList.KRT("bug")
 
@@ -18482,6 +18561,42 @@ test("reserves local data wins over synced runtime cache", function()
     assertTrue(Reserves:IsLocalDataAvailable() == true, "expected local reserves to remain authoritative")
     assertEqual(Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice", "expected local reserve display to remain active")
     assertEqual(Reserves:FormatReservedPlayersLine(2002, false, true, true), "", "expected rejected synced cache to stay hidden")
+end)
+
+test("reserves service exposes count facade for entrypoints", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { item = "A" },
+                { item = "B" },
+            },
+        },
+        Bob = {
+            reserves = {
+                { item = "C" },
+            },
+        },
+    }
+
+    h:load("!KRT/Services/Reserves.lua")
+
+    local players, entries = h.addon.Services.Reserves:GetCounts(_G.KRT_Reserves)
+    assertEqual(players, 2, "expected reserve player count")
+    assertEqual(entries, 3, "expected reserve entry count")
+
+    players, entries = h.addon.Services.Reserves:GetCounts()
+    assertEqual(players, 2, "expected default reserve player count from SavedVariables")
+    assertEqual(entries, 3, "expected default reserve entry count from SavedVariables")
+
+    _G.KRT_Reserves = "bad"
+    players, entries = h.addon.Services.Reserves:GetCounts()
+    assertEqual(players, 0, "expected malformed default reserve store to report zero players")
+    assertEqual(entries, 0, "expected malformed default reserve store to report zero entries")
+
+    players, entries = h.addon.Services.Reserves:GetCounts(false)
+    assertEqual(players, 0, "expected malformed explicit reserve store to report zero players")
+    assertEqual(entries, 0, "expected malformed explicit reserve store to report zero entries")
 end)
 
 test("reserves whisper softres ignores requests while disabled", function()

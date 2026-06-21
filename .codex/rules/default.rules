@@ -1,0 +1,24 @@
+# Prompt before potentially irreversible git operations outside the sandbox.
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "Pushing changes should remain an explicit operator choice.",
+)
+
+prefix_rule(
+    pattern = ["git", "merge"],
+    decision = "prompt",
+    justification = "Merging branches should be reviewed before running outside the sandbox.",
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Hard resets are prohibited by KRT repository policy.",
+)
+
+prefix_rule(
+    pattern = ["Remove-Item"],
+    decision = "prompt",
+    justification = "Recursive or destructive PowerShell deletes need explicit review.",
+)

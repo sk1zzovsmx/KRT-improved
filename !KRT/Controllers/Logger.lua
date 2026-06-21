@@ -67,6 +67,7 @@ local setLootEntry
 local _G = _G
 local tinsert, tremove, twipe, tconcat = table.insert, table.remove, table.wipe, table.concat
 local pairs, ipairs, type, select = pairs, ipairs, type, select
+local LoggerHelpers = Services.Logger and Services.Logger.Helpers or nil
 
 local tostring, tonumber = tostring, tonumber
 local max, floor = math.max, math.floor
@@ -621,8 +622,13 @@ local function getLootEmptyStateText(count, sel)
     return L.StrLoggerEmptyLoot
 end
 
+local function normalizeLoggerRollValue(value)
+    local normalize = LoggerHelpers and LoggerHelpers.NormalizeRollValue or tonumber
+    return normalize(value)
+end
+
 local function isValidRollValue(text)
-    local value = text and tonumber(text)
+    local value = normalizeLoggerRollValue(text)
     if not value or value < 0 then
         return false
     end
@@ -642,6 +648,8 @@ do
     local View = LoggerSvc.View
     local Export = LoggerSvc.Export
     local Actions = LoggerSvc.Actions
+    local Helpers = LoggerSvc.Helpers
+    LoggerHelpers = Helpers
 
     module.Store = Store
     module.View = View
@@ -2938,10 +2946,10 @@ do
             ui.Winner:SetText(it.looter or "")
             ui.Winner:SetVertexColor(r, g, b)
 
-            local rt = tonumber(it.rollType)
+            local rt = LoggerHelpers and LoggerHelpers.NormalizeRollType(it.rollType) or tonumber(it.rollType)
             it.rollType = rt
             ui.Type:SetText((rt and lootTypesColored[rt]) or "")
-            ui.Roll:SetText(it.rollValue or 0)
+            ui.Roll:SetText(LoggerHelpers and LoggerHelpers.FormatRollValueForRow(it.rollValue) or (it.rollValue or 0))
             ui.Roll:SetVertexColor(0.95, 0.95, 0.95)
             ui.Time:SetText(it.timeFmt)
             ui.Time:SetVertexColor(0.86, 0.82, 0.72)
@@ -2993,16 +3001,16 @@ do
                 return compareLootTie(a, b, asc)
             end,
             type = function(a, b, asc)
-                local aType = tonumber(a and a.rollType) or 0
-                local bType = tonumber(b and b.rollType) or 0
+                local aType = LoggerHelpers and LoggerHelpers.GetRollTypeSortValue(a and a.rollType) or tonumber(a and a.rollType) or 0
+                local bType = LoggerHelpers and LoggerHelpers.GetRollTypeSortValue(b and b.rollType) or tonumber(b and b.rollType) or 0
                 if aType ~= bType then
                     return CompareValues(aType, bType, asc)
                 end
                 return compareLootTie(a, b, asc)
             end,
             roll = function(a, b, asc)
-                local aRoll = tonumber(a and a.rollValue) or 0
-                local bRoll = tonumber(b and b.rollValue) or 0
+                local aRoll = LoggerHelpers and LoggerHelpers.GetRollSortValue(a and a.rollValue) or tonumber(a and a.rollValue) or 0
+                local bRoll = LoggerHelpers and LoggerHelpers.GetRollSortValue(b and b.rollValue) or tonumber(b and b.rollValue) or 0
                 if aRoll ~= bRoll then
                     return CompareValues(aRoll, bRoll, asc)
                 end

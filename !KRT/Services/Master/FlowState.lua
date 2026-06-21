@@ -104,7 +104,7 @@ function FlowState.BuildState(opts)
 
     if currentFlowState == flowStates.MULTI_AWARD then
         local total = tonumber(multiAward and multiAward.total) or (multiAward and multiAward.winners and #multiAward.winners) or requiredWinnerCount
-        local position = tonumber(multiAward and multiAward.index) or 1
+        local position = tonumber(multiAward and multiAward.pos) or tonumber(multiAward and multiAward.index) or 1
         local currentWinner = currentMultiWinner or displayedWinner
         state.name = "multi_award"
         if total < 1 then

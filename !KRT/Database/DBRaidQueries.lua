@@ -17,7 +17,6 @@ local pairs, type = pairs, type
 local tonumber, tostring = tonumber, tostring
 
 local isBossFightRecord = Database.IsBossFightRecord
-local SHARED_SOURCE_LABEL = LootSourceCandidates.GetSharedLabel()
 
 -- Raid read-only projection/query service.
 do
@@ -72,21 +71,6 @@ do
             rows[i] = nil
         end
         return rows
-    end
-
-    local function getLootSourceModel(loot, boss)
-        local lootSource = type(loot and loot.lootSource) == "table" and loot.lootSource or nil
-        local sourceKind = (lootSource and lootSource.kind) or (boss and boss.sourceKind) or nil
-        local bossName = boss and boss.name or ""
-        local lootSourceName = lootSource and lootSource.sourceName or nil
-        local sourceName = lootSourceName or bossName or ""
-        local sourceKey = lootSource and lootSource.sourceKey or boss and boss.sourceKey or nil
-
-        if sourceKind == "shared" or LootSourceCandidates.IsLegacySharedText(sourceName) or LootSourceCandidates.IsLegacySharedText(bossName) then
-            return SHARED_SOURCE_LABEL, "shared", LootSourceCandidates.Copy(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
-        end
-
-        return sourceName, sourceKind, nil, sourceKey
     end
 
     local function getPlayerByNid(raid, runtime, playerNid)
@@ -500,7 +484,7 @@ do
                 if okBoss and okPlayer then
                     local lootTime = tonumber(loot.time) or 0
                     local sourceBoss = bossByNid and bossByNid[tonumber(loot.bossNid)] or nil
-                    local sourceName, sourceKind, sourceCandidates, sourceKey = getLootSourceModel(loot, sourceBoss)
+                    local sourceName, sourceKind, sourceCandidates, sourceKey = LootSourceCandidates.BuildLootSourceModel(loot, sourceBoss)
                     local looterPlayer = looterNid and getPlayerByNid(raid, runtime, looterNid) or nil
                     count = count + 1
                     local row = acquireOutputRow(rows, count)

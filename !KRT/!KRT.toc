@@ -132,10 +132,12 @@ Services\Reserves.lua
 Services\Reserves\Chat.lua
 Widgets\ReservesUI.lua
 Services\Logger\Store.lua
+Services\Logger\Helpers.lua
 Services\Logger\View.lua
 Services\Logger\Export.lua
-Services\Logger\Helpers.lua
 Services\Logger\Actions.lua
+Services\Spammer\Draft.lua
+Services\Warnings\Store.lua
 Controllers\Logger.lua
 Widgets\Config.lua
 Controllers\Warnings.lua

@@ -129,4 +129,27 @@ assert(Master.DebugRaidGrid, "expected DebugRaidGrid module")
 assert(Master.AwardMessages, "expected AwardMessages module")
 assert(Master.LootSpam, "expected LootSpam module")
 
+local multiAwardState = Master.BuildWorkflowState({
+    hasItem = true,
+    hasLootAccess = true,
+    lootState = {
+        lootCount = 1,
+        rollsCount = 2,
+        multiAward = {
+            active = true,
+            pos = 2,
+            total = 3,
+            winners = {
+                { name = "Alice" },
+                { name = "Bob" },
+                { name = "Cara" },
+            },
+        },
+    },
+    currentFlowState = "multi_award",
+    currentMultiWinner = "Bob",
+})
+assert(multiAwardState.name == "multi_award", "expected multi-award workflow state")
+assert(multiAwardState.statusText == "Multi 2/3 Bob", "expected multi-award position to use pos")
+
 print("master service split spec passed")

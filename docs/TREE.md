@@ -150,6 +150,10 @@
 |   |   |   |-- Service.lua
 |   |   |   |-- Sessions.lua
 |   |   |   \\-- Strategies.lua
+|   |   |-- Spammer
+|   |   |   \\-- Draft.lua
+|   |   |-- Warnings
+|   |   |   \\-- Store.lua
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
 |   |   |-- README.md
@@ -211,7 +215,14 @@
 |   |-- agents
 |   |   |-- code-mapper.toml
 |   |   \\-- spark-implementer.toml
-|   \\-- config.toml
+|   |-- hooks
+|   |   |-- stop_workflow_enforcer.py
+|   |   |-- subagent_start_context.py
+|   |   \\-- user_prompt_submit_router.py
+|   |-- rules
+|   |   \\-- default.rules
+|   |-- config.toml
+|   \\-- hooks.json
 |-- .githooks
 |   |-- pre-commit
 |   \\-- README.md
@@ -229,7 +240,9 @@
 |   |   |   |-- 2026-06-04-atlasloot-raid-dataset.md
 |   |   |   |-- 2026-06-05-master-loot-grid.md
 |   |   |   |-- 2026-06-07-master-service-split.md
-|   |   |   \\-- 2026-06-07-runtime-cleanup-followup.md
+|   |   |   |-- 2026-06-07-runtime-cleanup-followup.md
+|   |   |   |-- 2026-06-12-controller-service-duplication-reduction.md
+|   |   |   \\-- 2026-06-12-master-controller-service-reduction.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       \\-- 2026-06-05-master-loot-grid-design.md

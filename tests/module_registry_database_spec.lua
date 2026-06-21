@@ -139,6 +139,7 @@ local directRegistryModules = {
     { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
     { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
+    { name = "Modules/LootSourceCandidates", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
 }
 
@@ -161,7 +162,15 @@ local postRegistryCoreModules = {
         name = "Database/DBRaidQueries",
         path = "!KRT/Database/DBRaidQueries.lua",
         toc = "Database\\DBRaidQueries.lua",
-        deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBRaidStore", "Modules/Sort" },
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Database/DB",
+            "Database/DBRaidStore",
+            "Modules/Strings",
+            "Modules/Sort",
+            "Modules/LootSourceCandidates",
+        },
         exports = { "function%s+module:[%w_]+%s*%(" },
     },
     {

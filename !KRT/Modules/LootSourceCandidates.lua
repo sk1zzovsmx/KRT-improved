@@ -148,6 +148,21 @@ function LootSourceCandidates.Copy(candidates, fallbackText)
     return (#copied > 0) and copied or nil
 end
 
+function LootSourceCandidates.BuildLootSourceModel(loot, boss)
+    local lootSource = type(loot and loot.lootSource) == "table" and loot.lootSource or nil
+    local sourceKind = (lootSource and lootSource.kind) or (boss and boss.sourceKind) or nil
+    local bossName = boss and boss.name or ""
+    local lootSourceName = lootSource and lootSource.sourceName or nil
+    local sourceName = lootSourceName or bossName or ""
+    local sourceKey = lootSource and lootSource.sourceKey or boss and boss.sourceKey or nil
+
+    if sourceKind == "shared" or LootSourceCandidates.IsLegacySharedText(sourceName) or LootSourceCandidates.IsLegacySharedText(bossName) then
+        return SHARED_SOURCE_LABEL, "shared", LootSourceCandidates.Copy(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
+    end
+
+    return sourceName, sourceKind, nil, sourceKey
+end
+
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Modules/LootSourceCandidates", {

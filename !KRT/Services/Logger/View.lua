@@ -11,37 +11,6 @@ local Database = feature.Database
 local Services = feature.Services
 local LootSourceCandidates = feature.LootSourceCandidates
 
-if type(LootSourceCandidates) ~= "table" then
-    LootSourceCandidates = {}
-
-    function LootSourceCandidates.GetSharedLabel()
-        return "Shared"
-    end
-
-    function LootSourceCandidates.IsLegacySharedText(value)
-        return type(value) == "string" and string.sub(value, 1, 7) == "Shared:"
-    end
-
-    function LootSourceCandidates.Copy(candidates)
-        if type(candidates) ~= "table" then
-            return nil
-        end
-        local copied = {}
-        for i = 1, #candidates do
-            local candidate = candidates[i]
-            if type(candidate) == "table" and (candidate.name or candidate.npcName) then
-                copied[#copied + 1] = {
-                    name = candidate.name or candidate.npcName,
-                    kind = candidate.kind or "boss",
-                    npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or nil,
-                    sourceKey = candidate.sourceKey,
-                }
-            end
-        end
-        return (#copied > 0) and copied or nil
-    end
-end
-
 local GetLootSortName = Sort.GetLootSortName
 
 local twipe = table.wipe
@@ -54,7 +23,6 @@ local Logger = Services.Logger
 local View = Logger.View
 local Store = Logger.Store
 local buildRows
-local SHARED_SOURCE_LABEL = LootSourceCandidates.GetSharedLabel()
 local isBossFightRecord = Database.IsBossFightRecord
 
 -- ----- Private helpers ----- --
@@ -93,21 +61,6 @@ local function finishPerf(label, startedAt, raid, out, extraDetails)
         details = details .. " " .. tostring(extraDetails)
     end
     addon:_PerfFinish(label, startedAt, details)
-end
-
-local function getLootSourceModel(loot, boss)
-    local lootSource = type(loot and loot.lootSource) == "table" and loot.lootSource or nil
-    local sourceKind = (lootSource and lootSource.kind) or (boss and boss.sourceKind) or nil
-    local bossName = boss and boss.name or ""
-    local lootSourceName = lootSource and lootSource.sourceName or nil
-    local sourceName = lootSourceName or bossName or ""
-    local sourceKey = lootSource and lootSource.sourceKey or boss and boss.sourceKey or nil
-
-    if sourceKind == "shared" or LootSourceCandidates.IsLegacySharedText(sourceName) or LootSourceCandidates.IsLegacySharedText(bossName) then
-        return SHARED_SOURCE_LABEL, "shared", LootSourceCandidates.Copy(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
-    end
-
-    return sourceName, sourceKind, nil, sourceKey
 end
 
 -- ----- Public methods ----- --
@@ -318,7 +271,7 @@ function View:FillLootList(out, raid, bossNid, playerName)
         it.bossNid = v.bossNid
         it.sortName = GetLootSortName(v.itemName, v.itemLink, v.itemId)
         local boss = Store:GetBoss(raid, v.bossNid)
-        local sourceName, sourceKind, sourceCandidates, sourceKey = getLootSourceModel(v, boss)
+        local sourceName, sourceKind, sourceCandidates, sourceKey = LootSourceCandidates.BuildLootSourceModel(v, boss)
         it.sourceName = sourceName or ""
         it.sourceKind = sourceKind
         it.sourceCandidates = sourceCandidates
@@ -343,6 +296,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/ModuleRegistry",
             "Modules/Sort",
             "Services/Logger/Store",
+            "Modules/LootSourceCandidates",
         },
     })
     registry.SetLoaded("Services/Logger/View")

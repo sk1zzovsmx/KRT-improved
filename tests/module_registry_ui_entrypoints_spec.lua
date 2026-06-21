@@ -157,6 +157,7 @@ local expectedControllers = {
             "Modules/UI/Frames",
             "Modules/UI/Visuals",
             "Modules/UI/ListController",
+            "Services/Warnings/Store",
             "Services/Chat",
         },
         forbiddenPrefixes = { "Services/Raid/" },
@@ -175,6 +176,7 @@ local expectedControllers = {
             "Modules/Strings",
             "Modules/UI/Frames",
             "Modules/UI/Visuals",
+            "Services/Spammer/Draft",
             "Services/Chat",
         },
         forbiddenPrefixes = { "Services/Raid/" },
@@ -193,6 +195,7 @@ local expectedWidgets = {
             "Modules/ModuleRegistry",
             "Modules/Colors",
             "Modules/UI/Facade",
+            "Modules/UI/Visuals",
         },
         forbiddenPrefixes = { "Controllers/", "EntryPoints/", "Services/" },
     },
@@ -225,6 +228,7 @@ local expectedWidgets = {
             "Modules/Bus",
             "Modules/UI/Facade",
             "Modules/UI/Frames",
+            "Modules/UI/Visuals",
             "Services/Chat",
             "Services/Raid/State",
             "Services/Raid/Capabilities",
@@ -352,6 +356,7 @@ local directRegistryModules = {
     { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/UI/OptionsLayout", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames" } },
+    { name = "Modules/LootSourceCandidates", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
 }
 
@@ -374,7 +379,15 @@ local postRegistryCoreModules = {
     },
     {
         name = "Database/DBRaidQueries",
-        deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBRaidStore", "Modules/Sort" },
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Database/DB",
+            "Database/DBRaidStore",
+            "Modules/Strings",
+            "Modules/Sort",
+            "Modules/LootSourceCandidates",
+        },
     },
     {
         name = "Database/DBRaidValidator",
@@ -411,8 +424,19 @@ local expectedService = {
     deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Timer", "Modules/Strings", "Modules/Comms" },
 }
 
+local expectedSpammerServices = {
+    {
+        name = "Services/Spammer/Draft",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
+    },
+    {
+        name = "Services/Warnings/Store",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
+    },
+}
+
 local expectedLootServices = {
-    { name = "Services/Loot/Context", deps = { "Init", "Modules/ModuleRegistry" } },
+    { name = "Services/Loot/Context", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/LootSourceCandidates" } },
     { name = "Services/Loot/State", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Services/Loot/Context" } },
     {
         name = "Services/Loot/Snapshots",
@@ -480,6 +504,7 @@ local expectedRaidServices = {
             "Modules/Base64",
             "Modules/Dataset/IgnoredMobs",
             "Modules/LootSources",
+            "Database/DBRaidQueries",
             "Services/Loot/Context",
             "Services/Loot/State",
             "Services/Loot/Snapshots",
@@ -508,7 +533,15 @@ local expectedRaidServices = {
     },
     {
         name = "Services/Raid/LootRecords",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item", "Modules/Strings", "Services/Raid/Counts" },
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Item",
+            "Modules/Strings",
+            "Database/DBRaidQueries",
+            "Services/Raid/Counts",
+        },
     },
     { name = "Services/Raid/Session", deps = { "Init", "Modules/ModuleRegistry" } },
     {
@@ -535,6 +568,7 @@ local expectedRollServices = {
         name = "Services/Rolls/Responses",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Comms", "Services/Chat" },
     },
+    { name = "Services/Rolls/Strategies", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Services/Rolls/Resolution", deps = { "Init", "Modules/ModuleRegistry" } },
     {
         name = "Services/Rolls/Display",
@@ -551,8 +585,11 @@ local expectedRollServices = {
             "Services/Rolls/Sessions",
             "Services/Rolls/History",
             "Services/Rolls/Responses",
+            "Services/Rolls/Strategies",
             "Services/Rolls/Resolution",
             "Services/Rolls/Display",
+            "Services/Raid/State",
+            "Services/Raid/LootRecords",
         },
     },
 }
@@ -591,13 +628,13 @@ local expectedReservesServices = {
 }
 
 local expectedLoggerServices = {
-    { name = "Services/Logger/Store", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" } },
-    { name = "Services/Logger/View", deps = { "Init", "Modules/ModuleRegistry", "Modules/Sort", "Services/Logger/Store" } },
-    { name = "Services/Logger/Export", deps = { "Init", "Modules/ModuleRegistry", "Services/Logger/Store" } },
+    { name = "Services/Logger/Store", deps = { "Init", "Modules/ModuleRegistry", "Database/DBRaidQueries", "Modules/Strings" } },
     {
         name = "Services/Logger/Helpers",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Services/Logger/Store" },
     },
+    { name = "Services/Logger/View", deps = { "Init", "Modules/ModuleRegistry", "Modules/Sort", "Services/Logger/Store", "Modules/LootSourceCandidates" } },
+    { name = "Services/Logger/Export", deps = { "Init", "Modules/ModuleRegistry", "Services/Logger/Store", "Services/Logger/Helpers" } },
     {
         name = "Services/Logger/Actions",
         deps = {
@@ -629,6 +666,7 @@ local moduleTocPaths = {
     ["Modules/Strings"] = "Modules\\Strings.lua",
     ["Modules/Item"] = "Modules\\Item.lua",
     ["Modules/LootSourcesData"] = "Modules\\LootSourcesData.lua",
+    ["Modules/LootSourceCandidates"] = "Modules\\LootSourceCandidates.lua",
     ["Modules/LootSources"] = "Modules\\LootSources.lua",
     ["Modules/IgnoredItems"] = "Modules\\IgnoredItems.lua",
     ["Modules/Dataset/IgnoredMobs"] = "Modules\\Dataset\\IgnoredMobs.lua",
@@ -678,6 +716,8 @@ local moduleTocPaths = {
     ["Services/Reserves/Sync"] = "Services\\Reserves\\Sync.lua",
     ["Services/Reserves"] = "Services\\Reserves.lua",
     ["Services/Reserves/Chat"] = "Services\\Reserves\\Chat.lua",
+    ["Services/Spammer/Draft"] = "Services\\Spammer\\Draft.lua",
+    ["Services/Warnings/Store"] = "Services\\Warnings\\Store.lua",
     ["Services/Logger/Store"] = "Services\\Logger\\Store.lua",
     ["Services/Logger/View"] = "Services\\Logger\\View.lua",
     ["Services/Logger/Export"] = "Services\\Logger\\Export.lua",
@@ -1252,6 +1292,7 @@ registry.SetLoaded(expectedService.name)
 registerList(expectedEntryPoints)
 registerList(expectedRollServices)
 registerList(expectedDebugServices)
+registerList(expectedSpammerServices)
 registry.AddModule(expectedControllers[1].name, { deps = expectedControllers[1].deps })
 registry.SetLoaded(expectedControllers[1].name)
 registry.AddModule(expectedWidgets[1].name, { deps = expectedWidgets[1].deps })
@@ -1289,6 +1330,7 @@ local function findSpec(name)
         { expectedService },
         expectedEntryPoints,
         expectedRollServices,
+        expectedSpammerServices,
         expectedDebugServices,
         expectedControllers,
         expectedWidgets,

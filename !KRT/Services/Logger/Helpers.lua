@@ -68,6 +68,41 @@ function Helpers.FindLoggerPlayer(normalizedName, raid, bossKill)
     return nil
 end
 
+-- Normalize roll type for logger row/cell operations.
+function Helpers.NormalizeRollType(value)
+    return tonumber(value)
+end
+
+-- Normalize roll value for logger row/cell operations.
+function Helpers.NormalizeRollValue(value)
+    return tonumber(value)
+end
+
+-- Get roll value suitable for sorting; invalid values become 0.
+function Helpers.GetRollSortValue(value)
+    return Helpers.NormalizeRollValue(value) or 0
+end
+
+-- Get roll type suitable for sorting; invalid values become 0.
+function Helpers.GetRollTypeSortValue(value)
+    return Helpers.NormalizeRollType(value) or 0
+end
+
+-- Format roll value for row rendering.
+function Helpers.FormatRollValueForRow(value)
+    return value or 0
+end
+
+-- Format roll type for CSV export.
+function Helpers.FormatRollTypeForExport(value)
+    return Helpers.NormalizeRollType(value) or ""
+end
+
+-- Format roll value for CSV export.
+function Helpers.FormatRollValueForExport(value)
+    return Helpers.NormalizeRollValue(value) or ""
+end
+
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Logger/Helpers", {

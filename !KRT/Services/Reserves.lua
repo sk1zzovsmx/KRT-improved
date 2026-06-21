@@ -362,6 +362,9 @@ do
     local function countReserves(sourceData)
         local players = 0
         local entries = 0
+        if type(sourceData) ~= "table" then
+            return 0, 0
+        end
         for _, player in pairs(sourceData or {}) do
             if type(player) == "table" then
                 players = players + 1
@@ -372,6 +375,13 @@ do
             end
         end
         return players, entries
+    end
+
+    function Service:GetCounts(sourceData)
+        if sourceData ~= nil then
+            return countReserves(sourceData)
+        end
+        return countReserves(KRT_Reserves)
     end
 
     local function finishPerf(label, startedAt, details)
