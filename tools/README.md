@@ -24,6 +24,8 @@ Examples:
 - Release notes for GitHub releases: `python3 tools/krt.py release-notes --current-tag v<version> --output-file dist/release-notes.md`
 - Release packaging: `python3 tools/krt.py build-release-zip --output-dir dist --write-checksum`
 - Hook install: `python3 tools/krt.py install-hooks`
+- 55to53 orchestrator prompt wrapper: `python3 tools/krt.py codex-55to53 "implement <task>"`
+- 55to53 handoff file + client launch: `python3 tools/krt.py codex-55to53 --mode handoff --launch-client "implement <task>"`
 - Mechanic wrapper: `python3 tools/krt.py mech AddonValidate --json`
 - API catalog refresh: `python3 tools/krt.py api-catalog-refresh`
 - API catalog drift check: `python3 tools/krt.py api-catalog-check`
@@ -81,6 +83,10 @@ control.
   Codex installs, Mechanic, and the repo-local MCP server
 - `sync-agent-skills.ps1`: syncs local Codex skills from the repo manifest
 - `agent-skills.manifest.json`: source of truth for repo-managed skill sync
+- `tools/krt.py codex-55to53`: repo-local launcher that classifies a task and
+  emits, runs, or writes a wrapped Codex prompt for the delegated 55to53
+  workflow. On Windows, `--mode handoff --launch-client` uses the installed
+  Codex app via `shell:AppsFolder` when available.
 - `api-contract-cleanup-wave.md`: reusable staged cleanup prompt for addon-wide
   contract, docs, and catalog cleanup waves
 

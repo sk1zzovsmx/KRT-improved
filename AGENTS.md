@@ -111,8 +111,10 @@ The final response must include:
 
 - Keep project-specific Codex workflow files under `.codex/` in the repository.
 - Keep project-specific orchestrator skills under `.agents/skills/` in the repository.
-- Treat `.codex/config.toml` and `.codex/agents/*` as project infrastructure, not personal
-  machine-local preferences.
+- Prefer the repo-local launcher `py -3 tools/krt.py codex-55to53 ...` when starting
+  complex delegated Codex tasks from the command line.
+- Treat `.codex/config.toml`, `.codex/agents/*`, `.codex/hooks*`, and `.codex/rules/*`
+  as project infrastructure, not personal machine-local preferences.
 - Do not move this workflow back to a global profile unless the user explicitly requests it.
 
 ### User reinforcement phrase

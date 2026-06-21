@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,35 @@ MECHANIC_COMMANDS = {
     "AddonDeprecations": "addon.deprecations",
     "AddonOutput": "addon.output",
 }
+
+CODEX_55TO53_MULTI_FILE_CUES = (
+    "multi-file",
+    "cross-module",
+    "architecture",
+    "orchestr",
+    "workflow",
+    "subagent",
+    "review",
+    "regression",
+    "controller",
+    "service",
+    "module",
+    "hook",
+    "mcp",
+    "refactor",
+)
+
+CODEX_55TO53_BOUNDED_CUES = (
+    "fix",
+    "implement",
+    "add",
+    "update",
+    "change",
+    "modify",
+    "rename",
+    "config",
+    "docs",
+)
 
 
 class CliError(Exception):
@@ -217,6 +247,240 @@ def run_command_capture(command: list[str], *, cwd: Path | None = None) -> subpr
         encoding="utf-8",
         errors="replace",
     )
+
+
+def codex_app_id_windows() -> str | None:
+    override = os.environ.get("KRT_CODEX_APP_ID", "").strip()
+    if override:
+        return override
+
+    powershell = powershell_executable()
+    if not powershell:
+        return None
+
+    probe = (
+        "Get-StartApps | Where-Object { $_.AppID -like 'OpenAI.Codex_*' } | "
+        "Select-Object -First 1 -ExpandProperty AppID"
+    )
+    completed = run_command_capture([powershell, "-NoProfile", "-Command", probe], cwd=REPO_ROOT)
+    if completed.returncode != 0:
+        return None
+
+    app_id = (completed.stdout or "").strip()
+    return app_id or None
+
+
+def launch_codex_client(args: argparse.Namespace) -> dict[str, Any]:
+    if is_windows():
+        powershell = powershell_executable()
+        app_id = codex_app_id_windows()
+        if not powershell or not app_id:
+            return {
+                "ok": False,
+                "method": "windows-app",
+                "reason": "Could not resolve the local Codex Windows app id.",
+            }
+
+        shell_target = f"shell:AppsFolder\\{app_id}"
+        completed = run_command_capture(
+            [powershell, "-NoProfile", "-Command", f"Start-Process '{shell_target}'"],
+            cwd=REPO_ROOT,
+        )
+        if completed.returncode != 0:
+            return {
+                "ok": False,
+                "method": "windows-app",
+                "app_id": app_id,
+                "reason": (completed.stderr or completed.stdout or "Unknown launch failure").strip(),
+            }
+        return {"ok": True, "method": "windows-app", "app_id": app_id}
+
+    command = [args.codex_command]
+    try:
+        subprocess.Popen(command, cwd=str(REPO_ROOT))
+    except OSError as exc:
+        return {
+            "ok": False,
+            "method": "command",
+            "command": command,
+            "reason": str(exc),
+        }
+    return {"ok": True, "method": "command", "command": command}
+
+
+def classify_codex_55to53_prompt(prompt: str) -> str:
+    lowered = prompt.lower()
+    bullet_count = len(re.findall(r"(?m)^\s*(?:[-*]|\d+\.)\s+", prompt))
+    if bullet_count >= 3 or any(cue in lowered for cue in CODEX_55TO53_MULTI_FILE_CUES):
+        return "complex-orchestrated"
+    if any(cue in lowered for cue in CODEX_55TO53_BOUNDED_CUES):
+        return "bounded"
+    return "trivial"
+
+
+def build_codex_55to53_prompt(user_prompt: str, classification: str) -> str:
+    common = (
+        "Use the KRT delegated workflow and obey AGENTS.md, the 55to53 orchestrator skill, "
+        "and the repo-local Codex configuration. Preserve scope, preserve architecture "
+        "boundaries, and keep changes aligned with the user's request."
+    )
+    if classification == "complex-orchestrated":
+        workflow = (
+            "This task is pre-classified as complex-orchestrated. Do not implement directly "
+            "without the delegated flow. First analyze the task. Use code-mapper when file "
+            "ownership, execution flow, or branch behavior is not already clear. Before "
+            "editing, write a concise operational plan. Then delegate implementation to "
+            "spark_implementer with closed instructions. After implementation, review the "
+            "final diff yourself and correct any deviation, regression, or unnecessary change "
+            "before closing."
+        )
+    elif classification == "bounded":
+        workflow = (
+            "This task is pre-classified as bounded. The parent may edit directly only after "
+            "writing a concise mini plan and keeping the diff tightly scoped. If scope grows "
+            "during analysis, upgrade the task to complex-orchestrated and switch to the "
+            "delegated flow."
+        )
+    else:
+        workflow = (
+            "This task is pre-classified as trivial. The parent may edit directly only if the "
+            "change remains single-file, low-risk, and clearly owned. If scope grows, upgrade "
+            "the task classification before editing."
+        )
+
+    response_contract = (
+        "The final response must include: chosen classification, mini plan followed, whether "
+        "code-mapper was used, whether spark_implementer was used, files changed, "
+        "tests/checks run, and remaining risks if any."
+    )
+    return (
+        f"{common}\n\n"
+        f"{workflow}\n\n"
+        f"{response_contract}\n\n"
+        f"Original user task:\n{user_prompt}"
+    )
+
+
+def codex_55to53(args: argparse.Namespace) -> int:
+    prompt_parts = [part for part in args.prompt if part.strip()]
+    if args.prompt_file and prompt_parts:
+        raise CliError("Use either a positional prompt or --prompt-file, not both.")
+    if not args.prompt_file and not prompt_parts:
+        raise CliError("Pass a prompt or --prompt-file.")
+
+    if args.prompt_file:
+        prompt_path = Path(args.prompt_file).expanduser()
+        if not prompt_path.is_file():
+            raise CliError(f"Prompt file not found: {prompt_path}")
+        user_prompt = prompt_path.read_text(encoding="utf-8", errors="replace").strip()
+    else:
+        user_prompt = " ".join(prompt_parts).strip()
+
+    if not user_prompt:
+        raise CliError("Prompt is empty.")
+
+    classification = (
+        args.classification
+        if args.classification != "auto"
+        else classify_codex_55to53_prompt(user_prompt)
+    )
+    wrapped_prompt = build_codex_55to53_prompt(user_prompt, classification)
+
+    payload = {
+        "profile": args.profile,
+        "classification": classification,
+        "mode": args.mode,
+        "codex_command": args.codex_command,
+        "wrapped_prompt": wrapped_prompt,
+    }
+
+    if args.mode == "print":
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print(f"Profile: {args.profile}")
+            print(f"Classification: {classification}")
+            print("Mode: print")
+            print("")
+            print(wrapped_prompt)
+        return 0
+
+    if args.mode == "handoff":
+        prompts_dir = REPO_ROOT / ".codex" / "prompts"
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        output_path = (
+            Path(args.output_file).expanduser()
+            if args.output_file
+            else prompts_dir / f"55to53-{datetime.now().strftime('%Y%m%d-%H%M%S')}.prompt.md"
+        )
+        if not output_path.is_absolute():
+            output_path = (REPO_ROOT / output_path).resolve()
+
+        header = [
+            f"# Codex 55to53 Handoff",
+            "",
+            f"- Profile: {args.profile}",
+            f"- Classification: {classification}",
+            "",
+            "## Prompt",
+            "",
+        ]
+        output_path.write_text("\n".join(header) + wrapped_prompt + "\n", encoding="utf-8")
+        launch_result = launch_codex_client(args) if args.launch_client else {"ok": False, "skipped": True}
+
+        result = dict(payload)
+        result["output_file"] = str(output_path)
+        result["launch_result"] = launch_result
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"Profile: {args.profile}")
+            print(f"Classification: {classification}")
+            print("Mode: handoff")
+            print(f"Prompt file: {output_path}")
+            if launch_result.get("ok"):
+                print(f"Launched Codex client via {launch_result['method']}.")
+            elif launch_result.get("skipped"):
+                print("Client launch skipped.")
+            else:
+                print(f"Client launch failed: {launch_result.get('reason', 'unknown error')}")
+        return 0
+
+    command = [args.codex_command, "exec", "--profile", args.profile, wrapped_prompt]
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=str(REPO_ROOT),
+            check=False,
+            capture_output=args.json,
+            text=args.json,
+            encoding="utf-8" if args.json else None,
+        )
+    except FileNotFoundError as exc:
+        raise CliError(
+            "Codex launcher not found. Set --codex-command or KRT_CODEX_COMMAND. "
+            f"Underlying error: {exc}"
+        ) from exc
+    except PermissionError as exc:
+        raise CliError(
+            "Codex launcher exists but could not be started from this environment. "
+            "Run the command from your normal shell, or set --mode print to emit the wrapped prompt. "
+            f"Underlying error: {exc}"
+        ) from exc
+    except OSError as exc:
+        raise CliError(
+            "Codex launcher failed to start from this environment. "
+            "Use --mode print as a fallback or point --codex-command at a working launcher. "
+            f"Underlying error: {exc}"
+        ) from exc
+
+    if args.json:
+        result = dict(payload)
+        result["returncode"] = completed.returncode
+        result["stdout"] = completed.stdout
+        result["stderr"] = completed.stderr
+        print(json.dumps(result, indent=2))
+    return completed.returncode
 
 
 def run_powershell_script(
@@ -1549,6 +1813,25 @@ def build_parser() -> argparse.ArgumentParser:
     mcp = subparsers.add_parser("run-krt-mcp", help="Start the repo-local MCP server")
     mcp.add_argument("--python-exe", default="")
     mcp.set_defaults(handler=run_krt_mcp)
+
+    codex_orchestrator = subparsers.add_parser(
+        "codex-55to53",
+        help="Classify a task and launch or print a wrapped Codex 55to53 workflow prompt",
+    )
+    codex_orchestrator.add_argument("prompt", nargs="*")
+    codex_orchestrator.add_argument("--prompt-file", default="")
+    codex_orchestrator.add_argument(
+        "--classification",
+        choices=("auto", "trivial", "bounded", "complex-orchestrated"),
+        default="auto",
+    )
+    codex_orchestrator.add_argument("--profile", default="55to53")
+    codex_orchestrator.add_argument("--codex-command", default=os.environ.get("KRT_CODEX_COMMAND", "codex"))
+    codex_orchestrator.add_argument("--mode", choices=("print", "exec", "handoff"), default="print")
+    codex_orchestrator.add_argument("--output-file", default="")
+    codex_orchestrator.add_argument("--launch-client", action="store_true")
+    codex_orchestrator.add_argument("--json", action="store_true")
+    codex_orchestrator.set_defaults(handler=codex_55to53)
 
     mech = subparsers.add_parser("mech", help="Call Mechanic with KRT defaults")
     mech.add_argument("action", choices=MECHANIC_ACTIONS)

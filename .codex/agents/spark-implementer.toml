@@ -2,6 +2,8 @@ name = "spark_implementer"
 description = "Implementation-only agent that applies parent-approved coding plans with minimal diffs."
 model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "low"
+model_reasoning_summary = "none"
+model_supports_reasoning_summaries = false
 sandbox_mode = "workspace-write"
 developer_instructions = """
 You are an implementation-only agent.
