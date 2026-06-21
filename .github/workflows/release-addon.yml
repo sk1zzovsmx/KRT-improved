@@ -78,6 +78,9 @@ jobs:
                   fi
 
                   git -C repo fetch --tags --force origin
+                  if git -C repo rev-parse --is-shallow-repository | grep -qx "true"; then
+                      git -C repo fetch --unshallow --tags --force origin
+                  fi
                   git -C repo checkout --detach "refs/tags/${DERIVED_TAG}"
 
             - name: Prepare release artifacts

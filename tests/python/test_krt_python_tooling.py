@@ -22,9 +22,11 @@ class PythonToolingTests(unittest.TestCase):
     def setUp(self) -> None:
         self.krt = load_krt_module()
         self.orig_run_command = self.krt.run_command
+        self.orig_git_commit_entries = self.krt.git_commit_entries
 
     def tearDown(self) -> None:
         self.krt.run_command = self.orig_run_command
+        self.krt.git_commit_entries = self.orig_git_commit_entries
 
     def test_python_quality_check_runs_expected_steps_in_order(self) -> None:
         called = []
@@ -93,6 +95,24 @@ class PythonToolingTests(unittest.TestCase):
         self.assertIn("pytest", text)
         self.assertIn("jsonschema", text)
         self.assertIn("Pillow", text)
+
+    def test_release_note_context_uses_current_tag_for_commit_range(self) -> None:
+        ranges = []
+
+        def fake_git_commit_entries(commit_range):
+            ranges.append(commit_range)
+            return [{"short_sha": "abcdef0", "subject": "Example change"}]
+
+        self.krt.git_commit_entries = fake_git_commit_entries
+        context = self.krt.resolve_release_note_context(
+            current_version="0.9.0-beta.1",
+            current_tag="v0.9.0-beta.1",
+            current_ref="HEAD",
+            previous_tag="v0.8.0-beta.1",
+        )
+
+        self.assertEqual(ranges, ["v0.8.0-beta.1..v0.9.0-beta.1"])
+        self.assertEqual(context["commit_range"], "v0.8.0-beta.1..v0.9.0-beta.1")
 
 
 @unittest.skipUnless(_module_available("jsonschema"), "jsonschema is not installed in this environment.")
