@@ -150,15 +150,15 @@ The final response must include:
 
 ### Repo policy
 
-- Keep project-specific Codex workflow files under `.codex/` in the repository.
-- Keep project-specific orchestrator skills under `.agents/skills/` in the repository.
+- Keep project-specific Codex workflow files local under `.codex/`, not committed.
+- Keep project-specific orchestrator skills local under `.agents/skills/`, not committed.
 - Prefer the repo-local launcher `py -3 tools/krt.py codex-55to53 ...` when starting
   complex delegated Codex tasks from the command line.
 - For `complex-orchestrated` tasks started through the repo-local launcher, use a
   dedicated task branch for the specific work item before implementation begins,
   even if the current checkout is already a `codex/*` branch.
-- Treat `.codex/config.toml`, `.codex/agents/*`, `.codex/hooks*`, and `.codex/rules/*`
-  as project infrastructure, not personal machine-local preferences.
+- Treat `.codex/`, `.agents/`, `.vscode/`, `.venv/`, Python caches, and linter caches as
+  local development state that must stay out of GitHub unless the user explicitly requests it.
 - Do not move this workflow back to a global profile unless the user explicitly requests it.
 
 ### User reinforcement phrase
