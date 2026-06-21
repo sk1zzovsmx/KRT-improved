@@ -81,7 +81,7 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 - Binding rules and coding policy: `AGENTS.md`
 - Quick layering checks: `docs/DEV_CHECKS.md`
 - Cross-platform tooling entrypoint: `tools/krt.py`
-- Agent skills + Mechanic companion workflow: `docs/AGENT_SKILLS.md`
+- Agent skills and workflow: `docs/AGENT_SKILLS.md`
 - Repo-local MCP server for skill/addon workflows: `docs/KRT_MCP.md`
 - UI/XML binding and template policy: `docs/ARCHITECTURE.md`
 - Addon debug command reference: `!KRT/debug/README.md`

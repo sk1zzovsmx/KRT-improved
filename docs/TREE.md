@@ -264,7 +264,8 @@
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-s2-rolls-service.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-s3-reserves-service.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-u1-ui-scaffold-infrastructure.md
-|   |   |   \\-- 2026-06-14-docs-current-addon-state.md
+|   |   |   |-- 2026-06-14-docs-current-addon-state.md
+|   |   |   \\-- 2026-06-15-tools-current-state-refresh.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       |-- 2026-06-05-master-loot-grid-design.md
@@ -355,11 +356,11 @@
 |   |-- install-hooks.ps1
 |   |-- krt.py
 |   |-- krt_mcp_server.py
-|   |-- mech-bootstrap.ps1
-|   |-- mech-krt.ps1
 |   |-- pre-commit.ps1
 |   |-- README.md
+|   |-- requirements-mcp.txt
 |   |-- run-krt-mcp.ps1
+|   |-- run-markitdown-mcp.py
 |   |-- run-raid-validator.ps1
 |   |-- run-release-targeted-tests.ps1
 |   |-- run-sv-inspector.ps1

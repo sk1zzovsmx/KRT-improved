@@ -9,6 +9,11 @@
       "command": "mcp-language-server",
       "args": ["--workspace", ".", "--lsp", "lua-language-server"],
       "cwd": "."
+    },
+    "markitdown": {
+      "command": "py",
+      "args": ["-3", "tools/run-markitdown-mcp.py"],
+      "cwd": "."
     }
   }
 }

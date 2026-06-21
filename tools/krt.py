@@ -17,33 +17,6 @@ from pathlib import Path
 from typing import Any
 
 
-MECHANIC_ACTIONS = (
-    "EnvStatus",
-    "ToolsStatus",
-    "AddonValidate",
-    "DocsStale",
-    "AddonDeadcode",
-    "AddonLint",
-    "AddonFormat",
-    "AddonSecurity",
-    "AddonComplexity",
-    "AddonDeprecations",
-    "AddonOutput",
-)
-
-MECHANIC_COMMANDS = {
-    "EnvStatus": "env.status",
-    "ToolsStatus": "tools.status",
-    "AddonValidate": "addon.validate",
-    "DocsStale": "docs.stale",
-    "AddonDeadcode": "addon.deadcode",
-    "AddonLint": "addon.lint",
-    "AddonFormat": "addon.format",
-    "AddonSecurity": "addon.security",
-    "AddonComplexity": "addon.complexity",
-    "AddonDeprecations": "addon.deprecations",
-    "AddonOutput": "addon.output",
-}
 
 CODEX_55TO53_MULTI_FILE_CUES = (
     "multi-file",
@@ -197,32 +170,6 @@ def powershell_script_arg(script_path: Path, powershell: str) -> str:
                 return value
 
     return script_arg
-
-
-def default_mechanic_root() -> Path:
-    override = os.environ.get("KRT_MECHANIC_ROOT", "").strip()
-    if override:
-        return Path(override).expanduser()
-    if is_windows():
-        return Path("C:/dev/Mechanic")
-    return Path.home() / "dev" / "Mechanic"
-
-
-def default_mechanic_executable() -> str | None:
-    override = os.environ.get("KRT_MECHANIC_EXE", "").strip()
-    if override:
-        return override
-
-    mechanic_root = default_mechanic_root()
-    if is_windows():
-        candidate = mechanic_root / "desktop" / ".venv" / "Scripts" / "mech.exe"
-    else:
-        candidate = mechanic_root / "desktop" / ".venv" / "bin" / "mech"
-
-    if candidate.is_file():
-        return str(candidate.resolve())
-
-    return first_command(["mech"])
 
 
 def local_skills_root() -> Path:
@@ -1336,24 +1283,6 @@ def skills_sync(args: argparse.Namespace) -> int:
     return run_powershell_script("sync-agent-skills.ps1", ps_args)
 
 
-def mechanic_bootstrap(args: argparse.Namespace) -> int:
-    ps_args: list[str] = []
-    if args.mechanic_root:
-        root = str(Path(args.mechanic_root).expanduser())
-        ps_args.extend(["-MechanicRoot", root])
-    if args.repo_url:
-        ps_args.extend(["-RepoUrl", args.repo_url])
-    if args.ref:
-        ps_args.extend(["-Ref", args.ref])
-    if args.pull:
-        ps_args.append("-Pull")
-    if args.skip_pip_upgrade:
-        ps_args.append("-SkipPipUpgrade")
-    if args.run_setup_tools:
-        ps_args.append("-RunSetupTools")
-    return run_powershell_script("mech-bootstrap.ps1", ps_args)
-
-
 def run_krt_mcp(args: argparse.Namespace) -> int:
     server_path = TOOLS_DIR / "krt_mcp_server.py"
     if not server_path.is_file():
@@ -1364,70 +1293,6 @@ def run_krt_mcp(args: argparse.Namespace) -> int:
         raise CliError("Python executable not found.")
 
     return run_command([python_exe, str(server_path)], cwd=REPO_ROOT)
-
-
-def mechanic_payload(args: argparse.Namespace) -> dict[str, Any]:
-    payload: dict[str, Any]
-    if args.action in ("EnvStatus", "ToolsStatus"):
-        payload = {}
-    elif args.action == "AddonOutput":
-        payload = {"agent_mode": bool(args.agent_mode)}
-    else:
-        addon_path = Path(args.addon_path).expanduser() if args.addon_path else ADDON_DIR
-        addon_path = addon_path.resolve()
-        if not addon_path.is_dir():
-            raise CliError(f"Addon path does not exist: {addon_path}")
-
-        payload = {
-            "addon": args.addon_name,
-            "path": str(addon_path),
-        }
-
-        if args.action in ("AddonDeadcode", "AddonSecurity", "DocsStale"):
-            payload["include_suspicious"] = bool(args.include_suspicious)
-        if args.action == "AddonFormat":
-            payload["check"] = bool(args.format_check)
-        if args.action in ("AddonDeadcode", "AddonSecurity", "AddonComplexity") and args.categories:
-            payload["categories"] = args.categories
-        if args.action == "AddonDeprecations":
-            payload["min_severity"] = args.min_severity
-
-    return payload
-
-
-def mechanic(args: argparse.Namespace) -> int:
-    if args.json and args.agent_mode:
-        raise CliError("Use either --json or --agent-mode, not both.")
-    if args.action != "AddonOutput" and args.agent_mode:
-        raise CliError("--agent-mode is only valid with action AddonOutput.")
-
-    mechanic_exe = args.mechanic_exe or default_mechanic_executable()
-    if not mechanic_exe:
-        raise CliError(
-            "Mechanic executable not found. Set KRT_MECHANIC_EXE or install Mechanic on this machine."
-        )
-
-    mech_path = Path(mechanic_exe).expanduser()
-    if mech_path.is_file():
-        command = [str(mech_path.resolve())]
-    else:
-        found = shutil.which(mechanic_exe)
-        if not found:
-            raise CliError(f"Mechanic executable not found: {mechanic_exe}")
-        command = [found]
-
-    if args.json:
-        command.append("--json")
-    elif args.agent_mode:
-        command.append("--agent")
-
-    command.extend(["call", MECHANIC_COMMANDS[args.action]])
-    payload = mechanic_payload(args)
-    if payload:
-        command.append(json.dumps(payload, separators=(",", ":")))
-
-    return run_command(command, cwd=REPO_ROOT)
-
 
 def command_status(name: str, candidates: list[str], required: bool, purpose: str) -> dict[str, Any]:
     resolved = first_command(candidates)
@@ -1531,15 +1396,6 @@ def dev_stack_status(args: argparse.Namespace) -> int:
         },
         command_status("luacheck", ["luacheck"], False, "Lua lint gate"),
         command_status("stylua", ["stylua"], False, "Lua formatting gate"),
-        {
-            "name": "mech",
-            "required": False,
-            "purpose": "Mechanic-backed addon and docs checks",
-            "requested": [default_mechanic_executable() or "mech"],
-            "available": bool(default_mechanic_executable()),
-            "status": "ready" if default_mechanic_executable() else "warning",
-            "path": default_mechanic_executable(),
-        },
     ]
 
     paths = [
@@ -1549,7 +1405,6 @@ def dev_stack_status(args: argparse.Namespace) -> int:
         path_status("mcpServer", TOOLS_DIR / "krt_mcp_server.py", True),
         path_status("directPreCommit", TOOLS_DIR / "pre-commit.ps1", True),
         path_status("localSkillsRoot", local_skills_root(), False, directory=True),
-        path_status("mechanicRoot", default_mechanic_root(), False, directory=True),
     ]
 
     verification = verify_skills_if_requested(args.verify_skills)
@@ -1891,15 +1746,6 @@ def build_parser() -> argparse.ArgumentParser:
     skills.add_argument("--local-skills-root", default="")
     skills.set_defaults(handler=skills_sync)
 
-    bootstrap = subparsers.add_parser("mechanic-bootstrap", help="Bootstrap/update local Mechanic checkout")
-    bootstrap.add_argument("--mechanic-root", default="")
-    bootstrap.add_argument("--repo-url", default="")
-    bootstrap.add_argument("--ref", default="")
-    bootstrap.add_argument("--pull", action="store_true")
-    bootstrap.add_argument("--skip-pip-upgrade", action="store_true")
-    bootstrap.add_argument("--run-setup-tools", action="store_true")
-    bootstrap.set_defaults(handler=mechanic_bootstrap)
-
     mcp = subparsers.add_parser("run-krt-mcp", help="Start the repo-local MCP server")
     mcp.add_argument("--python-exe", default="")
     mcp.set_defaults(handler=run_krt_mcp)
@@ -1924,19 +1770,6 @@ def build_parser() -> argparse.ArgumentParser:
     codex_orchestrator.add_argument("--allow-dirty-branch", action="store_true")
     codex_orchestrator.add_argument("--json", action="store_true")
     codex_orchestrator.set_defaults(handler=codex_55to53)
-
-    mech = subparsers.add_parser("mech", help="Call Mechanic with KRT defaults")
-    mech.add_argument("action", choices=MECHANIC_ACTIONS)
-    mech.add_argument("--mechanic-exe", default="")
-    mech.add_argument("--addon-name", default="!KRT")
-    mech.add_argument("--addon-path", default="")
-    mech.add_argument("--json", action="store_true")
-    mech.add_argument("--agent-mode", action="store_true")
-    mech.add_argument("--include-suspicious", action="store_true")
-    mech.add_argument("--format-check", action="store_true")
-    mech.add_argument("--categories", default="")
-    mech.add_argument("--min-severity", default="warning")
-    mech.set_defaults(handler=mechanic)
 
     status = subparsers.add_parser("dev-stack-status", help="Inspect repo tooling readiness")
     status.add_argument("--json", action="store_true")

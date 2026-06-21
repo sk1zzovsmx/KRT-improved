@@ -17,8 +17,9 @@ The repo registers this server in both:
 Keep these registrations project-local so agents can use the same repo-specific tooling
 without relying on personal global Codex config.
 
-Mechanic integration remains optional. The structured `55to53` workflow base depends on
-`AGENTS.md`, `.codex/*`, and the KRT MCP registration, not on a local Mechanic install.
+The workflow base depends on `AGENTS.md`, `.codex/*`, and the KRT MCP registration.
+MarkItDown MCP is also registered as an auxiliary local server for attachment and
+document conversion.
 
 ## Start Command
 
@@ -31,10 +32,28 @@ Linux:   python3 tools/krt.py run-krt-mcp
 
 Server implementation: `tools/krt_mcp_server.py`.
 
+### Installation for MCP Python dependencies
+
+Windows:
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r tools/requirements-mcp.txt
+```
+
+This virtualenv is used by both `run-markitdown-mcp.py` and related attachment
+conversion tooling.
+
+### MarkItDown MCP Start Command
+
+```text
+py -3 tools/run-markitdown-mcp.py
+```
+
 ## Exposed MCP Tools
 
 - `dev_stack_status`
-  Unified readiness across commands, manifests, local skills, Mechanic, and MCP dependencies.
+  Unified readiness across commands, manifests, local skills, and MCP dependencies.
 - `skills_manifest`
   Read `tools/agent-skills.manifest.json` with resolved destination paths.
 - `skills_verify`
@@ -44,11 +63,6 @@ Server implementation: `tools/krt_mcp_server.py`.
 - `repo_quality_check`
   Run one MCP-exposed repo check: `toc_files`, `lua_syntax`, `ui_binding`, `layering`,
   `retired_aliases`, `raid_hardening`, or `lua_uniformity`.
-- `mechanic_call`
-  Execute existing Mechanic wrapper flows (`env.status`, addon validate/lint/deadcode, etc.).
-- `mechanic_bootstrap`
-  Bootstrap/update external Mechanic checkout used by wrappers.
-
 ## Suggested Workflow
 
 1. Run `dev_stack_status` first.
@@ -56,8 +70,6 @@ Server implementation: `tools/krt_mcp_server.py`.
 3. Run `skills_verify` before doc/tooling updates.
 4. Run `skills_sync` when vendored snapshots drift.
 5. Run `repo_quality_check` for fast local guardrails.
-6. If addon-aware Mechanic flows are needed and Mechanic is missing, run `mechanic_bootstrap`.
-7. Use `mechanic_call` only for checks that specifically need the external Mechanic companion.
 
 ## Shell Equivalents
 
@@ -66,8 +78,6 @@ The MCP server delegates to these repo scripts:
 - `tools/dev-stack-status.ps1`
 - `tools/sync-agent-skills.ps1`
 - `tools/check-*.ps1` (`toc`, `lua`, `layering`, `ui_binding`, ...)
-- `tools/mech-krt.ps1`
-- `tools/mech-bootstrap.ps1`
 
 Equivalent direct CLI path:
 
@@ -76,7 +86,6 @@ python3 tools/krt.py dev-stack-status
 python3 tools/krt.py repo-quality-check --check layering
 python3 tools/krt.py api-catalog-check
 python3 tools/krt.py skills-sync --verify-only
-python3 tools/krt.py mech AddonValidate --json
 ```
 
 ## Optional Environment Overrides
@@ -84,16 +93,13 @@ python3 tools/krt.py mech AddonValidate --json
 - `KRT_LOCAL_SKILLS_ROOT`
   Overrides local Codex skills destination.
   Default: `%USERPROFILE%\.codex\skills` (Windows), `~/.codex/skills` (Linux).
-- `KRT_MECHANIC_ROOT`
-  Overrides Mechanic checkout root.
-  Default: `C:\dev\Mechanic` (Windows), `~/dev/Mechanic` (Linux).
-- `KRT_MECHANIC_EXE`
-  Overrides executable used by Mechanic wrapper calls.
 - `KRT_POWERSHELL_EXE`
   Overrides PowerShell executable used by the MCP server.
 
 ## Notes
 
 - MCP tool operations do not patch vendored skill content directly.
-- `skills_sync` and `mechanic_bootstrap` are intentionally marked as destructive operations.
+- `skills_sync` is intentionally marked as a destructive operation.
 - The server supports both newline-delimited JSON-RPC framing and `Content-Length` framing.
+- MarkItDown MCP is for local trusted usage only. It can read files and URIs with
+  current-user privileges; keep stdio transport local (no HTTP/SSE exposure).

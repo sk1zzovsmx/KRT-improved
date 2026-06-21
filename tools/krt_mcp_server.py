@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repo-local MCP server for KRT skill and addon development workflows."""
+"""Repo-local MCP server for KRT repo tooling, skills, and addon checks."""
 
 from __future__ import annotations
 
@@ -28,21 +28,6 @@ REPO_CHECKS = {
     "raid_hardening": "check-raid-hardening.ps1",
     "lua_uniformity": "check-lua-uniformity.ps1",
 }
-
-MECHANIC_ACTIONS = (
-    "EnvStatus",
-    "ToolsStatus",
-    "AddonValidate",
-    "DocsStale",
-    "AddonDeadcode",
-    "AddonLint",
-    "AddonFormat",
-    "AddonSecurity",
-    "AddonComplexity",
-    "AddonDeprecations",
-    "AddonOutput",
-)
-
 
 class ToolError(Exception):
     """Raised for invalid MCP tool inputs."""
@@ -315,89 +300,6 @@ def handle_repo_quality_check(arguments: dict[str, Any]) -> dict[str, Any]:
     return run_powershell(REPO_CHECKS[check_name], [])
 
 
-def handle_mechanic_call(arguments: dict[str, Any]) -> dict[str, Any]:
-    validate_keys(
-        arguments,
-        {
-            "action",
-            "agentMode",
-            "jsonOutput",
-            "includeSuspicious",
-            "formatCheck",
-            "categories",
-            "minSeverity",
-            "mechanicExe",
-            "addonName",
-            "addonPath",
-        },
-    )
-    action = expect_enum(arguments, "action", list(MECHANIC_ACTIONS))
-    agent_mode = expect_bool(arguments, "agentMode", default=(action == "AddonOutput"))
-    json_output = expect_bool(arguments, "jsonOutput", default=(action != "AddonOutput"))
-    include_suspicious = expect_bool(arguments, "includeSuspicious", default=False)
-    format_check = expect_bool(arguments, "formatCheck", default=False)
-    categories = expect_string(arguments, "categories")
-    min_severity = expect_string(arguments, "minSeverity")
-    mechanic_exe = expect_string(arguments, "mechanicExe")
-    addon_name = expect_string(arguments, "addonName")
-    addon_path = expect_string(arguments, "addonPath")
-
-    if action != "AddonOutput" and agent_mode:
-        raise ToolError("'agentMode' is only valid for action='AddonOutput'.")
-    if agent_mode and json_output:
-        raise ToolError("'agentMode' and 'jsonOutput' cannot both be true.")
-
-    args = ["-Action", action]
-    if json_output:
-        args.append("-Json")
-    if agent_mode:
-        args.append("-AgentMode")
-    if include_suspicious:
-        args.append("-IncludeSuspicious")
-    if format_check:
-        args.append("-FormatCheck")
-    if categories:
-        args.extend(["-Categories", categories])
-    if min_severity:
-        args.extend(["-MinSeverity", min_severity])
-    if mechanic_exe:
-        args.extend(["-MechanicExe", mechanic_exe])
-    if addon_name:
-        args.extend(["-AddonName", addon_name])
-    if addon_path:
-        args.extend(["-AddonPath", addon_path])
-
-    return run_powershell("mech-krt.ps1", args)
-
-
-def handle_mechanic_bootstrap(arguments: dict[str, Any]) -> dict[str, Any]:
-    validate_keys(
-        arguments,
-        {"mechanicRoot", "repoUrl", "ref", "pull", "skipPipUpgrade", "runSetupTools"},
-    )
-    mechanic_root = expect_string(arguments, "mechanicRoot")
-    repo_url = expect_string(arguments, "repoUrl")
-    ref = expect_string(arguments, "ref")
-    pull = expect_bool(arguments, "pull", default=False)
-    skip_pip_upgrade = expect_bool(arguments, "skipPipUpgrade", default=False)
-    run_setup_tools = expect_bool(arguments, "runSetupTools", default=False)
-
-    args = []
-    if mechanic_root:
-        args.extend(["-MechanicRoot", mechanic_root])
-    if repo_url:
-        args.extend(["-RepoUrl", repo_url])
-    if ref:
-        args.extend(["-Ref", ref])
-    if pull:
-        args.append("-Pull")
-    if skip_pip_upgrade:
-        args.append("-SkipPipUpgrade")
-    if run_setup_tools:
-        args.append("-RunSetupTools")
-    return run_powershell("mech-bootstrap.ps1", args)
-
-
 TOOLS = {
     spec.name: spec
     for spec in [
@@ -449,7 +351,7 @@ TOOLS = {
         ToolSpec(
             name="dev_stack_status",
             description=(
-                "Inspect repo-local AFD, skill sync, Mechanic, and MCP readiness. "
+                "Inspect repo-local tooling, skill sync, and MCP readiness. "
                 "Use this first to understand what is missing on the current machine."
             ),
             input_schema={
@@ -466,7 +368,7 @@ TOOLS = {
             name="repo_quality_check",
             description=(
                 "Run one of the repo-local addon quality checks from tools/. "
-                "These scripts do not require Mechanic."
+                "These scripts are repo-local."
             ),
             input_schema={
                 "type": "object",
@@ -481,52 +383,6 @@ TOOLS = {
             },
             handler=handle_repo_quality_check,
             annotations={"readOnlyHint": True},
-        ),
-        ToolSpec(
-            name="mechanic_call",
-            description=(
-                "Run the existing Mechanic wrapper for KRT. "
-                "Requires Mechanic to be bootstrapped locally first."
-            ),
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "action": {"type": "string", "enum": list(MECHANIC_ACTIONS)},
-                    "agentMode": {"type": "boolean"},
-                    "jsonOutput": {"type": "boolean"},
-                    "includeSuspicious": {"type": "boolean"},
-                    "formatCheck": {"type": "boolean"},
-                    "categories": {"type": "string"},
-                    "minSeverity": {"type": "string"},
-                    "mechanicExe": {"type": "string"},
-                    "addonName": {"type": "string"},
-                    "addonPath": {"type": "string"},
-                },
-                "required": ["action"],
-                "additionalProperties": False,
-            },
-            handler=handle_mechanic_call,
-        ),
-        ToolSpec(
-            name="mechanic_bootstrap",
-            description=(
-                "Bootstrap or update the external Mechanic companion checkout used by "
-                "repo-local wrappers."
-            ),
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "mechanicRoot": {"type": "string"},
-                    "repoUrl": {"type": "string"},
-                    "ref": {"type": "string"},
-                    "pull": {"type": "boolean", "default": False},
-                    "skipPipUpgrade": {"type": "boolean", "default": False},
-                    "runSetupTools": {"type": "boolean", "default": False},
-                },
-                "additionalProperties": False,
-            },
-            handler=handle_mechanic_bootstrap,
-            annotations={"destructiveHint": True},
         ),
     ]
 }
@@ -556,8 +412,8 @@ def handle_request(method: str, params: dict[str, Any]) -> dict[str, Any]:
                 "version": SERVER_VERSION,
             },
             "instructions": (
-                "Use dev_stack_status first, then skills_* or mechanic_bootstrap, "
-                "and finish with repo_quality_check or mechanic_call."
+                "Use dev_stack_status first, use skills_* only for skill manifest or sync work, "
+                "and finish addon/tooling changes with repo_quality_check."
             ),
         }
 

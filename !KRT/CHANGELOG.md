@@ -6,6 +6,16 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.8.0-beta.1
 
+### Tooling
+
+- **Repo workflow** - Removed the external Mechanic/Mech companion from the
+  active CLI, MCP server, readiness checks, and development docs.
+- **Repo tooling docs** - Refreshed `tools/` guidance and readiness/MCP wording
+  to match the current non-Mechanic workflow.
+- **MarkItDown MCP** - Added project-local MarkItDown MCP registration plus
+  `tools/requirements-mcp.txt` and launcher for attachment/document
+  conversion dependency support.
+
 ### Fixes
 
 - **Spec role inspector** - Added runtime spec icons beside player names in

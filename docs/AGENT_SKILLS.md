@@ -23,7 +23,7 @@ The current structured Codex workflow for KRT is split across:
   complex implementation work through Spark.
 
 Treat these `.codex/*` files as project infrastructure, not personal machine-local preferences.
-This project workflow base does not require Mechanic to be installed locally.
+This project workflow base uses repo-local Codex skills/configuration and WotLK-aware repo tooling, not external addon analyzers.
 
 ## Active Skill
 
@@ -57,7 +57,7 @@ Adaptation notes:
 
 ## Archived Legacy Skills
 
-The old KRT/Mechanic-derived skills are archived under `.agents/skills/OLD`:
+The old legacy KRT skills are archived under `.agents/skills/OLD`:
 
 - `k-docs`
 - `s-audit`

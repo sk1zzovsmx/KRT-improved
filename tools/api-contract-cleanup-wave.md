@@ -8,11 +8,17 @@ Run a new staged cleanup wave for this addon.
 Baseline:
 - Use docs/TECH_CLEANUP_BACKLOG.md and repo docs as the planning baseline.
 - Re-catalog the repo before changing code.
+- Use the repo-local delegated 55to53 workflow for complex multi-file cleanup:
+  parent plans, code-mapper maps when ownership is unclear, spark_implementer
+  applies bounded patches, and parent reviews/corrects before closing.
+- External addon analyzer companions are not part of the active workflow.
 - Cover the whole addon surface: Database, Controllers, Services, Widgets,
   EntryPoints, Modules, UI/XML, docs, and touched tooling.
 
 Process requirements:
-1. Rebuild inventories in sequence, not in parallel:
+1. Rebuild inventories with the canonical CLI:
+   - py -3 tools/krt.py api-catalog-refresh
+   Expanded fallback sequence, only when the CLI wrapper is unavailable:
    - powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-inventory.ps1
    - powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-classify.ps1
    - powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-api-census.ps1
@@ -60,6 +66,7 @@ Deliverables:
 - updated docs/* and tooling docs touched by the cleanup
 - refreshed FUNCTION_REGISTRY / FN_CLUSTERS / API_REGISTRY / TREE
 - a short stage-by-stage summary
+- parent plan, delegation notes if 55to53 was used, checks run, and risks left
 - final metrics delta:
   - function inventory
   - total API surface

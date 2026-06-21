@@ -215,4 +215,4 @@ verify architecture-specific constraints during refactors.
 - `docs/UI_CODING_RULES.md` - reusable UI layout and template rules
 - `docs/DEV_CHECKS.md` - quick checks and audit commands
 - `docs/KRT_MCP.md` - MCP tools for repo workflows
-- `docs/AGENT_SKILLS.md` - skill sync and Mechanic companion workflow
+- `docs/AGENT_SKILLS.md` - skill sync and Codex workflow

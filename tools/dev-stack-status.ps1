@@ -13,25 +13,11 @@ $manifestPath = Join-Path $repoRoot.Path "tools/agent-skills.manifest.json"
 $mcpWrapperPath = Join-Path $repoRoot.Path "tools/run-krt-mcp.ps1"
 $mcpServerPath = Join-Path $repoRoot.Path "tools/krt_mcp_server.py"
 $skillsSyncPath = Join-Path $repoRoot.Path "tools/sync-agent-skills.ps1"
-$mechanicBootstrapPath = Join-Path $repoRoot.Path "tools/mech-bootstrap.ps1"
-$mechanicWrapperPath = Join-Path $repoRoot.Path "tools/mech-krt.ps1"
 
 $localSkillsRoot = if (-not [string]::IsNullOrWhiteSpace($env:KRT_LOCAL_SKILLS_ROOT)) {
     $env:KRT_LOCAL_SKILLS_ROOT
 } else {
     "$env:USERPROFILE\.codex\skills"
-}
-
-$mechanicRoot = if (-not [string]::IsNullOrWhiteSpace($env:KRT_MECHANIC_ROOT)) {
-    $env:KRT_MECHANIC_ROOT
-} else {
-    "C:\dev\Mechanic"
-}
-
-$mechanicExe = if (-not [string]::IsNullOrWhiteSpace($env:KRT_MECHANIC_EXE)) {
-    $env:KRT_MECHANIC_EXE
-} else {
-    "C:\dev\Mechanic\desktop\.venv\Scripts\mech.exe"
 }
 
 $powershellExe = if (-not [string]::IsNullOrWhiteSpace($env:KRT_POWERSHELL_EXE)) {
@@ -159,13 +145,13 @@ $commandChecks = @(
         -Name "git" `
         -Candidates @("git") `
         -Required $true `
-        -Purpose "skill sync and Mechanic bootstrap" `
+        -Purpose "skill sync and project tooling" `
         -Suggestion "Install git and ensure it is in PATH."),
     (New-CommandStatus `
         -Name "python" `
         -Candidates @("py", "python") `
         -Required $true `
-        -Purpose "repo-local MCP server and Mechanic bootstrap" `
+        -Purpose "repo-local MCP server and project tooling" `
         -Suggestion "Install Python 3 and expose 'py' or 'python' in PATH."),
     (New-CommandStatus `
         -Name "powershell" `
@@ -210,16 +196,6 @@ $pathChecks = @(
         -Path $skillsSyncPath `
         -Required $true `
         -Suggestion "Restore tools/sync-agent-skills.ps1."),
-    (New-PathStatus `
-        -Name "mechanicBootstrapScript" `
-        -Path $mechanicBootstrapPath `
-        -Required $true `
-        -Suggestion "Restore tools/mech-bootstrap.ps1."),
-    (New-PathStatus `
-        -Name "mechanicWrapperScript" `
-        -Path $mechanicWrapperPath `
-        -Required $true `
-        -Suggestion "Restore tools/mech-krt.ps1."),
     (New-PathStatus `
         -Name "mcpWrapperScript" `
         -Path $mcpWrapperPath `
@@ -284,10 +260,6 @@ foreach ($skill in $managedSkills) {
 
 $localSkillsReady = $localSkillEntries.Count -gt 0 -and
     @($localSkillEntries | Where-Object { -not $_.exists }).Count -eq 0
-
-$mechanicRootExists = Test-Path -LiteralPath $mechanicRoot -PathType Container
-$mechanicExeExists = Test-Path -LiteralPath $mechanicExe -PathType Leaf
-$mechanicReady = $mechanicExeExists
 
 $pythonReady = @($commandChecks | Where-Object { $_.name -eq "python" -and $_.available }).Count -gt 0
 $powershellReady = @($commandChecks | Where-Object { $_.name -eq "powershell" -and $_.available }).Count -gt 0
@@ -359,13 +331,6 @@ if (-not $localSkillsReady -and $managedSkills.Count -gt 0) {
     )
 }
 
-if (-not $mechanicReady) {
-    $warnings.Add((New-Warning `
-        -Code "MECHANIC_NOT_READY" `
-        -Message "Mechanic is not bootstrapped at the configured executable path."))
-    $suggestions.Add("Run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-bootstrap.ps1")
-}
-
 if (-not $mcpReady) {
     $warnings.Add((New-Warning `
         -Code "MCP_NOT_READY" `
@@ -387,9 +352,8 @@ $repoReady = $vendoredSkillsReady -and
 $summary = [pscustomobject]@{
     repoReady = $repoReady
     localSkillsReady = $localSkillsReady
-    mechanicReady = $mechanicReady
     mcpReady = $mcpReady
-    fullReady = $repoReady -and $localSkillsReady -and $mechanicReady -and $mcpReady
+    fullReady = $repoReady -and $localSkillsReady -and $mcpReady
     managedSkillCount = $managedSkills.Count
     warningCount = $warnings.Count
 }
@@ -411,15 +375,6 @@ $localSkillsResult = [pscustomobject]@{
     entries = $localSkillEntries
 }
 
-$mechanicResult = [pscustomobject]@{
-    root = $mechanicRoot
-    rootExists = $mechanicRootExists
-    exe = $mechanicExe
-    exeExists = $mechanicExeExists
-    ready = $mechanicReady
-    bootstrapCommand = "powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-bootstrap.ps1"
-}
-
 $mcpResult = [pscustomobject]@{
     wrapperPath = $mcpWrapperPath
     serverPath = $mcpServerPath
@@ -432,13 +387,15 @@ $result | Add-Member -NotePropertyName "ok" -NotePropertyValue $true
 $result | Add-Member -NotePropertyName "repoRoot" -NotePropertyValue $repoRoot.Path
 $result | Add-Member `
     -NotePropertyName "reasoning" `
-    -NotePropertyValue "AFD readiness in KRT depends on vendored skills, local installs, Mechanic, and MCP agreeing."
+    -NotePropertyValue (
+        "KRT repo tooling readiness depends on required commands, vendored skills, " +
+        "optional local skill installs, and MCP files agreeing."
+    )
 $result | Add-Member -NotePropertyName "summary" -NotePropertyValue $summary
 $result | Add-Member -NotePropertyName "commands" -NotePropertyValue $commandChecks
 $result | Add-Member -NotePropertyName "paths" -NotePropertyValue $pathChecks
 $result | Add-Member -NotePropertyName "vendoredSkills" -NotePropertyValue $vendoredSkillsResult
 $result | Add-Member -NotePropertyName "localSkills" -NotePropertyValue $localSkillsResult
-$result | Add-Member -NotePropertyName "mechanic" -NotePropertyValue $mechanicResult
 $result | Add-Member -NotePropertyName "mcp" -NotePropertyValue $mcpResult
 $result | Add-Member -NotePropertyName "warnings" -NotePropertyValue $warningItems
 $result | Add-Member -NotePropertyName "suggestions" -NotePropertyValue $suggestionItems
@@ -448,12 +405,11 @@ if ($Json) {
     exit 0
 }
 
-Write-Host "KRT Mechanic + AFD Stack Status"
+Write-Host "KRT Repo Tooling Status"
 Write-Host ("Repo root: {0}" -f $repoRoot.Path)
 Write-Host ""
 Write-Host ("Repo ready:        {0}" -f $summary.repoReady)
 Write-Host ("Local skills ready:{0}" -f $summary.localSkillsReady)
-Write-Host ("Mechanic ready:    {0}" -f $summary.mechanicReady)
 Write-Host ("MCP ready:         {0}" -f $summary.mcpReady)
 Write-Host ("Full ready:        {0}" -f $summary.fullReady)
 Write-Host ""
@@ -473,11 +429,6 @@ if ($VerifySkills) {
 Write-Host ""
 Write-Host "Local skills root:"
 Write-Host ("- {0}" -f $localSkillsRoot)
-Write-Host ""
-Write-Host "Mechanic:"
-Write-Host ("- root exists: {0}" -f $mechanicRootExists)
-Write-Host ("- exe exists:  {0}" -f $mechanicExeExists)
-Write-Host ("- exe path:    {0}" -f $mechanicExe)
 Write-Host ""
 Write-Host "MCP:"
 Write-Host ("- wrapper: {0}" -f $mcpWrapperPath)
