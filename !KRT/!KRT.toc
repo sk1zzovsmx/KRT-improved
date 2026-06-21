@@ -95,7 +95,7 @@ Services\Raid\Attendance.lua
 Services\Raid\LootRecords.lua
 Services\Raid\Session.lua
 Services\SpecInspect.lua
-Services\RaidInspect.lua
+Services\EquipInspect.lua
 Services\Chat.lua
 EntryPoints\Minimap.lua
 EntryPoints\SlashEvents.lua

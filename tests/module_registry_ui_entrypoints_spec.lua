@@ -46,11 +46,11 @@ local function getPostRegistryDeps(source, moduleName)
     return collectQuotedValues(source:sub(depsStart, depsEnd))
 end
 
-local raidInspectSource = nil
+local equipInspectSource = nil
 pcall(function()
-    raidInspectSource = read("!KRT/Services/RaidInspect.lua")
+    equipInspectSource = read("!KRT/Services/EquipInspect.lua")
 end)
-assert(raidInspectSource, "Services/RaidInspect.lua must exist for UI entrypoint registry coverage")
+assert(equipInspectSource, "Services/EquipInspect.lua must exist for UI entrypoint registry coverage")
 
 local function findLastExportedFunction(source, owner, separator)
     local lastStart = nil
@@ -432,8 +432,8 @@ local expectedService = {
     deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Timer", "Modules/Strings", "Modules/Comms" },
 }
 
-local expectedRaidInspectService = {
-    name = "Services/RaidInspect",
+local expectedEquipInspectService = {
+    name = "Services/EquipInspect",
     deps = {
         "Init",
         "Modules/ModuleRegistry",
@@ -443,6 +443,7 @@ local expectedRaidInspectService = {
         "Modules/Strings",
         "Services/Raid/Roster",
         "Services/Raid/Attendance",
+        "Services/SpecInspect",
     },
 }
 
@@ -716,7 +717,7 @@ local moduleTocPaths = {
     ["Services/Loot/Rules"] = "Services\\Loot\\Rules.lua",
     ["Services/Loot/DistributionSession"] = "Services\\Loot\\DistributionSession.lua",
     ["Services/Loot/Service"] = "Services\\Loot\\Service.lua",
-    ["Services/RaidInspect"] = "Services\\RaidInspect.lua",
+    ["Services/EquipInspect"] = "Services\\EquipInspect.lua",
     ["Services/Raid/State"] = "Services\\Raid\\State.lua",
     ["Services/Raid/Capabilities"] = "Services\\Raid\\Capabilities.lua",
     ["Services/Raid/Counts"] = "Services\\Raid\\Counts.lua",
@@ -1324,14 +1325,14 @@ registerList(expectedLootServices)
 registerList(expectedRaidServices)
 registry.AddModule(expectedService.name, { deps = expectedService.deps })
 registry.SetLoaded(expectedService.name)
-registry.AddModule(expectedRaidInspectService.name, { deps = expectedRaidInspectService.deps })
-registry.SetLoaded(expectedRaidInspectService.name)
+registry.AddModule("Services/SpecInspect", { deps = { "Init", "Modules/ModuleRegistry", "Modules/Events", "Modules/Bus", "Modules/Strings", "Services/Raid/Roster" } })
+registry.SetLoaded("Services/SpecInspect")
+registry.AddModule(expectedEquipInspectService.name, { deps = expectedEquipInspectService.deps })
+registry.SetLoaded(expectedEquipInspectService.name)
 registerList(expectedEntryPoints)
 registerList(expectedRollServices)
 registerList(expectedDebugServices)
 registerList(expectedSpammerServices)
-registry.AddModule("Services/SpecInspect", { deps = { "Init", "Modules/ModuleRegistry", "Modules/Events", "Modules/Bus", "Modules/Strings", "Services/Raid/Roster" } })
-registry.SetLoaded("Services/SpecInspect")
 registry.AddModule(expectedControllers[1].name, { deps = expectedControllers[1].deps })
 registry.SetLoaded(expectedControllers[1].name)
 registry.AddModule(expectedWidgets[1].name, { deps = expectedWidgets[1].deps })
@@ -1369,7 +1370,7 @@ local function findSpec(name)
         { expectedService },
         expectedEntryPoints,
         expectedRollServices,
-        { expectedRaidInspectService },
+        { expectedEquipInspectService },
         expectedSpammerServices,
         expectedDebugServices,
         expectedControllers,

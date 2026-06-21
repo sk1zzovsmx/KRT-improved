@@ -3690,8 +3690,8 @@ local function initializeRaidAttendanceFrame()
                     if not (currentRaid and tonumber(currentRaid) == tonumber(selectedRaid)) then
                         return
                     end
-                    if Services.RaidInspect and Services.RaidInspect.ForcePlayer then
-                        Services.RaidInspect:ForcePlayer(selectedRaid, selectedPlayer)
+                    if Services.EquipInspect and Services.EquipInspect.ForcePlayer then
+                        Services.EquipInspect:ForcePlayer(selectedRaid, selectedPlayer)
                         if attendancePlayersController then
                             attendancePlayersController:Dirty()
                         end
@@ -3997,7 +3997,7 @@ local function initializeRaidAttendanceFrame()
         module.attendanceSelectedPlayer = nil
         markAttendanceListsDirty()
     end)
-    Bus.RegisterCallback(InternalEvents.RaidInspectUpdated, function(_, raidId)
+    Bus.RegisterCallback(InternalEvents.EquipInspectUpdated, function(_, raidId)
         if not (module.attendanceSelectedRaid and tonumber(module.attendanceSelectedRaid) == tonumber(raidId)) then
             return
         end
@@ -4005,7 +4005,7 @@ local function initializeRaidAttendanceFrame()
             attendancePlayersController:Dirty()
         end
     end)
-    Bus.RegisterCallback(InternalEvents.RaidInspectCompleted, function(_, raidId)
+    Bus.RegisterCallback(InternalEvents.EquipInspectCompleted, function(_, raidId)
         if not (module.attendanceSelectedRaid and tonumber(module.attendanceSelectedRaid) == tonumber(raidId)) then
             return
         end

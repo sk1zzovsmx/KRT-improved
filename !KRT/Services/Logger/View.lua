@@ -38,15 +38,15 @@ local function getRaidPerfId(raid)
     return tostring((raid and raid.raidNid) or "?")
 end
 
-local function getRaidInspectSnapshot(raid, playerNid)
-    local raidInspect = Services.RaidInspect
+local function getEquipInspectSnapshot(raid, playerNid)
+    local equipInspect = Services.EquipInspect
     local nid = tonumber(playerNid)
     if not nid then
         return nil
     end
 
-    if raidInspect and type(raidInspect.GetSnapshot) == "function" then
-        local snapshot = raidInspect:GetSnapshot(raid, nid)
+    if equipInspect and type(equipInspect.GetSnapshot) == "function" then
+        local snapshot = equipInspect:GetSnapshot(raid, nid)
         if snapshot then
             return snapshot
         end
@@ -72,7 +72,7 @@ local function enrichAttendanceRowsWithInspect(raid, out)
         row.playerNid = rowId
 
         if rowId then
-            local snapshot = getRaidInspectSnapshot(raid, rowId)
+            local snapshot = getEquipInspectSnapshot(raid, rowId)
             row.inspect = snapshot
             if snapshot then
                 local avgIlvl = tonumber(snapshot.avgIlvl)

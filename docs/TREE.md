@@ -157,7 +157,7 @@
 |   |   |   \\-- Store.lua
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
-|   |   |-- RaidInspect.lua
+|   |   |-- EquipInspect.lua
 |   |   |-- README.md
 |   |   |-- Reserves.lua
 |   |   \\-- SpecInspect.lua
@@ -321,6 +321,8 @@
 |   |-- config_interface_options_spec.lua
 |   |-- controllers_cleanup_spec.lua
 |   |-- controller_chunk_budget_spec.lua
+|   |-- equip_inspect_service_spec.lua
+|   |-- equip_inspect_source_contract_spec.lua
 |   |-- logger_visual_refresh_spec.lua
 |   |-- master_assignment_service_spec.lua
 |   |-- master_model_services_spec.lua
@@ -334,8 +336,6 @@
 |   |-- module_registry_ui_entrypoints_spec.lua
 |   |-- module_registry_ui_spec.lua
 |   |-- raid_grid_spec_icon_spec.lua
-|   |-- raid_inspect_service_spec.lua
-|   |-- raid_inspect_source_contract_spec.lua
 |   |-- release_stabilization_spec.lua
 |   |-- screen_notice_runtime_spec.lua
 |   |-- spec_inspect_service_spec.lua

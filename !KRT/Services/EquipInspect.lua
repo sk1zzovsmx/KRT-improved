@@ -1,8 +1,8 @@
--- ----- KRT Lua Contract ----- --
+--- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: addon.Services.RaidInspect
--- events: listens wow.INSPECT_TALENT_READY and wow.PLAYER_REGEN_ENABLED; emits RaidInspectStarted/RaidInspectUpdated/RaidInspectCompleted
+-- exports: addon.Services.EquipInspect
+-- events: listens wow.INSPECT_TALENT_READY and wow.PLAYER_REGEN_ENABLED; emits EquipInspectStarted/EquipInspectUpdated/EquipInspectCompleted
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -35,7 +35,6 @@ local GetInventoryItemLink = GetInventoryItemLink or noop
 local GetInventoryItemTexture = GetInventoryItemTexture or noop
 local GetInventoryItemQuality = GetInventoryItemQuality or noop
 local GetItemInfo = GetItemInfo or noop
-local GetTalentTabInfo = GetTalentTabInfo or noop
 
 local type, tonumber, tostring = type, tonumber, tostring
 local pairs, ipairs = pairs, ipairs
@@ -49,9 +48,9 @@ local SLOT_ORDER = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 
 
 -- ----- Internal state ----- --
 
-feature.EnsureServiceNamespace("RaidInspect")
-local module = Services.RaidInspect
-Timer.BindMixin(module, "RaidInspect")
+feature.EnsureServiceNamespace("EquipInspect")
+local module = Services.EquipInspect
+Timer.BindMixin(module, "EquipInspect")
 
 local queueByRaid = {}
 local queuedByPlayer = {}
@@ -145,7 +144,7 @@ local function emitStarted(raidId, reason)
         return
     end
     sessionBusyByRaid[raidId] = true
-    Bus.TriggerEvent(InternalEvents.RaidInspectStarted, raidId, reason or "start")
+    Bus.TriggerEvent(InternalEvents.EquipInspectStarted, raidId, reason or "start")
 end
 
 local function emitCompleted(raidId)
@@ -155,11 +154,11 @@ local function emitCompleted(raidId)
     if inspect then
         inspect.completedAt = now()
     end
-    Bus.TriggerEvent(InternalEvents.RaidInspectCompleted, raidId)
+    Bus.TriggerEvent(InternalEvents.EquipInspectCompleted, raidId)
 end
 
 local function emitUpdated(raidId, playerNid, snapshot)
-    Bus.TriggerEvent(InternalEvents.RaidInspectUpdated, raidId, playerNid, snapshot)
+    Bus.TriggerEvent(InternalEvents.EquipInspectUpdated, raidId, playerNid, snapshot)
 end
 
 local function setRuntimeStatus(raidId, playerNid, status, reason)
@@ -266,35 +265,40 @@ local function collectItems(unit)
     return items, (count > 0 and (total / count) or 0)
 end
 
-local function detectMainSpec(unit)
-    local bestTab, bestPoints, bestName, bestIcon = nil, -1, nil, nil
-    for tab = 1, 3 do
-        local name, icon, points = GetTalentTabInfo(tab, true)
-        local v = tonumber(points) or 0
-        if v > bestPoints then
-            bestPoints = v
-            bestTab = tab
-            bestName = name
-            bestIcon = icon
-        end
+local function getSpecInspectSnapshot(unit, player)
+    local specInspect = Services.SpecInspect
+    if type(specInspect) ~= "table" or type(specInspect.GetUnitTalentSnapshot) ~= "function" then
+        return nil
     end
 
-    return {
-        mainTalentTree = bestTab,
-        specName = tostring(bestName or ""),
-        specIcon = bestIcon,
-    }
+    local playerName = player and player.name or unit
+    return specInspect:GetUnitTalentSnapshot(unit, playerName, "equip_inspect", true)
 end
 
-local function buildReadyDetails(unit)
+local function copySpecSnapshotFields(snapshot, talentSnapshot)
+    if type(snapshot) ~= "table" or type(talentSnapshot) ~= "table" then
+        return
+    end
+
+    snapshot.talentSnapshot = talentSnapshot
+    snapshot.specName = talentSnapshot.specName
+    snapshot.specIcon = talentSnapshot.icon
+    snapshot.mainTalentTree = talentSnapshot.mainTalentTree
+    snapshot.activeTalentGroup = talentSnapshot.activeGroup
+    snapshot.numTalentGroups = talentSnapshot.numGroups
+    snapshot.secondarySpecName = talentSnapshot.secondarySpecName
+    snapshot.secondarySpecIcon = talentSnapshot.secondaryIcon
+    snapshot.secondaryTalentGroup = talentSnapshot.secondaryGroup
+    snapshot.secondaryMainTalentTree = talentSnapshot.secondaryMainTalentTree
+end
+
+local function buildReadyDetails(unit, player)
     local items, avgIlvl = collectItems(unit)
-    local spec = detectMainSpec(unit)
+    local talentSnapshot = getSpecInspectSnapshot(unit, player)
     return {
         items = items,
         avgIlvl = avgIlvl,
-        specName = spec.specName,
-        specIcon = spec.specIcon,
-        mainTalentTree = spec.mainTalentTree,
+        talentSnapshot = talentSnapshot,
     }
 end
 
@@ -370,7 +374,9 @@ local function finalizeRequest(raidId, playerNid, status, reason, unit, request)
     local snapshot
     local snapshotStatus = status
     if status == "ready" and unit then
-        local details = buildReadyDetails(unit)
+        local raid = getRaid(raidId)
+        local player = getPlayerByNid(raid or {}, playerNid)
+        local details = buildReadyDetails(unit, player)
         local resolvedGuid = UnitGUID(unit)
         snapshot = {
             status = status,
@@ -378,14 +384,10 @@ local function finalizeRequest(raidId, playerNid, status, reason, unit, request)
             inspectedAt = now(),
             playerNid = playerNid,
             avgIlvl = details.avgIlvl,
-            specName = details.specName,
-            specIcon = details.specIcon,
-            mainTalentTree = details.mainTalentTree,
             guid = resolvedGuid,
             items = details.items,
         }
-        local raid = getRaid(raidId)
-        local player = getPlayerByNid(raid or {}, playerNid)
+        copySpecSnapshotFields(snapshot, details.talentSnapshot)
         if player then
             snapshot.name = player.name
             snapshot.class = player.class
@@ -748,7 +750,7 @@ end
 
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
-    registry.AddModule("Services/RaidInspect", {
+    registry.AddModule("Services/EquipInspect", {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -758,7 +760,8 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/Strings",
             "Services/Raid/Roster",
             "Services/Raid/Attendance",
+            "Services/SpecInspect",
         },
     })
-    registry.SetLoaded("Services/RaidInspect")
+    registry.SetLoaded("Services/EquipInspect")
 end

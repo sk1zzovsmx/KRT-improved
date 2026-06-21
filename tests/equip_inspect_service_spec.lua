@@ -233,9 +233,9 @@ local function newAddon()
         Events = {
             Internal = {
                 RaidCreate = "RaidCreate",
-                RaidInspectStarted = "RaidInspectStarted",
-                RaidInspectUpdated = "RaidInspectUpdated",
-                RaidInspectCompleted = "RaidInspectCompleted",
+                EquipInspectStarted = "EquipInspectStarted",
+                EquipInspectUpdated = "EquipInspectUpdated",
+                EquipInspectCompleted = "EquipInspectCompleted",
                 RaidAttendanceChanged = "RaidAttendanceChanged",
             },
             Wow = {
@@ -256,6 +256,39 @@ local function newAddon()
         CloseAttendanceForRaid = function() end,
         GetPlayerAttendance = function(_, _, playerNid)
             return roster.players[playerNid]
+        end,
+    }
+    fake.Services.SpecInspect = {
+        GetUnitTalentSnapshot = function(_, unit)
+            if unit == "raid1" then
+                return {
+                    specName = "Feral Combat",
+                    icon = "Interface\\Icons\\ability_druid_catform",
+                    activeGroup = 1,
+                    numGroups = 2,
+                    secondarySpecName = "Restoration",
+                    secondaryIcon = "Interface\\Icons\\spell_nature_healingtouch",
+                    secondaryGroup = 2,
+                    secondaryMainTalentTree = 3,
+                    groups = {
+                        [1] = {
+                            group = 1,
+                            specName = "Feral Combat",
+                            specIcon = "Interface\\Icons\\ability_druid_catform",
+                            mainTalentTree = 2,
+                            points = { 0, 55, 16 },
+                        },
+                        [2] = {
+                            group = 2,
+                            specName = "Restoration",
+                            specIcon = "Interface\\Icons\\spell_nature_healingtouch",
+                            mainTalentTree = 3,
+                            points = { 11, 0, 60 },
+                        },
+                    },
+                }
+            end
+            return nil
         end,
     }
 
@@ -350,9 +383,9 @@ local function loadAddonFile(addon, path)
 end
 
 local addon = newAddon()
-loadAddonFile(addon, "!KRT/Services/RaidInspect.lua")
+loadAddonFile(addon, "!KRT/Services/EquipInspect.lua")
 
-local service = assert(addon.Services.RaidInspect, "RaidInspect service must load")
+local service = assert(addon.Services.EquipInspect, "EquipInspect service must load")
 
 local currentRaid = addon.Database.GetRaid(1)
 local historicalRaid = addon.Database.GetRaid(2)
@@ -380,7 +413,7 @@ local function hasInspectUpdate(playerNid, status)
     for i = 1, #busEvents do
         local event = busEvents[i]
         local payload = event and event[4]
-        if event and event[1] == "RaidInspectUpdated" and tonumber(event[3]) == tonumber(playerNid) and payload and payload.status == status then
+        if event and event[1] == "EquipInspectUpdated" and tonumber(event[3]) == tonumber(playerNid) and payload and payload.status == status then
             return true
         end
     end
@@ -405,7 +438,31 @@ addon.Bus.TriggerEvent("INSPECT_TALENT_READY")
 runTimerWork(1)
 
 local aliceSnapshot = service:GetSnapshot(currentRaid, 1)
+local talentSnapshot = aliceSnapshot.talentSnapshot
 assert(aliceSnapshot.status == "ready", "Alice should be ready after INSPECT_TALENT_READY")
+assert(talentSnapshot.activeGroup == 1, "Alice talent snapshot should include active group from SpecInspect")
+assert(talentSnapshot.numGroups == 2, "Alice talent snapshot should include group count from SpecInspect")
+assert(aliceSnapshot.specName == "Feral Combat", "Alice snapshot should include active spec name from SpecInspect")
+assert(aliceSnapshot.specIcon == "Interface\\Icons\\ability_druid_catform", "Alice snapshot should include active spec icon from SpecInspect")
+assert(aliceSnapshot.secondarySpecName == "Restoration", "Alice snapshot should include secondary spec name from SpecInspect")
+assert(aliceSnapshot.secondarySpecIcon == "Interface\\Icons\\spell_nature_healingtouch", "Alice snapshot should include secondary spec icon from SpecInspect")
+assert(talentSnapshot ~= nil and talentSnapshot.groups[1] and talentSnapshot.groups[2], "Alice snapshot should include both spec groups from SpecInspect")
+assert(talentSnapshot.groups[1].group == 1, "Alice snapshot group 1 should keep group index")
+assert(talentSnapshot.groups[1].mainTalentTree == 2, "Alice snapshot group 1 should keep primary talent tree")
+assert(
+    talentSnapshot.groups[1].points[1] == 0 and talentSnapshot.groups[1].points[2] == 55 and talentSnapshot.groups[1].points[3] == 16,
+    "Alice snapshot group 1 should keep primary points"
+)
+assert(talentSnapshot.groups[2].group == 2, "Alice snapshot group 2 should keep group index")
+assert(talentSnapshot.groups[2].mainTalentTree == 3, "Alice snapshot group 2 should keep secondary talent tree")
+assert(
+    talentSnapshot.groups[2].points[1] == 11 and talentSnapshot.groups[2].points[2] == 0 and talentSnapshot.groups[2].points[3] == 60,
+    "Alice snapshot group 2 should keep secondary points"
+)
+assert(talentSnapshot.groups[1].specName == "Feral Combat", "Alice snapshot should copy first spec name from SpecInspect")
+assert(talentSnapshot.groups[1].specIcon == "Interface\\Icons\\ability_druid_catform", "Alice snapshot should copy first spec icon from SpecInspect")
+assert(talentSnapshot.groups[2].specName == "Restoration", "Alice snapshot should copy second spec name from SpecInspect")
+assert(talentSnapshot.groups[2].specIcon == "Interface\\Icons\\spell_nature_healingtouch", "Alice snapshot should copy second spec icon from SpecInspect")
 assert(type(aliceSnapshot.avgIlvl) == "number", "ready Alice snapshot should include numeric avgIlvl")
 assert(type(aliceSnapshot.specName) == "string", "ready Alice snapshot should include string specName")
 assert(type(aliceSnapshot.items) == "table", "ready Alice snapshot should include items table")
@@ -427,4 +484,4 @@ assert(ok == true and reason == nil, "ForcePlayer(current, readyPlayer) should s
 local readyAgain = service:GetRuntimeStatus(1, 1)
 assert(readyAgain and readyAgain.status == "pending", "forced ready player should be pending")
 
-print("raid inspect service spec passed")
+print("equip inspect service spec passed")
