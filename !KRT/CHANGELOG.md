@@ -18,6 +18,9 @@ Release-Version: 0.8.0-beta.1
 
 ### Fixes
 
+- **Inspect ownership** - Renamed raid attendance equipment inspection to
+  EquipInspect and made SpecInspect the canonical owner of active and secondary
+  talent/spec snapshots.
 - **Raid attendance inspect snapshots** - Added one-shot raid-start inspect snapshots
   to the dedicated Raid Attendance window. Attendance keeps continuous
   join/leave tracking throughout the raid, while inspect data is captured at
@@ -28,6 +31,13 @@ Release-Version: 0.8.0-beta.1
 - **Spec role inspector** - Added runtime spec icons beside player names in
   Master Loot and Loot Counter, backed by `LibGroupTalents-1.0` and
   refreshable with `/krt specinspect`.
+- **Raid attendance spec/inspect icons** - Adjusted attendance row spec and
+  equip-inspect layout so spec renders primary+secondary icons in a 37px spec
+  column and equip-inspect uses 18px icons with 1px spacing and a 324px start
+  field.
+- **Raid attendance spec tooltips** - Attendance row spec icons now use tiny
+  hoverable icon buttons with simple spec-name tooltips, the primary spec
+  remains saturated, and the secondary spec icon is desaturated.
 - **Raid Grid** - Added cached spec icons from `Services.SpecInspect` snapshots
   to RaidGrid player buttons with name icon alignment and event-driven refresh
   while visible.

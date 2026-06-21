@@ -139,8 +139,8 @@ local LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS = {
     join = 39,
     leave = 39,
     ilvl = 30,
-    spec = 25,
-    inspect = 0,
+    spec = 37,
+    inspect = 324,
 }
 
 local LOGGER_ATTENDANCE_COLUMN_RATIOS = {
@@ -439,9 +439,13 @@ local function applyAttendanceRowColumnWidths(ui, frameName)
 end
 
 local RAID_INSPECT_SLOTS = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 }
-local RAID_INSPECT_ICON_SIZE = 19
-local RAID_INSPECT_ICON_GAP = 0.5
-local RAID_SPEC_ICON_SIZE = 19
+local RAID_INSPECT_ICON_SIZE = 18
+local RAID_INSPECT_ICON_GAP = 1
+local RAID_SPEC_ICON_SIZE = 17
+local RAID_SPEC_ICON_GAP = 1
+local RAID_INSPECT_ICON_LEFT_OFFSET = 1
+local RAID_SPEC_ICON_LEFT_OFFSET = 1
+local bindAttendanceSpecIconTooltip
 
 local function getInspectStatusLabel(status, reason)
     local safeStatus = status and tostring(status):lower() or ""
@@ -548,38 +552,129 @@ local function ensureAttendanceSpecIcon(row)
         return row._krtAttendanceSpecIcon
     end
 
-    local icon = row:CreateTexture(nil, "ARTWORK")
+    local icon = CreateFrame("Button", nil, row)
+    icon:EnableMouse(true)
     icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    icon.texture:SetAllPoints(icon)
+    icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    bindAttendanceSpecIconTooltip(icon)
     row._krtAttendanceSpecIcon = icon
     return icon
 end
 
-local function setAttendanceSpecIcon(row, ui, specIcon)
+local function ensureAttendanceSecondarySpecIcon(row)
+    if not row then
+        return nil
+    end
+    if row._krtAttendanceSecondarySpecIcon then
+        return row._krtAttendanceSecondarySpecIcon
+    end
+
+    local icon = CreateFrame("Button", nil, row)
+    icon:EnableMouse(true)
+    icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
+    icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    icon.texture:SetAllPoints(icon)
+    icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    bindAttendanceSpecIconTooltip(icon)
+    row._krtAttendanceSecondarySpecIcon = icon
+    return icon
+end
+
+bindAttendanceSpecIconTooltip = function(icon)
+    if not icon or not icon.SetScript then
+        return
+    end
+
+    icon:SetScript("OnEnter", function(self)
+        local specName = self and self._krtSpecName
+        if not (specName and specName ~= "") then
+            return
+        end
+        if GameTooltip and GameTooltip.SetOwner and GameTooltip.AddLine then
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+            GameTooltip:AddLine(specName)
+            GameTooltip:Show()
+        end
+    end)
+    icon:SetScript("OnLeave", function()
+        if GameTooltip and GameTooltip.Hide then
+            GameTooltip:Hide()
+        end
+    end)
+end
+
+local function setAttendanceSpecIconTexture(icon, iconPath, specName, desaturate)
+    if not icon or not icon.texture then
+        return
+    end
+    if iconPath and iconPath ~= "" then
+        icon.texture:SetTexture(iconPath)
+        icon:Show()
+        icon._krtSpecName = specName
+    else
+        icon:Hide()
+        icon.texture:SetTexture(nil)
+        icon._krtSpecName = nil
+    end
+    if icon.texture.SetDesaturated then
+        icon.texture:SetDesaturated(desaturate and true or false)
+    end
+end
+
+local function clearAttendanceSpecIcons(row)
+    if not row then
+        return
+    end
+
+    local icon = row._krtAttendanceSpecIcon
+    if icon then
+        icon:Hide()
+        icon._krtSpecName = nil
+        if icon.texture then
+            icon.texture:SetTexture(nil)
+            if icon.texture.SetDesaturated then
+                icon.texture:SetDesaturated(false)
+            end
+        end
+    end
+
+    local secondaryIcon = row._krtAttendanceSecondarySpecIcon
+    if secondaryIcon then
+        secondaryIcon:Hide()
+        secondaryIcon._krtSpecName = nil
+        if secondaryIcon.texture then
+            secondaryIcon.texture:SetTexture(nil)
+            if secondaryIcon.texture.SetDesaturated then
+                secondaryIcon.texture:SetDesaturated(false)
+            end
+        end
+    end
+end
+
+local function setAttendanceSpecIcon(row, ui, primarySpecIcon, secondarySpecIcon, primarySpecName, secondarySpecName)
     if ui and ui.Spec and ui.Spec.SetText then
         ui.Spec:SetText("")
     end
 
-    local icon = ensureAttendanceSpecIcon(row)
-    if not icon then
+    local primaryIcon = ensureAttendanceSpecIcon(row)
+    local secondaryIcon = ensureAttendanceSecondarySpecIcon(row)
+    if not primaryIcon or not secondaryIcon then
         return
     end
     if not (ui and ui.Spec) then
-        icon:Hide()
+        clearAttendanceSpecIcons(row)
         return
     end
 
-    icon:ClearAllPoints()
-    icon:SetPoint("CENTER", ui.Spec, "CENTER", 0, -1)
+    primaryIcon:ClearAllPoints()
+    primaryIcon:SetPoint("TOPLEFT", ui.Spec, "TOPLEFT", RAID_SPEC_ICON_LEFT_OFFSET, -1)
+    secondaryIcon:ClearAllPoints()
+    secondaryIcon:SetPoint("TOPLEFT", ui.Spec, "TOPLEFT", RAID_SPEC_ICON_LEFT_OFFSET + RAID_SPEC_ICON_SIZE + RAID_SPEC_ICON_GAP, -1)
 
-    if specIcon and specIcon ~= "" then
-        icon:SetTexture(specIcon)
-        icon:Show()
-        return
-    end
-
-    icon:Hide()
-    icon:SetTexture(nil)
+    setAttendanceSpecIconTexture(primaryIcon, primarySpecIcon, primarySpecName, false)
+    setAttendanceSpecIconTexture(secondaryIcon, secondarySpecIcon, secondarySpecName, true)
 end
 
 local function renderAttendanceInspectIcons(row, ui, playerNid, snapshot)
@@ -610,7 +705,7 @@ local function renderAttendanceInspectIcons(row, ui, playerNid, snapshot)
         return
     end
 
-    local x = 0
+    local x = RAID_INSPECT_ICON_LEFT_OFFSET
     local count = 0
     for i = 1, #RAID_INSPECT_SLOTS do
         local slot = RAID_INSPECT_SLOTS[i]
@@ -3751,7 +3846,14 @@ local function initializeRaidAttendanceFrame()
             ui.Join:SetText(it.joinFmt)
             ui.Leave:SetText(it.leaveFmt)
             ui.Ilvl:SetText(it.avgIlvlFmt or "")
-            setAttendanceSpecIcon(row, ui, it.inspect and it.inspect.specIcon)
+            setAttendanceSpecIcon(
+                row,
+                ui,
+                it.inspect and it.inspect.specIcon,
+                it.inspect and it.inspect.secondarySpecIcon,
+                it.inspect and it.inspect.specName,
+                it.inspect and it.inspect.secondarySpecName
+            )
             renderAttendanceInspectIcons(row, ui, row._krtPlayerNid, it.inspect)
         end),
 

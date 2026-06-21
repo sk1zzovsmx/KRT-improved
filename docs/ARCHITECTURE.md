@@ -67,7 +67,13 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   remains package-internal.
   `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
   `Services/Raid/LootMethod.lua` owns opt-in Master Loot automation and Group Loot restore prompts.
-  `Services/SpecInspect.lua` owns the UI-free runtime spec snapshot cache backed by LibGroupTalents.
+  `Services/EquipInspect.lua` owns raid attendance equipment snapshots, inspect queueing, item capture,
+  average item level, and manual force actions.
+  `Services/SpecInspect.lua` owns the UI-free runtime spec snapshot cache backed by LibGroupTalents,
+  including active and secondary talent groups.
+  `Services/EquipInspect.lua` must not deduce talent specs directly. It may copy the current
+  `Services.SpecInspect` talent snapshot into persisted attendance equipment snapshots for
+  historical display.
   `Services/Spammer/Draft.lua` owns PUG spammer draft persistence helpers.
   `Services/Warnings/Store.lua` owns warning text storage.
   `Services/Chat.lua` owns announce/warn output contracts.

@@ -61,7 +61,10 @@ Runtime data/model/service modules:
 - `addon.Services.Loot` (public API in `Services/Loot/Service.lua`; internal loot-context/rule helpers in
   `Services/Loot/*.lua`)
 - `addon.Services.Debug`
-- `addon.Services.SpecInspect` (UI-free cached raid talent/spec snapshots backed by LibGroupTalents)
+- `addon.Services.EquipInspect` owns raid attendance equipment snapshots, inspect queueing, item capture,
+  average item level, and manual force actions.
+- `addon.Services.SpecInspect` owns UI-free talent/spec snapshots backed by `LibGroupTalents-1.0`,
+  including active and secondary talent groups.
 - `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import, alias,
   grouped-display, runtime sync, and whisper-response helpers in
   `Services/Reserves/{Import,Aliases,Display,Sync,Chat}.lua`)
@@ -194,6 +197,8 @@ changes first.
   `addon.Services.Reserves._...`) instead of public `*Internal` methods.
 - For `Master`, keep only explicitly consumed button handlers public. Dropdown, cursor,
   and other frame-local glue should stay private inside `Controllers/Master.lua`.
+- For raid attendance equipment snapshots, use `addon.Services.EquipInspect`; `raid.inspect`
+  remains the persisted compatibility key.
 - For spec icons/roles in UI rows, use `addon.Services.SpecInspect:GetPlayerSpecSnapshot(...)`
   and refresh on `Internal.SpecInspectUpdated`; do not inspect talents from Controllers or Widgets.
 - Retired alias usage is blocked by local gates to prevent new root call sites.

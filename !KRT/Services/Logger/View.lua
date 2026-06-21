@@ -84,11 +84,15 @@ local function enrichAttendanceRowsWithInspect(raid, out)
                 end
                 row.specName = snapshot.specName
                 row.specFmt = snapshot.specName or ""
+                row.secondarySpecName = snapshot.secondarySpecName
+                row.secondarySpecIcon = snapshot.secondarySpecIcon
             else
                 row.avgIlvl = nil
                 row.avgIlvlFmt = ""
                 row.specName = nil
                 row.specFmt = ""
+                row.secondarySpecName = nil
+                row.secondarySpecIcon = nil
             end
         else
             row.inspect = nil
@@ -96,6 +100,8 @@ local function enrichAttendanceRowsWithInspect(raid, out)
             row.avgIlvlFmt = ""
             row.specName = nil
             row.specFmt = ""
+            row.secondarySpecName = nil
+            row.secondarySpecIcon = nil
         end
     end
 end

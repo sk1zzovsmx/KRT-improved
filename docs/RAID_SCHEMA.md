@@ -61,9 +61,13 @@ Strict mode status: current-schema reads are enabled; retired payload keys are s
 | `subgroup` | number | no | `nil` | Raid subgroup when not the default group `1`. |
 | `online` | boolean | no | `nil` | `false` means offline; omitted/`nil` means online. |
 
-## RaidInspectSnapshot (`raid.inspect`)
+## EquipInspectSnapshot (`raid.inspect`)
 
 `raid.inspect` is optional. Old raids may omit it.
+`raid.inspect` remains the persisted key for compatibility. `EquipInspect`
+owns equipment/iLvl capture; `SpecInspect` owns talent/spec deduction and may
+provide copied active and secondary spec metadata inside each persisted
+equipment snapshot.
 
 Persisted root fields:
 - `startedAt` (optional number)
@@ -82,6 +86,13 @@ Persisted player snapshot fields under `players[playerNid]`:
 - `specName`
 - `specIcon`
 - `mainTalentTree`
+- `secondarySpecName`
+- `secondarySpecIcon`
+- `activeTalentGroup`
+- `numTalentGroups`
+- `secondaryTalentGroup`
+- `secondaryMainTalentTree`
+- `talentSnapshot`
 
 Persisted item fields under `players[playerNid].items[slotId]`:
 - `slot`

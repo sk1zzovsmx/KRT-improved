@@ -70,6 +70,8 @@ assertContains(raidState, "CloseAttendanceForRaid", "Raid end must close attenda
 
 assertContains(view, "getEquipInspectSnapshot", "Logger View must read EquipInspect snapshots")
 assertContains(view, "enrichAttendanceRowsWithInspect", "Logger View must enrich attendance rows")
+assertContains(view, "row.secondarySpecName = snapshot.secondarySpecName", "Logger View must store secondary spec name")
+assertContains(view, "row.secondarySpecIcon = snapshot.secondarySpecIcon", "Logger View must store secondary spec icon")
 assertNotContains(view, "StartRaidSnapshot", "Logger View must not start inspect")
 assertNotContains(view, "ForcePlayer", "Logger View must not force inspect")
 
