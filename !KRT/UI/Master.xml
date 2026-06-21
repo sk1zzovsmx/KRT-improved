@@ -110,20 +110,6 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentRollsHeaderPlayer" inherits="KRTFontStringGray">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset>
-								<AbsDimension x="16" y="-160" />
-							</Offset>
-						</Anchor>
-						<Anchor point="TOPRIGHT" relativeTo="$parentRollsHeaderInfo" relativePoint="TOPLEFT">
-							<Offset>
-								<AbsDimension x="-8" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</FontString>
 				<FontString name="$parentRollsHeaderRoll" inherits="KRTFontStringGray" justifyH="RIGHT">
 					<Size>
 						<AbsDimension x="28" y="5" />
@@ -156,6 +142,20 @@
 						<Anchor point="TOPRIGHT" relativeTo="$parentRollsHeaderCounter" relativePoint="TOPLEFT">
 							<Offset>
 								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentRollsHeaderPlayer" inherits="KRTFontStringGray">
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="16" y="-160" />
+							</Offset>
+						</Anchor>
+						<Anchor point="TOPRIGHT" relativeTo="$parentRollsHeaderInfo" relativePoint="TOPLEFT">
+							<Offset>
+								<AbsDimension x="-8" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>

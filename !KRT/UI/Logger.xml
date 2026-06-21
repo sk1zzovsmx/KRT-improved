@@ -39,6 +39,8 @@
 						</Anchor>
 					</Anchors>
 				</Texture>
+			</Layer>
+			<Layer level="BORDER">
 				<Texture name="$parentTop" file="Interface\Buttons\WHITE8x8">
 					<Size>
 						<AbsDimension y="1" />
@@ -159,31 +161,6 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
-				</Texture>
-				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
-					<Size>
-						<AbsDimension y="1" />
-					</Size>
-					<Anchors>
-						<Anchor point="BOTTOMLEFT">
-							<Offset>
-								<AbsDimension x="2" y="0" />
-							</Offset>
-						</Anchor>
-						<Anchor point="BOTTOMRIGHT">
-							<Offset>
-								<AbsDimension x="-2" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
-				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -201,6 +178,33 @@
 						</Anchor>
 					</Anchors>
 					<TexCoords top="0" right="0.75" bottom="0.75" left="0.078125" />
+				</Texture>
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+			</Layer>
+			<Layer level="BORDER" textureSubLevel="0">
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
@@ -283,31 +287,6 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
-				</Texture>
-				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
-					<Size>
-						<AbsDimension y="1" />
-					</Size>
-					<Anchors>
-						<Anchor point="BOTTOMLEFT">
-							<Offset>
-								<AbsDimension x="2" y="0" />
-							</Offset>
-						</Anchor>
-						<Anchor point="BOTTOMRIGHT">
-							<Offset>
-								<AbsDimension x="-2" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
-				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -325,6 +304,33 @@
 						</Anchor>
 					</Anchors>
 					<TexCoords top="0" right="0.75" bottom="0.75" left="0.078125" />
+				</Texture>
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+			</Layer>
+			<Layer level="BORDER" textureSubLevel="0">
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
@@ -407,31 +413,6 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
-				</Texture>
-				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
-					<Size>
-						<AbsDimension y="1" />
-					</Size>
-					<Anchors>
-						<Anchor point="BOTTOMLEFT">
-							<Offset>
-								<AbsDimension x="2" y="0" />
-							</Offset>
-						</Anchor>
-						<Anchor point="BOTTOMRIGHT">
-							<Offset>
-								<AbsDimension x="-2" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
-				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -449,6 +430,33 @@
 						</Anchor>
 					</Anchors>
 					<TexCoords top="0" right="0.75" bottom="0.75" left="0.078125" />
+				</Texture>
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+			</Layer>
+			<Layer level="BORDER" textureSubLevel="0">
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
@@ -496,31 +504,6 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
-				</Texture>
-				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
-					<Size>
-						<AbsDimension y="1" />
-					</Size>
-					<Anchors>
-						<Anchor point="BOTTOMLEFT">
-							<Offset>
-								<AbsDimension x="2" y="0" />
-							</Offset>
-						</Anchor>
-						<Anchor point="BOTTOMRIGHT">
-							<Offset>
-								<AbsDimension x="-2" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
-				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -538,6 +521,33 @@
 						</Anchor>
 					</Anchors>
 					<TexCoords top="0" right="0.75" bottom="0.75" left="0.078125" />
+				</Texture>
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+			</Layer>
+			<Layer level="BORDER" textureSubLevel="0">
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
@@ -639,6 +649,29 @@
 					</Layer>
 				</Layers>
 			</Button>
+			<Button name="$parentSecondarySpecIcon" enableMouse="true" hidden="true">
+				<Size>
+					<AbsDimension x="17" y="17" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentSpec" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="19" y="-1" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture name="$parentTexture">
+							<Anchors>
+								<Anchor point="TOPLEFT" />
+								<Anchor point="BOTTOMRIGHT" />
+							</Anchors>
+							<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
+						</Texture>
+					</Layer>
+				</Layers>
+			</Button>
 		</Frames>
 		<HighlightTexture>
 			<Anchors>
@@ -647,22 +680,6 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-	</Button>
-	<Button name="KRTLoggerInspectItemIconButtonTemplate" enableMouse="true" hidden="true" virtual="true">
-		<Size>
-			<AbsDimension x="16" y="16" />
-		</Size>
-		<Layers>
-			<Layer level="ARTWORK">
-				<Texture name="$parentTexture">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
-				</Texture>
-			</Layer>
-		</Layers>
 	</Button>
 	<Button name="KRTLoggerLootButton" inherits="KRTSelectableRowButtonTemplate" virtual="true">
 		<Size>
@@ -682,19 +699,39 @@
 					<AbsDimension x="-5" y="0" />
 				</Offset>
 			</Anchor>
-		</Anchors>
-		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
-				</Texture>
-				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
-					<Size>
-						<AbsDimension y="1" />
+			</Anchors>
+			<Layers>
+				<Layer level="BACKGROUND">
+					<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
+						<Size>
+							<AbsDimension x="10" y="31" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT">
+								<Offset>
+									<AbsDimension x="0" y="0" />
+								</Offset>
+							</Anchor>
+							<Anchor point="BOTTOMRIGHT">
+								<Offset>
+									<AbsDimension x="0" y="-2" />
+								</Offset>
+							</Anchor>
+						</Anchors>
+						<TexCoords top="0" right="0.75" bottom="0.75" left="0.078125" />
+					</Texture>
+					<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+						<Anchors>
+							<Anchor point="TOPLEFT" />
+							<Anchor point="BOTTOMRIGHT" />
+						</Anchors>
+						<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+					</Texture>
+				</Layer>
+				<Layer level="BORDER" textureSubLevel="0">
+					<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+						<Size>
+							<AbsDimension y="1" />
 					</Size>
 					<Anchors>
 						<Anchor point="BOTTOMLEFT">
@@ -707,28 +744,10 @@
 								<AbsDimension x="-2" y="0" />
 							</Offset>
 						</Anchor>
-					</Anchors>
-					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
-				</Texture>
-				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
-					<Size>
-						<AbsDimension x="10" y="31" />
-					</Size>
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset>
-								<AbsDimension x="0" y="0" />
-							</Offset>
-						</Anchor>
-						<Anchor point="BOTTOMRIGHT">
-							<Offset>
-								<AbsDimension x="0" y="-2" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-					<TexCoords top="0" right="0.75" bottom="0.75" left="0.078125" />
-				</Texture>
-			</Layer>
+						</Anchors>
+						<Color r="0.32" g="0.30" b="0.25" a="0.42" />
+					</Texture>
+				</Layer>
 			<Layer level="ARTWORK">
 				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>

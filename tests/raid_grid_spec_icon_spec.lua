@@ -148,8 +148,27 @@ local tooltipLines = {}
 local snapshotIcon = "Interface\\Icons\\Spell_Holy_HolyBolt"
 local specCalls = 0
 local frames = {}
-
 local fakeG
+
+local function seedRaidGridFrame()
+    local frame = makeFrame("KRTRaidGridFrame")
+    local childNames = {
+        "KRTRaidGridFrameIcon",
+        "KRTRaidGridFrameTitle",
+        "KRTRaidGridFrameCount",
+        "KRTRaidGridFrameDivider",
+        "KRTRaidGridFrameEmpty",
+        "KRTRaidGridFrameCloseButton",
+    }
+    frames.KRTRaidGridFrame = frame
+    fakeG.KRTRaidGridFrame = frame
+    for _, name in ipairs(childNames) do
+        local child = makeFrame(name)
+        frames[name] = child
+        fakeG[name] = child
+    end
+end
+
 fakeG = {
     UIParent = makeFrame("UIParent"),
     UISpecialFrames = {},
@@ -169,6 +188,8 @@ fakeG = {
         end,
     },
 }
+
+seedRaidGridFrame()
 
 function fakeG.CreateFrame(_, name, parent, template)
     local frame = makeFrame(name)

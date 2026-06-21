@@ -32,8 +32,10 @@ Database\DBManager.lua
 Localization\localization.en.lua
 Localization\DiagnoseLog.en.lua
 
-# Layer 3 - Shared templates
+# Layer 3 - Shared templates and lightweight XML-only frames
 UI\Templates\Common.xml
+UI\ScreenNotice.xml
+UI\RaidGrid.xml
 
 # Layer 4 - Shared modules (helpers/constants)
 Modules\C.lua
@@ -146,6 +148,12 @@ Widgets\Config.lua
 Controllers\Warnings.lua
 Controllers\Spammer.lua
 
-# Layer 6 - UI include manifest
-# Unified UI include manifest (single profile).
-KRT.xml
+# Layer 6 - Concrete UI frames
+UI\Minimap.xml
+UI\Spammer.xml
+UI\Warnings.xml
+UI\Master.xml
+UI\Logger.xml
+UI\Config.xml
+UI\LootCounter.xml
+UI\Reserves.xml

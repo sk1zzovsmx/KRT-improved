@@ -74,25 +74,6 @@ do
     local activeButtonCount = 0
 
     -- ----- Private helpers ----- --
-    local function noop() end
-
-    local function ensureRegion()
-        return {
-            Show = noop,
-            Hide = noop,
-            SetAllPoints = noop,
-            SetBlendMode = noop,
-            SetFontObject = noop,
-            SetHeight = noop,
-            SetJustifyH = noop,
-            SetPoint = noop,
-            SetText = noop,
-            SetTextColor = noop,
-            SetTexture = noop,
-            SetVertexColor = noop,
-            SetWidth = noop,
-        }
-    end
 
     local function safeCall(obj, methodName, ...)
         local fn = obj and obj[methodName]
@@ -120,20 +101,6 @@ do
                 texture:SetTexture(r, g, b, a)
             end
         end
-
-    local function createTexture(parent, layer)
-        if parent and parent.CreateTexture then
-            return parent:CreateTexture(nil, layer)
-        end
-        return ensureRegion()
-    end
-
-    local function createFontString(parent, template)
-        if parent and parent.CreateFontString then
-            return parent:CreateFontString(nil, "OVERLAY", template)
-        end
-        return ensureRegion()
-    end
 
     local function shortName(name)
         if not name then
@@ -236,73 +203,35 @@ do
         return result
     end
 
-    local function createButtonFallback(index, button)
-        local buttonName = "KRTRaidGridButton" .. tostring(index)
-        if not button and _G.CreateFrame then
-            button = _G.CreateFrame("Button", buttonName, frame)
-        end
-        if not button then
-            return nil
-        end
-        setSize(button, CFG.buttonWidth, CFG.buttonHeight)
-
-        button.bg = button.bg or createTexture(button, "BACKGROUND")
-        safeCall(button.bg, "SetAllPoints", button)
-        setTextureColor(button.bg, 0, 0, 0, CFG.buttonAlpha)
-
-        button.topLine = button.topLine or createTexture(button, "BORDER")
-        safeCall(button.topLine, "SetHeight", 1)
-        safeCall(button.topLine, "SetPoint", "TOPLEFT", button, "TOPLEFT", 0, 0)
-        safeCall(button.topLine, "SetPoint", "TOPRIGHT", button, "TOPRIGHT", 0, 0)
-        setTextureColor(button.topLine, 1, 1, 1, 0.08)
-
-        button.bottomLine = button.bottomLine or createTexture(button, "BORDER")
-        safeCall(button.bottomLine, "SetHeight", 1)
-        safeCall(button.bottomLine, "SetPoint", "BOTTOMLEFT", button, "BOTTOMLEFT", 0, 0)
-        safeCall(button.bottomLine, "SetPoint", "BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
-        setTextureColor(button.bottomLine, 0, 0, 0, 0.90)
-
-        button.highlight = button.highlight or createTexture(button, "HIGHLIGHT")
-        safeCall(button.highlight, "SetAllPoints", button)
-        safeCall(button.highlight, "SetTexture", "Interface\\QuestFrame\\UI-QuestTitleHighlight")
-        safeCall(button.highlight, "SetBlendMode", "ADD")
-
-        button.text = button.text or createFontString(button, "GameFontNormalLarge")
-        safeCall(button.text, "SetPoint", "CENTER", button, "CENTER", 0, 0)
-        safeCall(button.text, "SetWidth", CFG.buttonWidth - 8)
-        safeCall(button.text, "SetJustifyH", "CENTER")
-
-        button.specIcon = button.specIcon or createTexture(button, "ARTWORK")
-        safeCall(button.specIcon, "SetPoint", "LEFT", button, "LEFT", 12, 0)
-        setSize(button.specIcon, CFG.specIconSize, CFG.specIconSize)
-        safeCall(button.specIcon, "SetTexCoord", 0.08, 0.92, 0.08, 0.92)
-        safeCall(button.specIcon, "Hide")
-
-        return button
-    end
-
     local function createButton(index)
         local buttonName = "KRTRaidGridButton" .. tostring(index)
         local button = _G[buttonName]
         if not button and _G.CreateFrame then
             button = _G.CreateFrame("Button", buttonName, frame, "KRTRaidGridButtonTemplate")
         end
-        if not button and _G.CreateFrame then
-            button = createButtonFallback(index)
+        if not button then
+            return nil
         end
 
         setSize(button, CFG.buttonWidth, CFG.buttonHeight)
         safeCall(button, "RegisterForClicks", "LeftButtonUp")
 
-        button.bg = _G[buttonName .. "Bg"] or button.bg
-        button.topLine = _G[buttonName .. "TopLine"] or button.topLine
-        button.bottomLine = _G[buttonName .. "BottomLine"] or button.bottomLine
-        button.highlight = _G[buttonName .. "Highlight"] or button.highlight
-        button.text = _G[buttonName .. "Text"] or button.text
-        button.specIcon = _G[buttonName .. "SpecIcon"] or button.specIcon
-        if not button.bg or not button.text or not button.specIcon then
-            button = createButtonFallback(index, button)
+        local bg = _G[buttonName .. "Bg"]
+        local topLine = _G[buttonName .. "TopLine"]
+        local bottomLine = _G[buttonName .. "BottomLine"]
+        local highlight = _G[buttonName .. "Highlight"]
+        local text = _G[buttonName .. "Text"]
+        local specIcon = _G[buttonName .. "SpecIcon"]
+        if not bg or not topLine or not bottomLine or not highlight or not text or not specIcon then
+            return nil
         end
+
+        button.bg = bg
+        button.topLine = topLine
+        button.bottomLine = bottomLine
+        button.highlight = highlight
+        button.text = text
+        button.specIcon = specIcon
         setSize(button.specIcon, CFG.specIconSize, CFG.specIconSize)
         safeCall(button.specIcon, "SetTexCoord", 0.08, 0.92, 0.08, 0.92)
         safeCall(button.specIcon, "Hide")
@@ -340,8 +269,23 @@ do
             return frame
         end
 
-        frame = _G.KRTRaidGridFrame or _G.CreateFrame("Frame", "KRTRaidGridFrame", _G.UIParent, "KRTDialogTemplate")
+        frame = _G.KRTRaidGridFrame
+        if not frame then
+            return nil
+        end
         frame.buttons = buttons
+
+        frame.icon = _G.KRTRaidGridFrameIcon
+        frame.title = _G.KRTRaidGridFrameTitle
+        frame.count = _G.KRTRaidGridFrameCount
+        frame.divider = _G.KRTRaidGridFrameDivider
+        frame.empty = _G.KRTRaidGridFrameEmpty
+        frame.closeButton = _G.KRTRaidGridFrameCloseButton
+        if not frame.icon or not frame.title or not frame.count or not frame.divider or not frame.empty or not frame.closeButton then
+            frame = nil
+            return nil
+        end
+
         safeCall(frame, "Hide")
         safeCall(frame, "SetFrameStrata", "FULLSCREEN_DIALOG")
         safeCall(frame, "SetToplevel", true)
@@ -359,58 +303,12 @@ do
                 self:StopMovingOrSizing()
             end
         end)
-
-        frame.icon = _G.KRTRaidGridFrameIcon
-        if not frame.icon then
-            frame.icon = createTexture(frame, "ARTWORK")
-            setSize(frame.icon, 30, 30)
-            safeCall(frame.icon, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -18)
-        end
-
-        frame.title = _G.KRTRaidGridFrameTitle
-        if not frame.title then
-            frame.title = createFontString(frame, "GameFontNormalLarge")
-            safeCall(frame.title, "SetPoint", "LEFT", frame.icon, "RIGHT", 8, 0)
-            safeCall(frame.title, "SetJustifyH", "LEFT")
-        end
-
-        frame.count = _G.KRTRaidGridFrameCount
-        if not frame.count then
-            frame.count = createFontString(frame, "GameFontNormal")
-            safeCall(frame.count, "SetTextColor", 1, 1, 1)
-            safeCall(frame.count, "Hide")
-        end
-
-        frame.divider = _G.KRTRaidGridFrameDivider
-        if not frame.divider then
-            frame.divider = createTexture(frame, "ARTWORK")
-            safeCall(frame.divider, "SetHeight", 1)
-            safeCall(frame.divider, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -CFG.headerHeight + 6)
-            safeCall(frame.divider, "SetPoint", "TOPRIGHT", frame, "TOPRIGHT", -22, -CFG.headerHeight + 6)
-            setTextureColor(frame.divider, 1, 0.82, 0, 0.35)
-        else
-            setTextureColor(frame.divider, 1, 0.82, 0, 0.35)
-        end
-
-        frame.empty = _G.KRTRaidGridFrameEmpty
-        if not frame.empty then
-            frame.empty = createFontString(frame, "GameFontHighlight")
-            safeCall(frame.empty, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 24, -CFG.headerHeight)
-            safeCall(frame.empty, "SetJustifyH", "LEFT")
-            safeCall(frame.empty, "SetTextColor", 1, 0.2, 0.2)
-            safeCall(frame.empty, "Hide")
-        end
-
-        frame.closeButton = _G.KRTRaidGridFrameCloseButton
-        if not frame.closeButton and _G.CreateFrame then
-            frame.closeButton = _G.CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-            safeCall(frame.closeButton, "SetPoint", "TOPRIGHT", frame, "TOPRIGHT", -5, -5)
-        end
         if frame.closeButton then
             safeCall(frame.closeButton, "SetScript", "OnClick", function()
                 module.Hide()
             end)
         end
+        setTextureColor(frame.divider, 1, 0.82, 0, 0.35)
 
         if type(_G.UISpecialFrames) == "table" then
             tinsert(_G.UISpecialFrames, "KRTRaidGridFrame")
@@ -470,13 +368,17 @@ do
         local config = normalizeConfig(selfOrConfig, maybeConfig) or {}
         local source = type(config.entries) == "table" and config.entries or {}
 
-        ensureFrame()
+        if not ensureFrame() then
+            return false
+        end
         activeConfig = config
         entries = {}
         for i = 1, #source do
             entries[i] = source[i]
         end
-        module.Refresh()
+        if not module.Refresh() then
+            return false
+        end
         positionFrame(config.anchor)
         safeCall(frame, "Show")
         return true
@@ -494,7 +396,9 @@ do
             end
         end
 
-        ensureFrame()
+        if not ensureFrame() then
+            return false
+        end
         local count = #entries
         local cols = min(CFG.maxCols, max(1, count))
         local rows = max(1, ceil(count / cols))
@@ -519,6 +423,9 @@ do
         for i = 1, count do
             local entry = entries[i]
             local button = buttons[i] or createButton(i)
+            if not button then
+                return false
+            end
             local col = (i - 1) % cols
             local row = ceil(i / cols) - 1
             local x = CFG.padding + (col * (CFG.buttonWidth + CFG.gapX))

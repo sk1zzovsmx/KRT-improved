@@ -2625,7 +2625,53 @@ local function loadMasterController(h)
     h:load("!KRT/Controllers/Master.lua")
 end
 
+local function seedRaidGridButtonChildren(h, buttonName)
+    local suffixes = {
+        "Bg",
+        "TopLine",
+        "BottomLine",
+        "Highlight",
+        "Text",
+        "SpecIcon",
+    }
+    for i = 1, #suffixes do
+        local childName = buttonName .. suffixes[i]
+        if not _G[childName] then
+            _G[childName] = h.makeFrame(true, childName)
+        end
+    end
+end
+
 local function loadRaidGridWidget(h)
+    if not _G.KRTRaidGridFrame then
+        local frame = h.makeFrame(true, "KRTRaidGridFrame")
+        _G.KRTRaidGridFrame = frame
+        local childNames = {
+            "KRTRaidGridFrameIcon",
+            "KRTRaidGridFrameTitle",
+            "KRTRaidGridFrameCount",
+            "KRTRaidGridFrameDivider",
+            "KRTRaidGridFrameEmpty",
+            "KRTRaidGridFrameCloseButton",
+        }
+        for i = 1, #childNames do
+            local name = childNames[i]
+            _G[name] = h.makeFrame(true, name)
+        end
+    end
+    if _G.__KRT_RaidGrid_CreateFrameWrapper ~= _G.CreateFrame then
+        local baseCreateFrame = _G.CreateFrame
+        local raidGridCreateFrame = function(frameType, name, parent, template, ...)
+            local frame = baseCreateFrame(frameType, name, parent, template, ...)
+            if name and template == "KRTRaidGridButtonTemplate" then
+                seedRaidGridButtonChildren(h, name)
+            end
+            return frame
+        end
+        _G.CreateFrame = raidGridCreateFrame
+        _G.__KRT_RaidGrid_CreateFrameBase = baseCreateFrame
+        _G.__KRT_RaidGrid_CreateFrameWrapper = raidGridCreateFrame
+    end
     h:load("!KRT/Widgets/RaidGrid.lua")
 end
 

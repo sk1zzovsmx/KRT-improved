@@ -13,7 +13,7 @@ For architecture guardrails, see `docs/ARCHITECTURE.md`.
 - Unified bootstrap ownership is in `!KRT/Init.lua`.
 - Runtime modules are split into `Controllers/`, `Services/`, `Widgets/`, and `EntryPoints/`.
 - Shared infra is in `!KRT/Modules/`.
-- XML is layout-only under `!KRT/UI/`, included through `!KRT/KRT.xml`.
+- XML is layout-only under `!KRT/UI/`, loaded directly from `!KRT/!KRT.toc`.
 
 ## Bootstrap Ownership (`Init.lua`)
 

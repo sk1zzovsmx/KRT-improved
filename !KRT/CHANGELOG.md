@@ -130,6 +130,9 @@ Release-Version: 0.8.0-beta.1
 - **Public API cleanup** - Removed retired bootstrap UI helper exports, exposed
   Reserves sync payload/cache imports through the parent service facade, and
   documented widget-facade dispatch plus vendored-library cleanup boundaries.
+- **Logger XML/Lua ownership follow-up** - Restored pushed button texture,
+  fixed Logger/selectable draw layers, moved UI XML loading into the TOC, and
+  removed the retired `KRT.xml` include manifest.
 
 ## [0.8.0-beta.1] - 2026-06-05
 

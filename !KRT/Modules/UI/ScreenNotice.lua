@@ -16,8 +16,6 @@ local Effects = UI.Effects
 local Bus = feature.Bus
 local Events = feature.Events
 
-local CreateFrame = CreateFrame
-local UIParent = UIParent
 local max = math.max
 local min = math.min
 local gsub = string.gsub
@@ -25,7 +23,6 @@ local tonumber, tostring, type = tonumber, tostring, type
 
 -- ----- Internal state ----- --
 local FRAME_NAME = "KRTScreenNoticeFrame"
-local FONT_PATH = "FONTS\\FRIZQT__.TTF"
 local DEFAULT_DURATION_SECONDS = 1.25
 local FADE_SECONDS = 0.35
 
@@ -43,41 +40,24 @@ local function ensureFrame()
     if frame then
         return frame
     end
+
     frame = _G[FRAME_NAME]
-    if frame then
-        titleText = _G[FRAME_NAME .. "TitleText"]
-        detailText = _G[FRAME_NAME .. "DetailText"]
-        if frame.SetFrameLevel then
-            frame:SetFrameLevel(1000)
-        end
-        return frame
-    end
-    if type(CreateFrame) ~= "function" or not UIParent then
+    if not frame then
         return nil
     end
 
-    frame = CreateFrame("Frame", FRAME_NAME, UIParent)
-    frame:SetFrameStrata("TOOLTIP")
-    frame:SetFrameLevel(1000)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 140)
-    frame:Hide()
+    titleText = _G[FRAME_NAME .. "TitleText"]
+    detailText = _G[FRAME_NAME .. "DetailText"]
+    if not titleText or not detailText then
+        frame = nil
+        titleText = nil
+        detailText = nil
+        return nil
+    end
 
-    titleText = frame:CreateFontString(nil, "OVERLAY")
-    titleText:SetPoint("CENTER", 0, 0)
-    titleText:SetFont(FONT_PATH, 24, "OUTLINE")
-    titleText:SetTextColor(1, 1, 1, 1)
-    titleText:SetShadowColor(0, 0, 0, 1)
-    titleText:SetShadowOffset(2, -2)
-
-    detailText = frame:CreateFontString(nil, "OVERLAY")
-    detailText:SetPoint("CENTER", 0, -22)
-    detailText:SetFont(FONT_PATH, 16, "OUTLINE")
-    detailText:SetTextColor(0.78, 0.78, 0.78, 1)
-    detailText:SetShadowColor(0, 0, 0, 1)
-    detailText:SetShadowOffset(1, -1)
-
-    frame:SetWidth(1)
-    frame:SetHeight(1)
+    if frame.SetFrameLevel then
+        frame:SetFrameLevel(1000)
+    end
 
     return frame
 end

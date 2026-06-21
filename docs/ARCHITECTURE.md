@@ -16,15 +16,15 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
    Unified bootstrap, shared namespaces, controller dispatch, DB/options bootstrap.
 3. `Localization/*`
    User strings (`addon.L`) and diagnose templates (`addon.Diagnose`).
-4. `UI/Templates/Common.xml`
-   Shared XML templates only.
+4. `UI/Templates/Common.xml` + lightweight XML-only frames
+   Shared XML templates and early-loaded XML frames that Lua may resolve lazily.
 5. `Modules/*`
    Shared infra (`Timer`, `Events`, `Bus`, `Item`, `Sort`, `UI.Scaffold`, `UI.Widgets`,
    `UI.Selection`, static datasets, ...).
 6. `Database/DBRaid*.lua`, `Services/*`, `Controllers/*`, `Widgets/*`, `EntryPoints/*`
    Runtime feature implementation and entrypoints.
-7. `KRT.xml` -> `UI/*.xml`
-   UI include manifest and concrete frame layout files.
+7. `UI/*.xml`
+   Concrete frame layout files loaded directly from the TOC.
 
 ## Runtime Ownership Map
 

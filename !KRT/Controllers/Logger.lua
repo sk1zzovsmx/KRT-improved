@@ -597,10 +597,18 @@ local function ensureAttendanceSecondarySpecIcon(row)
         return row._krtAttendanceSecondarySpecIcon
     end
 
-    local icon = CreateFrame("Button", nil, row)
+    local rowName = row.GetName and row:GetName() or nil
+    local iconName = rowName and (rowName .. "SecondarySpecIcon") or nil
+    local icon = iconName and _G[iconName] or nil
+    if not icon then
+        icon = CreateFrame("Button", nil, row)
+    end
     icon:EnableMouse(true)
     icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
-    icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    icon.texture = iconName and _G[iconName .. "Texture"] or icon.texture
+    if not icon.texture then
+        icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    end
     icon.texture:SetAllPoints(icon)
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     bindAttendanceSpecIconTooltip(icon)

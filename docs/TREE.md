@@ -185,8 +185,7 @@
 |   |   \\-- ReservesUI.lua
 |   |-- !KRT.toc
 |   |-- CHANGELOG.md
-|   |-- Init.lua
-|   \\-- KRT.xml
+|   \\-- Init.lua
 |-- .agents
 |   \\-- skills
 |       |-- 55to53-orchestrator
@@ -271,7 +270,9 @@
 |   |   |   |-- 2026-06-14-docs-current-addon-state.md
 |   |   |   |-- 2026-06-15-raidinspect-attendance-redesign.md
 |   |   |   |-- 2026-06-15-tools-current-state-refresh.md
-|   |   |   \\-- 2026-06-16-equipinspect-specinspect-canonicalization.md
+|   |   |   |-- 2026-06-16-equipinspect-specinspect-canonicalization.md
+|   |   |   |-- 2026-06-16-krt-dead-ui-fallback-removal.md
+|   |   |   \\-- 2026-06-16-krt-ui-xml-lua-homogenization.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       |-- 2026-06-05-master-loot-grid-design.md

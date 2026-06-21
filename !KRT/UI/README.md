@@ -21,3 +21,11 @@ Lua owns runtime behavior:
 
 Do not put addon behavior in XML `<Scripts>`.
 Use XML for layout and Lua for state.
+
+## Temporary exceptions (LootCounter)
+
+LootCounter is intentionally excluded from the current XML skeleton migration.
+XML owns the top-level LootCounter frame and fixed outer buttons.
+Lua still owns dynamic header/row/section/button/count/spec-icon/name skeletons.
+Do not move row/header internals into XML again except under a dedicated LootCounter migration
+plan.

@@ -3,7 +3,10 @@
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: listens RaidRosterDelta, PlayerCountChanged, RaidCreate
--- ui ownership: XML owns fixed counter skeletons; Lua owns counts, clicks, tooltips, and refresh.
+-- ui ownership: temporary exception.
+-- XML owns the top-level LootCounter frame and fixed outer buttons.
+-- Lua still owns header/row/section skeletons because the XML row migration was rolled back for stability.
+-- Do not remove Lua-created LootCounter internals until a dedicated LootCounter migration is reintroduced.
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -328,34 +331,7 @@ do
         return fs
     end
 
-    local function setupTooltip(btn, text)
-        if not text or text == "" then
-            return
-        end
-        btn:HookScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(text, 1, 1, 1, true)
-            GameTooltip:Show()
-        end)
-        btn:HookScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-    end
-
-    local function makeBtn(parent, label, tip)
-        local b = CreateFrame("Button", nil, parent, "KRTActionButtonTemplate")
-        b:SetSize(BTN_W, BTN_H)
-        b:SetText(label)
-        local txt = b:GetFontString()
-        if txt then
-            txt:ClearAllPoints()
-            txt:SetPoint("CENTER", b, "CENTER", 0, 0)
-        end
-        setupTooltip(b, tip)
-        return b
-    end
-
-    local function ensureHeaderFallback()
+    local function ensureHeader()
         if header or not scrollChild then
             return
         end
@@ -402,71 +378,6 @@ do
         setFontColor(header.name, COLOR_HEADER_TEXT)
     end
 
-    local function ensureHeader()
-        if header or not scrollChild then
-            return
-        end
-
-        local childName = scrollChild.GetName and scrollChild:GetName() or nil
-        if not childName then
-            return ensureHeaderFallback()
-        end
-
-        local candidate = _G[childName .. "Header"]
-        local separator = _G[childName .. "HeaderSeparator"]
-        local resetPlaceholder = _G[childName .. "HeaderResetPlaceholder"]
-        local freeLabel = _G[childName .. "HeaderFreeLabel"]
-        local osLabel = _G[childName .. "HeaderOSLabel"]
-        local msLabel = _G[childName .. "HeaderMSLabel"]
-        local name = _G[childName .. "HeaderName"]
-        local sepOS = _G[childName .. "HeaderSepOS"]
-        local sepFree = _G[childName .. "HeaderSepFree"]
-        local sepReset = _G[childName .. "HeaderSepReset"]
-
-        local hasHeaderParts = candidate and separator and resetPlaceholder and freeLabel and osLabel and msLabel and name and sepOS and sepFree and sepReset
-        if not hasHeaderParts then
-            header = nil
-            return ensureHeaderFallback()
-        end
-
-        header = candidate
-        header.separator = separator
-        header.resetPlaceholder = resetPlaceholder
-        header.freeLabel = freeLabel
-        header.osLabel = osLabel
-        header.msLabel = msLabel
-        header.name = name
-        header.sepOS = sepOS
-        header.sepFree = sepFree
-        header.sepReset = sepReset
-
-        setTextureColor(header.separator, COLOR_ROW_SEPARATOR)
-
-        header.resetPlaceholder:SetWidth(RESET_BTN_W)
-        header.resetPlaceholder:SetText("R")
-        setFontColor(header.resetPlaceholder, COLOR_HEADER_TEXT)
-
-        header.freeLabel:SetWidth(SECTION_W)
-        header.freeLabel:SetText(L.StrFREE)
-        setFontColor(header.freeLabel, COLOR_COUNT_FREE)
-
-        header.osLabel:SetWidth(SECTION_W)
-        header.osLabel:SetText(L.StrOS)
-        setFontColor(header.osLabel, COLOR_COUNT_OS)
-
-        header.msLabel:SetWidth(SECTION_W)
-        header.msLabel:SetText(L.StrMS)
-        setFontColor(header.msLabel, COLOR_COUNT_MS)
-
-        header.name:SetText(L.StrPlayer)
-        setFontColor(header.name, COLOR_HEADER_TEXT)
-        header.name:SetJustifyH("LEFT")
-
-        setTextureColor(header.sepOS, COLOR_SEPARATOR)
-        setTextureColor(header.sepFree, COLOR_SEPARATOR)
-        setTextureColor(header.sepReset, COLOR_SEPARATOR)
-    end
-
     local function applyCountLabelColor(fs, count, positiveColor)
         if not fs then
             return
@@ -486,11 +397,38 @@ do
         return Services.Raid:GetLootCounterRows(Database.GetCurrentRaid(), raidPlayers)
     end
 
-    local function ensureRowFallback(i, rowHeight)
+    local function ensureRow(i, rowHeight)
         local row = rows[i]
         if not row then
             row = CreateFrame("Frame", nil, scrollChild)
             row:SetHeight(rowHeight)
+
+            local function setupTooltip(btn, text)
+                if not text or text == "" then
+                    return
+                end
+                btn:HookScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetText(text, 1, 1, 1, true)
+                    GameTooltip:Show()
+                end)
+                btn:HookScript("OnLeave", function()
+                    GameTooltip:Hide()
+                end)
+            end
+
+            local function makeBtn(parent, label, tip)
+                local b = CreateFrame("Button", nil, parent, "KRTActionButtonTemplate")
+                b:SetSize(BTN_W, BTN_H)
+                b:SetText(label)
+                local txt = b:GetFontString()
+                if txt then
+                    txt:ClearAllPoints()
+                    txt:SetPoint("CENTER", b, "CENTER", 0, 0)
+                end
+                setupTooltip(b, tip)
+                return b
+            end
 
             row.background = row:CreateTexture(nil, "BACKGROUND")
             row.background:SetAllPoints(row)
@@ -580,129 +518,6 @@ do
 
             rows[i] = row
         end
-        return row
-    end
-
-    local function ensureRow(i, rowHeight)
-        if rows[i] then
-            local row = rows[i]
-            row:SetHeight(rowHeight)
-            return row
-        end
-
-        local rowName = "KRTLootCounterFrameRow" .. tostring(i)
-        local row = _G[rowName] or CreateFrame("Frame", rowName, scrollChild, "KRTLootCounterRowTemplate")
-        local background = _G[rowName .. "Background"]
-        local separator = _G[rowName .. "Separator"]
-        local reset = _G[rowName .. "Reset"]
-        local freeSection = _G[rowName .. "FreeSection"]
-        local osSection = _G[rowName .. "OSSection"]
-        local msSection = _G[rowName .. "MSSection"]
-        local specIcon = _G[rowName .. "SpecIcon"]
-        local name = _G[rowName .. "Name"]
-        local sepOS = _G[rowName .. "SepOS"]
-        local sepFree = _G[rowName .. "SepFree"]
-        local sepReset = _G[rowName .. "SepReset"]
-
-        local hasRowParts = row and background and separator and reset and freeSection and osSection and msSection and specIcon and name and sepOS and sepFree and sepReset
-        if not hasRowParts then
-            return ensureRowFallback(i, rowHeight)
-        end
-
-        local freePlus = _G[rowName .. "FreeSectionPlus"]
-        local freeMinus = _G[rowName .. "FreeSectionMinus"]
-        local freeCount = _G[rowName .. "FreeSectionCount"]
-        local osPlus = _G[rowName .. "OSSectionPlus"]
-        local osMinus = _G[rowName .. "OSSectionMinus"]
-        local osCount = _G[rowName .. "OSSectionCount"]
-        local msPlus = _G[rowName .. "MSSectionPlus"]
-        local msMinus = _G[rowName .. "MSSectionMinus"]
-        local msCount = _G[rowName .. "MSSectionCount"]
-        if not (freePlus and freeMinus and freeCount and osPlus and osMinus and osCount and msPlus and msMinus and msCount) then
-            return ensureRowFallback(i, rowHeight)
-        end
-
-        row.background = background
-        row.separator = separator
-        row.reset = reset
-        row.freeSection = freeSection
-        row.osSection = osSection
-        row.msSection = msSection
-        row.specIcon = specIcon
-        row.name = name
-        row.sepOS = sepOS
-        row.sepFree = sepFree
-        row.sepReset = sepReset
-
-        row.freeSection.plus = freePlus
-        row.freeSection.minus = freeMinus
-        row.freeSection.count = freeCount
-        row.osSection.plus = osPlus
-        row.osSection.minus = osMinus
-        row.osSection.count = osCount
-        row.msSection.plus = msPlus
-        row.msSection.minus = msMinus
-        row.msSection.count = msCount
-
-        row.separator:SetHeight(1)
-        setTextureColor(row.separator, COLOR_ROW_SEPARATOR)
-        row.background:SetAllPoints(row)
-        row.specIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        row.specIcon:Hide()
-        setTextureColor(row.sepOS, COLOR_SEPARATOR)
-        setTextureColor(row.sepFree, COLOR_SEPARATOR)
-        setTextureColor(row.sepReset, COLOR_SEPARATOR)
-
-        if not row._initialized then
-            row.reset:SetText("R")
-            setupTooltip(row.reset, L.TipLootCounterReset)
-            row.reset:SetScript("OnClick", function()
-                local nid = row._playerNid
-                if nid then
-                    local raidNum = Database.GetCurrentRaid()
-                    Services.Raid:SetPlayerLootCountByNid(nid, "ms", 0, raidNum)
-                    Services.Raid:SetPlayerLootCountByNid(nid, "os", 0, raidNum)
-                    Services.Raid:SetPlayerLootCountByNid(nid, "free", 0, raidNum)
-                    module:RequestRefresh("count_reset")
-                end
-            end)
-
-            local LOOT_TYPES = { ms = row.msSection, os = row.osSection, free = row.freeSection }
-            for lootType, sec in pairs(LOOT_TYPES) do
-                local lt = lootType
-                sec.plus:SetText("+")
-                sec.minus:SetText("-")
-                sec.count:SetWidth(COUNT_LABEL_W)
-                sec.count:SetJustifyH("CENTER")
-                sec.plus:SetSize(BTN_W, BTN_H)
-                sec.minus:SetSize(BTN_W, BTN_H)
-                setupTooltip(sec.plus, L.TipLootCounterPlus)
-                setupTooltip(sec.minus, L.TipLootCounterMinus)
-                sec.plus:SetScript("OnClick", function()
-                    local nid = row._playerNid
-                    if nid then
-                        Services.Raid:AddPlayerLootCountByNid(nid, lt, 1, Database.GetCurrentRaid())
-                        module:RequestRefresh("count_changed")
-                    end
-                end)
-                sec.minus:SetScript("OnClick", function()
-                    local nid = row._playerNid
-                    if nid then
-                        Services.Raid:AddPlayerLootCountByNid(nid, lt, -1, Database.GetCurrentRaid())
-                        module:RequestRefresh("count_changed")
-                    end
-                end)
-            end
-
-            row.reset:SetSize(RESET_BTN_W, BTN_H)
-            row.name:SetPoint("LEFT", row, "LEFT", SPEC_ICON_SIZE + SPEC_ICON_GAP, 0)
-            row.name:SetPoint("RIGHT", row.msSection, "LEFT", -COL_GAP, 0)
-            row.name:SetJustifyH("LEFT")
-            row._initialized = true
-        end
-
-        row:SetHeight(rowHeight)
-        rows[i] = row
         return row
     end
 

@@ -21,6 +21,12 @@ UI.Primitives = Primitives
 
 local Rows = UI.Rows or {}
 UI.Rows = Rows
+Rows._fallbackStats = Rows._fallbackStats or {
+    selectable = 0,
+    loggerHeader = 0,
+    loggerRow = 0,
+    masterSpecIcon = 0,
+}
 
 -- ----- Internal state ----- --
 local LOGGER_HEADER_TAB_INSET = 1
@@ -81,6 +87,7 @@ local function ensureRowTextures(row)
         sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
         sel:Hide()
         row._krtSelTex = sel
+        Rows._fallbackStats.selectable = Rows._fallbackStats.selectable + 1
     end
 
     if not row._krtFocusTex and row.CreateTexture then
@@ -91,6 +98,7 @@ local function ensureRowTextures(row)
         focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
         focus:Hide()
         row._krtFocusTex = focus
+        Rows._fallbackStats.selectable = Rows._fallbackStats.selectable + 1
     end
 
     if not pushed and row.CreateTexture and row.SetPushedTexture then
@@ -98,6 +106,12 @@ local function ensureRowTextures(row)
         pushed:SetAllPoints(row)
         pushed:SetTexture(1, 1, 1, 0.08)
         row:SetPushedTexture(pushed)
+    end
+    if row._krtSelTex and row._krtSelTex.SetDrawLayer then
+        row._krtSelTex:SetDrawLayer("BORDER")
+    end
+    if row._krtFocusTex and row._krtFocusTex.SetDrawLayer then
+        row._krtFocusTex:SetDrawLayer("BORDER")
     end
 
     row._krtVisualsResolved = true
@@ -118,6 +132,7 @@ local function ensureLoggerHeaderTab(header)
         fill = header:CreateTexture(nil, "BACKGROUND")
         fill:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
         fill:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
     end
     header._krtHeaderFill = fill
 
@@ -127,6 +142,7 @@ local function ensureLoggerHeaderTab(header)
         top:SetHeight(1)
         top:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
         top:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
     end
     header._krtHeaderTop = top
 
@@ -136,6 +152,7 @@ local function ensureLoggerHeaderTab(header)
         bottom:SetHeight(1)
         bottom:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
         bottom:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
     end
     header._krtHeaderBottom = bottom
 
@@ -145,6 +162,7 @@ local function ensureLoggerHeaderTab(header)
         left:SetWidth(1)
         left:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
         left:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
     end
     header._krtHeaderLeft = left
 
@@ -154,8 +172,25 @@ local function ensureLoggerHeaderTab(header)
         right:SetWidth(1)
         right:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
         right:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
     end
     header._krtHeaderRight = right
+
+    if fill and fill.SetDrawLayer then
+        fill:SetDrawLayer("BACKGROUND")
+    end
+    if top and top.SetDrawLayer then
+        top:SetDrawLayer("BORDER")
+    end
+    if bottom and bottom.SetDrawLayer then
+        bottom:SetDrawLayer("BORDER")
+    end
+    if left and left.SetDrawLayer then
+        left:SetDrawLayer("BORDER")
+    end
+    if right and right.SetDrawLayer then
+        right:SetDrawLayer("BORDER")
+    end
 
     header._krtHeaderTab = true
 end
@@ -240,6 +275,7 @@ local function getMasterRollRowRefs(row)
             counter = "Counter",
             info = "Info",
             star = "Star",
+            specIcon = "SpecIcon",
         })
     end
     return nil
@@ -476,6 +512,7 @@ function Rows.StyleLoggerRow(row)
         if not bg then
             bg = row:CreateTexture(nil, "BACKGROUND")
             bg:SetAllPoints(row)
+            Rows._fallbackStats.loggerRow = Rows._fallbackStats.loggerRow + 1
         end
         row._krtLoggerBg = bg
     end
@@ -487,13 +524,24 @@ function Rows.StyleLoggerRow(row)
             line:SetHeight(1)
             line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
             line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
+            Rows._fallbackStats.loggerRow = Rows._fallbackStats.loggerRow + 1
         end
         row._krtLoggerLine = line
+    end
+    if row._krtLoggerBg and row._krtLoggerBg.SetDrawLayer then
+        row._krtLoggerBg:SetDrawLayer("BACKGROUND")
+    end
+    if row._krtLoggerLine and row._krtLoggerLine.SetDrawLayer then
+        row._krtLoggerLine:SetDrawLayer("BORDER")
     end
 
     if row._krtLoggerLine then
         row._krtLoggerLine:SetTexture(0.32, 0.30, 0.25, 0.42)
     end
+end
+
+function Rows.GetFallbackStats()
+    return Rows._fallbackStats
 end
 
 function Rows.SetLoggerRowIndex(row, index)
@@ -586,10 +634,11 @@ function Rows.DrawMasterRollRow(row, data, onClick)
         nameStr:Show()
     end
 
-    local specIcon = row._krtSpecIcon
+    local specIcon = ui and (ui.specIcon or ui.SpecIcon) or row._krtSpecIcon
     if hasSpecIcon and not specIcon and row.CreateTexture then
         specIcon = row:CreateTexture(nil, "ARTWORK")
         row._krtSpecIcon = specIcon
+        Rows._fallbackStats.masterSpecIcon = Rows._fallbackStats.masterSpecIcon + 1
     end
     if specIcon then
         if hasSpecIcon then
