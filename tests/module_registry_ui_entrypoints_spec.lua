@@ -193,11 +193,13 @@ local expectedWidgets = {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Modules/Bus",
             "Modules/Colors",
+            "Services/SpecInspect",
             "Modules/UI/Facade",
             "Modules/UI/Visuals",
         },
-        forbiddenPrefixes = { "Controllers/", "EntryPoints/", "Services/" },
+        forbiddenPrefixes = { "Controllers/", "EntryPoints/", "Services/Raid/", "Services/Loot/", "Services/Master/" },
     },
     {
         name = "Widgets/LootHints",
@@ -718,6 +720,7 @@ local moduleTocPaths = {
     ["Services/Reserves/Chat"] = "Services\\Reserves\\Chat.lua",
     ["Services/Spammer/Draft"] = "Services\\Spammer\\Draft.lua",
     ["Services/Warnings/Store"] = "Services\\Warnings\\Store.lua",
+    ["Services/SpecInspect"] = "Services\\SpecInspect.lua",
     ["Services/Logger/Store"] = "Services\\Logger\\Store.lua",
     ["Services/Logger/View"] = "Services\\Logger\\View.lua",
     ["Services/Logger/Export"] = "Services\\Logger\\Export.lua",
@@ -1299,6 +1302,8 @@ registerList(expectedEntryPoints)
 registerList(expectedRollServices)
 registerList(expectedDebugServices)
 registerList(expectedSpammerServices)
+registry.AddModule("Services/SpecInspect", { deps = { "Init", "Modules/ModuleRegistry", "Modules/Events", "Modules/Bus", "Modules/Strings", "Services/Raid/Roster" } })
+registry.SetLoaded("Services/SpecInspect")
 registry.AddModule(expectedControllers[1].name, { deps = expectedControllers[1].deps })
 registry.SetLoaded(expectedControllers[1].name)
 registry.AddModule(expectedWidgets[1].name, { deps = expectedWidgets[1].deps })

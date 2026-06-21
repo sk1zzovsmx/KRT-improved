@@ -321,7 +321,11 @@ do
             return nil
         end
 
-        return rebuildSnapshotFromLibrary(playerName, unit, "cache_getter", true)
+        local ok, spec = pcall(rebuildSnapshotFromLibrary, playerName, unit, "cache_getter", true)
+        if not ok then
+            return nil
+        end
+        return spec
     end
 
     function module:RefreshPlayer(name, opts)

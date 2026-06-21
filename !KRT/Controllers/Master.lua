@@ -912,7 +912,7 @@ do
             keyName = "MasterRolls",
             rowName = UI.Lists.MakeIndexedRowName("PlayerBtn"),
             rowTmpl = "KRTSelectPlayerTemplate",
-            _rowParts = { "Name", "Roll", "Counter", "Info", "Star", "SpecIcon" },
+            _rowParts = { "Name", "Roll", "Counter", "Info", "Star" },
             getData = copyVisibleRollRows,
             drawRow = UI.Lists.CreateRowRenderer(drawRollRow),
             highlightFn = function(_, data)

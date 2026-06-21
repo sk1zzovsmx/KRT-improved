@@ -284,6 +284,7 @@
 |   |-- master_assignment_service_spec.lua
 |   |-- master_model_services_spec.lua
 |   |-- master_roll_list_copy_spec.lua
+|   |-- master_roll_row_visuals_spec.lua
 |   |-- master_service_split_spec.lua
 |   |-- module_registry_database_spec.lua
 |   |-- module_registry_modules_spec.lua
@@ -291,6 +292,7 @@
 |   |-- module_registry_spec.lua
 |   |-- module_registry_ui_entrypoints_spec.lua
 |   |-- module_registry_ui_spec.lua
+|   |-- raid_grid_spec_icon_spec.lua
 |   |-- release_stabilization_spec.lua
 |   |-- screen_notice_runtime_spec.lua
 |   |-- spec_inspect_service_spec.lua

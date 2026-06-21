@@ -195,10 +195,47 @@ local function getMasterRollRowRefs(row)
             counter = "Counter",
             info = "Info",
             star = "Star",
-            specIcon = "SpecIcon",
         })
     end
     return nil
+end
+
+local function clearPoints(frame)
+    if frame and frame.ClearAllPoints then
+        frame:ClearAllPoints()
+    end
+end
+
+local function setPoint(frame, point, relativeTo, relativePoint, x, y)
+    if frame and frame.SetPoint then
+        frame:SetPoint(point, relativeTo, relativePoint, x, y)
+    end
+end
+
+local function setSinglePoint(frame, point, relativeTo, relativePoint, x, y)
+    clearPoints(frame)
+    setPoint(frame, point, relativeTo, relativePoint, x, y)
+end
+
+local function setFrameShown(frame, cond)
+    if not frame then
+        return
+    end
+    if cond then
+        if frame.Show then
+            frame:Show()
+        end
+    elseif frame.Hide then
+        frame:Hide()
+    end
+end
+
+local function setMasterRollNamePoints(nameStr, row, infoStr, leftOffset)
+    clearPoints(nameStr)
+    setPoint(nameStr, "LEFT", row, "LEFT", leftOffset, 0)
+    if infoStr then
+        setPoint(nameStr, "RIGHT", infoStr, "LEFT", -3, 0)
+    end
 end
 
 -- ----- Public methods ----- --
@@ -481,7 +518,8 @@ function Rows.DrawMasterRollRow(row, data, onClick)
     local counterStr = ui and (ui.counter or ui.Counter) or nil
     local infoStr = ui and (ui.info or ui.Info) or nil
     local star = ui and (ui.star or ui.Star) or nil
-    local specIcon = ui and (ui.specIcon or ui.SpecIcon) or nil
+    local hasSpecIcon = data.specIcon ~= nil and data.specIcon ~= ""
+    local hasStar = data.showStar == true
 
     if nameStr then
         local class = data.class or "UNKNOWN"
@@ -493,6 +531,40 @@ function Rows.DrawMasterRollRow(row, data, onClick)
         end
         nameStr:SetText(data.displayName or data.name or "")
         nameStr:Show()
+    end
+
+    local specIcon = row._krtSpecIcon
+    if hasSpecIcon and not specIcon and row.CreateTexture then
+        specIcon = row:CreateTexture(nil, "ARTWORK")
+        row._krtSpecIcon = specIcon
+    end
+    if specIcon then
+        if hasSpecIcon then
+            if specIcon.SetTexture then
+                specIcon:SetTexture(data.specIcon)
+            end
+            if specIcon.SetTexCoord then
+                specIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
+            if specIcon.SetSize then
+                specIcon:SetSize(12, 12)
+            else
+                if specIcon.SetWidth then
+                    specIcon:SetWidth(12)
+                end
+                if specIcon.SetHeight then
+                    specIcon:SetHeight(12)
+                end
+            end
+            if hasStar then
+                setSinglePoint(specIcon, "LEFT", row, "LEFT", 16, 0)
+            else
+                setSinglePoint(specIcon, "LEFT", row, "LEFT", 2, 0)
+            end
+            setFrameShown(specIcon, true)
+        else
+            setFrameShown(specIcon, false)
+        end
     end
 
     if rollStr then
@@ -508,19 +580,18 @@ function Rows.DrawMasterRollRow(row, data, onClick)
         infoStr:Show()
     end
 
-    if specIcon then
-        if data.specIcon and data.specIcon ~= "" then
-            specIcon:SetTexture(data.specIcon)
-            if specIcon.SetTexCoord then
-                specIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            end
-            specIcon:Show()
-        else
-            specIcon:Hide()
+    if nameStr then
+        local nameLeft = 18
+        if hasSpecIcon and hasStar then
+            nameLeft = 30
         end
+        setMasterRollNamePoints(nameStr, row, infoStr, nameLeft)
     end
 
-    Primitives.SetShown(star, data.showStar == true)
+    if star then
+        setSinglePoint(star, "LEFT", row, "LEFT", 2, 0)
+        setFrameShown(star, hasStar)
+    end
 end
 
 local registry = feature.ModuleRegistry

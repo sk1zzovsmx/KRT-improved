@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Widgets.RaidGrid
--- events: none
+-- events: listens SpecInspectUpdated
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -11,14 +11,18 @@ local Widgets = feature.Widgets
 local UI = feature.UI
 local UIWidgets = UI.Widgets
 local Primitives = UI.Primitives
+local Services = feature.Services
 local Colors = feature.Colors
 local L = feature.L
+local Events = feature.Events
+local Bus = feature.Bus
 
 local _G = _G
 local tinsert = table.insert
 local type, tostring, tonumber = type, tostring, tonumber
 local strmatch, strlen, strsub = string.match, string.len, string.sub
-local ceil, min, max = math.ceil, math.min, math.max
+local ceil, floor, min, max = math.ceil, math.floor, math.min, math.max
+local InternalEvents = Events and Events.Internal or nil
 
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
@@ -26,7 +30,9 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Modules/Bus",
             "Modules/Colors",
+            "Services/SpecInspect",
             "Modules/UI/Facade",
             "Modules/UI/Visuals",
         },
@@ -56,6 +62,8 @@ do
         maxNameLen = 15,
         buttonAlpha = 0.42,
         buttonHoverAlpha = 0.85,
+        specIconSize = 16,
+        specIconGap = 4,
     }
 
     local frame
@@ -178,6 +186,40 @@ do
         end
     end
 
+    local function getTextWidth(textFrame, fallbackText)
+        if textFrame and textFrame.GetStringWidth then
+            return tonumber(textFrame:GetStringWidth()) or 0
+        end
+        return min(CFG.buttonWidth - 8, strlen(tostring(fallbackText or "")) * 8)
+    end
+
+    local function layoutButtonText(button, label, hasSpecIcon)
+        if not button or not button.text then
+            return
+        end
+
+        safeCall(button.text, "ClearAllPoints")
+        if hasSpecIcon and button.specIcon then
+            local textWidth = getTextWidth(button.text, label)
+            local groupWidth = CFG.specIconSize + CFG.specIconGap + textWidth
+            local iconLeft = floor((CFG.buttonWidth - groupWidth) / 2)
+            if iconLeft < 4 then
+                iconLeft = 4
+            end
+
+            safeCall(button.specIcon, "ClearAllPoints")
+            safeCall(button.specIcon, "SetPoint", "LEFT", button, "LEFT", iconLeft, 0)
+            safeCall(button.text, "SetPoint", "LEFT", button.specIcon, "RIGHT", CFG.specIconGap, 0)
+            safeCall(button.text, "SetWidth", max(20, CFG.buttonWidth - iconLeft - CFG.specIconSize - CFG.specIconGap - 4))
+            safeCall(button.text, "SetJustifyH", "LEFT")
+            return
+        end
+
+        safeCall(button.text, "SetPoint", "CENTER", button, "CENTER", 0, 0)
+        safeCall(button.text, "SetWidth", CFG.buttonWidth - 8)
+        safeCall(button.text, "SetJustifyH", "CENTER")
+    end
+
     local function selectEntry(entry)
         if not entry then
             return nil
@@ -224,6 +266,12 @@ do
         safeCall(button.text, "SetPoint", "CENTER", button, "CENTER", 0, 0)
         safeCall(button.text, "SetWidth", CFG.buttonWidth - 8)
         safeCall(button.text, "SetJustifyH", "CENTER")
+
+        button.specIcon = createTexture(button, "ARTWORK")
+        safeCall(button.specIcon, "SetPoint", "LEFT", button, "LEFT", 12, 0)
+        setSize(button.specIcon, CFG.specIconSize, CFG.specIconSize)
+        safeCall(button.specIcon, "SetTexCoord", 0.08, 0.92, 0.08, 0.92)
+        safeCall(button.specIcon, "Hide")
 
         safeCall(button, "SetScript", "OnEnter", function(self)
             updateButtonColor(self, true)
@@ -434,13 +482,31 @@ do
             local x = CFG.padding + (col * (CFG.buttonWidth + CFG.gapX))
             local y = -(CFG.headerHeight + (row * (CFG.buttonHeight + CFG.gapY)))
             local r, g, b = getClassColor(entry)
+            local fullName = getEntryName(entry)
+            local specIcon
+
+            if Services and Services.SpecInspect and Services.SpecInspect.GetPlayerSpecSnapshot and fullName then
+                local spec = Services.SpecInspect:GetPlayerSpecSnapshot(fullName)
+                specIcon = spec and spec.icon or nil
+            end
 
             safeCall(button, "ClearAllPoints")
             safeCall(button, "SetPoint", "TOPLEFT", frame, "TOPLEFT", x, y)
             button.entry = entry
-            button.fullName = getEntryName(entry)
-            safeCall(button.text, "SetText", trimName(button.fullName))
+            button.fullName = fullName
+            local buttonLabel = trimName(button.fullName)
+            safeCall(button.text, "SetText", buttonLabel)
             safeCall(button.text, "SetTextColor", r, g, b)
+            if button.specIcon then
+                if specIcon and specIcon ~= "" then
+                    safeCall(button.specIcon, "SetTexture", specIcon)
+                    safeCall(button.specIcon, "Show")
+                    layoutButtonText(button, buttonLabel, true)
+                else
+                    safeCall(button.specIcon, "Hide")
+                    layoutButtonText(button, buttonLabel, false)
+                end
+            end
             updateButtonColor(button, false)
             safeCall(button, "Show")
         end
@@ -475,6 +541,16 @@ do
     function module.GetEntryNameForTest(selfOrIndex, maybeIndex)
         local index = selfOrIndex == module and maybeIndex or selfOrIndex
         return getEntryName(entries[tonumber(index) or 0])
+    end
+
+    local function requestSpecRefresh()
+        if module.IsShown() then
+            module.Refresh()
+        end
+    end
+
+    if Bus and InternalEvents and InternalEvents.SpecInspectUpdated then
+        Bus.RegisterCallback(InternalEvents.SpecInspectUpdated, requestSpecRefresh)
     end
 
     if UIWidgets and UIWidgets.Register then

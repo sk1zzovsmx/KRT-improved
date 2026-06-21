@@ -9,6 +9,9 @@ local fakeLGT = {
 
 function fakeLGT:GetUnitTalentSpec(unit)
     local row = self.snapshots[unit]
+    if row and row.raiseTalentError then
+        error("talent read failed")
+    end
     if not row then
         return nil
     end
@@ -86,7 +89,7 @@ local function newAddon()
     }
     feature.Services.Raid = {
         GetUnitID = function(_, name)
-            return ({ Alice = "raid1", Bob = "raid2" })[name] or "none"
+            return ({ Alice = "raid1", Bob = "raid2", Charlie = "raid3" })[name] or "none"
         end,
         GetPlayers = function(_, _, _, out)
             out = out or {}
@@ -174,5 +177,12 @@ local bob = assert(service:GetPlayerSpecSnapshot("Bob"), "Bob snapshot should up
 assert(bob.role == "DAMAGER", "caster role should normalize to DAMAGER")
 assert(bob.icon == "Interface\\Icons\\spell_frost_frostbolt02", "expected callback refresh icon")
 assert(busEvents._triggered and #busEvents._triggered > 0, "SpecInspectUpdated should be emitted")
+
+fakeLGT.snapshots.raid3 = {
+    raiseTalentError = true,
+}
+local ok, charlie = pcall(service.GetPlayerSpecSnapshot, service, "Charlie")
+assert(ok, "GetPlayerSpecSnapshot should not leak LibGroupTalents errors")
+assert(charlie == nil, "GetPlayerSpecSnapshot should return nil when talent reads fail")
 
 print("spec inspect service spec passed")
