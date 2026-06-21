@@ -184,7 +184,7 @@ do
         showRollsOnly = true,
         model = nil,
     }
-    module._PendingCounter = module._PendingCounter or { Awards = {} }
+    module._PendingCounter = MasterService.EnsureAwardCounterState(module._PendingCounter)
     module._FLOW_STATES = module._FLOW_STATES
         or {
             IDLE = "idle",
@@ -1257,20 +1257,17 @@ do
     end
 
     function module._PendingCounter:Remove(index)
-        local awards = self.Awards
-        local pending = awards[index]
-        self:CancelAward(pending)
-        if pending then
-            awards[index] = nil
-            table.remove(awards, index)
-        end
-        return pending
+        return MasterService.RemoveAwardCounterPending(self, index, function(handle)
+            module:CancelTimer(handle)
+        end)
     end
 
     function module._PendingCounter:Clear(reason)
-        local awards = self.Awards
-        for i = #awards, 1, -1 do
-            local pending = self:Remove(i)
+        local removed = MasterService.ClearAwardCounterPending(self, reason, function(handle)
+            module:CancelTimer(handle)
+        end)
+        for i = 1, #removed do
+            local pending = removed[i]
             if pending and addon.hasDebug then
                 addon:debug(Diag.W.LogMLAwardCounterFailed:format(tostring(pending.itemLink), tostring(pending.playerName), tostring(reason or "clear")))
             end
@@ -1278,21 +1275,11 @@ do
     end
 
     function module._PendingCounter:FindBySlot(clearedSlot)
-        local awards = self.Awards
-        local slot = tonumber(clearedSlot)
-        for i = 1, #awards do
-            local pending = awards[i]
-            if pending and pending.failed ~= true and pending.counterApplied ~= true then
-                if not slot or tonumber(pending.itemIndex) == slot then
-                    return pending, i
-                end
-            end
-        end
-        return nil, nil
+        return MasterService.FindAwardCounterPendingBySlot(self, clearedSlot)
     end
 
     function module._PendingCounter:HasPending()
-        return self.Awards[1] ~= nil
+        return MasterService.HasAwardCounterPending(self)
     end
 
     function module._PendingCounter:IsFailureMessage(message)
@@ -1300,27 +1287,25 @@ do
     end
 
     function module._PendingCounter:Fail(reason)
-        local awards = self.Awards
-        local failed = false
-        for i = #awards, 1, -1 do
-            local pending = self:Remove(i)
-            if pending then
-                failed = true
-                addon:warn(Diag.W.LogMLAwardCounterFailed:format(tostring(pending.itemLink), tostring(pending.playerName), tostring(reason or "unknown")))
-            end
+        local failed = MasterService.FailAwardCounterPending(self, reason, function(handle)
+            module:CancelTimer(handle)
+        end)
+        for i = 1, #failed do
+            local pending = failed[i]
+            addon:warn(Diag.W.LogMLAwardCounterFailed:format(tostring(pending.itemLink), tostring(pending.playerName), tostring(reason or "unknown")))
         end
-        return failed
+        return failed[1] ~= nil
     end
 
     function module._PendingCounter:Confirm(clearedSlot, source)
-        local pending, index = self:FindBySlot(clearedSlot)
+        local pending = MasterService.ConfirmAwardCounterPending(self, clearedSlot, function(handle)
+            module:CancelTimer(handle)
+        end)
         if not pending then
             return false
         end
 
         Raid:AddPlayerCountForRollType(pending.playerName, pending.rollType, pending.itemCount or 1, Database.GetCurrentRaid())
-        pending.counterApplied = true
-        self:Remove(index)
         if addon.hasDebug then
             addon:debug(
                 Diag.D.LogMLAwardCounterConfirmed:format(tostring(pending.itemLink), tostring(pending.playerName), tonumber(pending.rollType) or -1, tostring(source or "unknown"))
@@ -1334,20 +1319,17 @@ do
     end
 
     function module._PendingCounter:Queue(itemLink, itemIndex, playerName, rollType, rollValue, sessionId)
-        local pending = {
+        local pending = MasterService.QueueAwardCounterPending(self, {
             itemLink = itemLink,
-            itemKey = Item.GetItemStringFromLink(itemLink) or itemLink,
-            itemIndex = tonumber(itemIndex) or itemIndex,
+            itemIndex = itemIndex,
             playerName = playerName,
             rollType = rollType,
             rollValue = rollValue,
-            rollSessionId = sessionId and tostring(sessionId) or nil,
+            sessionId = sessionId,
             itemCount = 1,
-            counterApplied = false,
-        }
+        })
 
         local timeout = tonumber(C.ML_AWARD_CONFIRM_TIMEOUT_SECONDS) or 4
-        tinsert(self.Awards, pending)
         if timeout > 0 then
             local owner = self
             pending.timeoutHandle = module:ScheduleTimer(function()

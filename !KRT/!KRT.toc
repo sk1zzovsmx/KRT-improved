@@ -117,6 +117,7 @@ Services\Master\AssignmentTargets.lua
 Services\Master\DebugRaidGrid.lua
 Services\Master\AwardMessages.lua
 Services\Master\LootSpam.lua
+Services\Master\AwardCounter.lua
 Services\Master\Service.lua
 Widgets\RaidGrid.lua
 Widgets\LootHints.lua

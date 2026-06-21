@@ -18,6 +18,7 @@ local AwardMessages = Master.AwardMessages
 local ButtonState = Master.ButtonState
 local DebugRaidGrid = Master.DebugRaidGrid
 local FlowState = Master.FlowState
+local AwardCounter = Master.AwardCounter
 local LootSpam = Master.LootSpam
 local RollRows = Master.RollRows
 local SessionWinners = Master.SessionWinners
@@ -95,6 +96,38 @@ function Master.BuildLootSpamPlan(opts)
     return LootSpam.BuildPlan(opts)
 end
 
+function Master.EnsureAwardCounterState(state)
+    return AwardCounter.EnsureState(state)
+end
+
+function Master.QueueAwardCounterPending(state, opts)
+    return AwardCounter.Queue(state, opts)
+end
+
+function Master.FindAwardCounterPendingBySlot(state, clearedSlot)
+    return AwardCounter.FindBySlot(state, clearedSlot)
+end
+
+function Master.RemoveAwardCounterPending(state, index, cancelTimer)
+    return AwardCounter.Remove(state, index, cancelTimer)
+end
+
+function Master.ClearAwardCounterPending(state, reason, cancelTimer)
+    return AwardCounter.Clear(state, reason, cancelTimer)
+end
+
+function Master.FailAwardCounterPending(state, reason, cancelTimer)
+    return AwardCounter.Fail(state, reason, cancelTimer)
+end
+
+function Master.ConfirmAwardCounterPending(state, clearedSlot, cancelTimer)
+    return AwardCounter.Confirm(state, clearedSlot, cancelTimer)
+end
+
+function Master.HasAwardCounterPending(state)
+    return AwardCounter.HasPending(state)
+end
+
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Master/Service", {
@@ -111,6 +144,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Services/Master/DebugRaidGrid",
             "Services/Master/AwardMessages",
             "Services/Master/LootSpam",
+            "Services/Master/AwardCounter",
         },
     })
     registry.SetLoaded("Services/Master/Service")

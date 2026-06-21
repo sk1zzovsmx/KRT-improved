@@ -91,6 +91,7 @@ loadAddonFile(addon, "!KRT/Services/Master/ButtonState.lua")
 loadAddonFile(addon, "!KRT/Services/Master/RollRows.lua")
 loadAddonFile(addon, "!KRT/Services/Master/AwardMessages.lua")
 loadAddonFile(addon, "!KRT/Services/Master/LootSpam.lua")
+loadAddonFile(addon, "!KRT/Services/Master/AwardCounter.lua")
 loadAddonFile(addon, "!KRT/Services/Master/Service.lua")
 
 local Master = addon.Services.Master
@@ -233,6 +234,44 @@ local spamPlan = Master.BuildLootSpamPlan({
 assert(spamPlan.header == "Patchwerk dropped:", "expected source-specific spam header")
 assert(spamPlan.lootLines[1] == "1. [Blade] x2", "expected loot count suffix")
 assert(spamPlan.reservedLines[1] == "1. [Blade] by Alice, Bob", "expected reserved line")
+
+local awardState = Master.EnsureAwardCounterState()
+local firstPending = Master.QueueAwardCounterPending(awardState, {
+    itemLink = "[Blade]",
+    itemIndex = 2,
+    playerName = "Alice",
+    rollType = rollTypes.MAINSPEC,
+    rollValue = 98,
+    sessionId = "roll-1",
+    itemCount = 1,
+})
+assert(firstPending.itemKey == "[Blade]", "expected pending award item key")
+assert(firstPending.itemIndex == 2, "expected pending award slot")
+assert(firstPending.playerName == "Alice", "expected pending award player")
+assert(Master.FindAwardCounterPendingBySlot(awardState, 2) == firstPending, "expected slot lookup")
+
+local confirmed = Master.ConfirmAwardCounterPending(awardState, 2)
+assert(confirmed == firstPending, "expected confirmed pending award")
+assert(confirmed.counterApplied == true, "expected confirm to mark counter applied")
+assert(Master.FindAwardCounterPendingBySlot(awardState, 2) == nil, "expected confirmed award removal")
+
+Master.QueueAwardCounterPending(awardState, {
+    itemLink = "[Ring]",
+    itemIndex = 4,
+    playerName = "Bob",
+    rollType = rollTypes.OFFSPEC,
+    rollValue = 77,
+})
+Master.QueueAwardCounterPending(awardState, {
+    itemLink = "[Trinket]",
+    itemIndex = 5,
+    playerName = "Cara",
+    rollType = rollTypes.FREE,
+    rollValue = 11,
+})
+local failed = Master.FailAwardCounterPending(awardState, "Inventory is full.")
+assert(#failed == 2, "expected all pending awards to fail")
+assert(awardState.Awards[1] == nil, "expected failed awards to be cleared")
 
 assert(Master.ButtonState, "expected ButtonState module")
 assert(Master.RollRows, "expected RollRows module")
