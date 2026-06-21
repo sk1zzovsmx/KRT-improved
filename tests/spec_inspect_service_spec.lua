@@ -7,7 +7,17 @@ local fakeLGT = {
     snapshots = {},
 }
 
-function fakeLGT:GetUnitTalentSpec(unit)
+function fakeLGT:GetActiveTalentGroup(unit)
+    local row = self.snapshots[unit]
+    return row and row.activeGroup or nil
+end
+
+function fakeLGT:GetNumTalentGroups(unit)
+    local row = self.snapshots[unit]
+    return row and row.numGroups or nil
+end
+
+function fakeLGT:GetUnitTalentSpec(unit, group)
     local row = self.snapshots[unit]
     if row and row.raiseTalentError then
         error("talent read failed")
@@ -15,15 +25,28 @@ function fakeLGT:GetUnitTalentSpec(unit)
     if not row then
         return nil
     end
-    return row.specName, row.t1 or 0, row.t2 or 0, row.t3 or 0
-end
 
-function fakeLGT:GetTalentTabInfo(unit, tab)
-    local row = self.snapshots[unit]
-    if not row or not row.tabs then
+    local groupIndex = tonumber(group) or tonumber(row.activeGroup) or 1
+    local groupData = row.groups and row.groups[groupIndex] or row
+    if not groupData then
         return nil
     end
-    local data = row.tabs[tab]
+    return groupData.specName, groupData.t1 or 0, groupData.t2 or 0, groupData.t3 or 0
+end
+
+function fakeLGT:GetTalentTabInfo(unit, tab, group)
+    local row = self.snapshots[unit]
+    if not row then
+        return nil
+    end
+
+    local groupIndex = tonumber(group) or tonumber(row.activeGroup) or 1
+    local groupData = row.groups and row.groups[groupIndex] or row
+    if not groupData or not groupData.tabs then
+        return nil
+    end
+
+    local data = groupData.tabs[tab]
     if not data then
         return nil
     end
@@ -138,13 +161,32 @@ local function loadAddonFile(addon, path)
 end
 
 fakeLGT.snapshots.raid1 = {
-    specName = "Feral Combat",
+    activeGroup = 1,
+    numGroups = 2,
     role = "tank",
-    t1 = 0,
-    t2 = 55,
-    t3 = 16,
-    tabs = {
-        [2] = { name = "Feral Combat", icon = "Interface\\Icons\\ability_druid_catform" },
+    groups = {
+        [1] = {
+            specName = "Feral Combat",
+            t1 = 0,
+            t2 = 55,
+            t3 = 16,
+            tabs = {
+                [1] = { name = "Balance", icon = "Interface\\Icons\\spell_nature_starfall", points = 0 },
+                [2] = { name = "Feral Combat", icon = "Interface\\Icons\\ability_druid_catform", points = 55 },
+                [3] = { name = "Restoration", icon = "Interface\\Icons\\spell_nature_healingtouch", points = 16 },
+            },
+        },
+        [2] = {
+            specName = "Restoration",
+            t1 = 11,
+            t2 = 0,
+            t3 = 60,
+            tabs = {
+                [1] = { name = "Balance", icon = "Interface\\Icons\\spell_nature_starfall", points = 11 },
+                [2] = { name = "Feral Combat", icon = "Interface\\Icons\\ability_druid_catform", points = 0 },
+                [3] = { name = "Restoration", icon = "Interface\\Icons\\spell_nature_healingtouch", points = 60 },
+            },
+        },
     },
 }
 
@@ -156,6 +198,24 @@ local snapshot = assert(service:GetPlayerSpecSnapshot("Alice"), "Alice snapshot 
 assert(snapshot.specName == "Feral Combat", "expected spec name from LibGroupTalents")
 assert(snapshot.icon == "Interface\\Icons\\ability_druid_catform", "expected tree icon")
 assert(snapshot.role == "TANK", "expected normalized tank role")
+
+local rowSnapshot = service:GetUnitTalentSnapshot("raid1", { name = "Alice" }, "row_test", true)
+assert(rowSnapshot ~= nil, "row table input should be handled by GetUnitTalentSnapshot")
+assert(rowSnapshot.name == "Alice", "row table name should be normalized to Alice")
+assert(rowSnapshot.specName == "Feral Combat", "row snapshot should expose active spec name")
+assert(rowSnapshot.icon == "Interface\\Icons\\ability_druid_catform", "row snapshot should expose icon")
+
+local talentSnapshot = assert(service:GetPlayerTalentSnapshot("Alice"), "Alice talent snapshot should be available")
+assert(talentSnapshot.activeGroup == 1, "Alice active talent group should be captured")
+assert(talentSnapshot.numGroups == 2, "Alice should expose both talent groups")
+assert(talentSnapshot.specName == "Feral Combat", "active spec name should remain compatible")
+assert(talentSnapshot.secondarySpecName == "Restoration", "secondary spec name should be captured")
+assert(talentSnapshot.groups and talentSnapshot.groups[1], "active group details should be present")
+assert(talentSnapshot.groups and talentSnapshot.groups[2], "secondary group details should be present")
+assert(talentSnapshot.groups[1].specIcon == "Interface\\Icons\\ability_druid_catform", "active group icon should be captured")
+assert(talentSnapshot.groups[2].specIcon == "Interface\\Icons\\spell_nature_healingtouch", "secondary group icon should be captured")
+assert(talentSnapshot.groups[1].mainTalentTree == 2, "active group dominant tree should be Feral")
+assert(talentSnapshot.groups[2].mainTalentTree == 3, "secondary group dominant tree should be Restoration")
 
 fakeLGT.refreshed = {}
 local result = service:RefreshRaidSpecs({ reason = "test" })

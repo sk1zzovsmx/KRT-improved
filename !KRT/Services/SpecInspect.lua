@@ -176,32 +176,147 @@ local function buildSpecIcon(unit, dominantTab, specName)
     return icon
 end
 
+local function getTalentGroupCount(unit)
+    if lgt and type(lgt.GetNumTalentGroups) == "function" then
+        return tonumber(lgt:GetNumTalentGroups(unit)) or 1
+    end
+    return 1
+end
+
+local function getActiveTalentGroup(unit)
+    if lgt and type(lgt.GetActiveTalentGroup) == "function" then
+        return tonumber(lgt:GetActiveTalentGroup(unit)) or 1
+    end
+    return 1
+end
+
+local function buildGroupSpecIcon(unit, group, dominantTab, specName)
+    if not isNonEmptyString(specName) or not lgt or type(lgt.GetTalentTabInfo) ~= "function" then
+        return nil
+    end
+
+    local icon
+    if type(dominantTab) == "number" then
+        local tabName, tabIcon = lgt:GetTalentTabInfo(unit, dominantTab, group)
+        if tabName == specName and isNonEmptyString(tabIcon) then
+            icon = tabIcon
+        end
+    end
+    if not isNonEmptyString(icon) then
+        for tab = 1, 3 do
+            local tabName, tabIcon = lgt:GetTalentTabInfo(unit, tab, group)
+            if tabName == specName and isNonEmptyString(tabIcon) then
+                icon = tabIcon
+                break
+            end
+        end
+    end
+    if not isNonEmptyString(icon) then
+        return nil
+    end
+
+    return icon
+end
+
+local function buildTalentGroupSnapshot(unit, group)
+    local specName, t1, t2, t3 = lgt:GetUnitTalentSpec(unit, group)
+    if not isNonEmptyString(specName) then
+        return nil
+    end
+    local dominantTab, specNameNormalized = dominantTalentTab(specName, t1, t2, t3)
+    specName = specNameNormalized
+    local icon = buildGroupSpecIcon(unit, group, dominantTab, specName)
+    return {
+        group = group,
+        specName = specName,
+        specIcon = icon,
+        mainTalentTree = dominantTab,
+        points = { tonumber(t1) or 0, tonumber(t2) or 0, tonumber(t3) or 0 },
+    }
+end
+
+local function findSecondaryGroup(snapshot)
+    local groups = type(snapshot) == "table" and snapshot.groups
+    if type(groups) ~= "table" then
+        return nil
+    end
+    local activeGroup = tonumber(snapshot.activeGroup) or 1
+    local numGroups = tonumber(snapshot.numGroups) or 0
+    if numGroups > 0 then
+        for group = 1, numGroups do
+            if group ~= activeGroup and type(groups[group]) == "table" then
+                return groups[group]
+            end
+        end
+    else
+        for group, groupSnapshot in pairs(groups) do
+            if group ~= activeGroup and type(groupSnapshot) == "table" then
+                return groupSnapshot
+            end
+        end
+    end
+    return nil
+end
+
 local function rebuildSnapshotFromLibrary(name, unit, reason, silent)
     local canReadTalents = lgt and type(lgt.GetUnitTalentSpec) == "function"
     if not canReadTalents or not isNonEmptyString(name) or not isNonEmptyString(unit) then
         return nil
     end
 
-    local specName, t1, t2, t3 = lgt:GetUnitTalentSpec(unit)
-    local dominantTab = dominantTalentTab(specName, t1, t2, t3)
-    local icon = buildSpecIcon(unit, dominantTab, specName)
-    local role
-    if type(lgt.GetUnitRole) == "function" then
-        role = normalizeRole(lgt:GetUnitRole(unit))
+    local activeGroup = getActiveTalentGroup(unit)
+    local numGroups = getTalentGroupCount(unit)
+    local groups = {}
+    for group = 1, tonumber(numGroups) or 1 do
+        groups[group] = buildTalentGroupSnapshot(unit, group)
     end
-    local guid = UnitGUID(unit)
 
-    local previous = cache[name]
-    local snapshot = {
+    local activeSnapshot = groups[activeGroup] or groups[1]
+    if type(activeSnapshot) ~= "table" then
+        return nil
+    end
+
+    local secondarySnapshot = nil
+    local compatSnapshot = {
         name = name,
-        guid = guid,
-        specName = specName,
-        icon = icon,
-        role = role,
+        guid = UnitGUID(unit),
+        specName = activeSnapshot.specName,
+        icon = activeSnapshot.specIcon,
+        role = nil,
         class = getClassForPlayer(name),
         updatedAt = now(),
         refreshReason = reason or "library",
+        activeGroup = activeGroup,
+        numGroups = numGroups,
+        groups = groups,
+        mainTalentTree = activeSnapshot.mainTalentTree,
     }
+    if type(compatSnapshot.role) ~= "string" then
+        if type(lgt.GetUnitRole) == "function" then
+            compatSnapshot.role = normalizeRole(lgt:GetUnitRole(unit))
+        end
+    end
+
+    local role
+    if type(compatSnapshot.role) == "string" then
+        role = compatSnapshot.role
+    end
+    compatSnapshot.role = role
+
+    secondarySnapshot = findSecondaryGroup({
+        activeGroup = activeGroup,
+        groups = groups,
+        numGroups = numGroups,
+    })
+    if type(secondarySnapshot) == "table" then
+        compatSnapshot.secondarySpecName = secondarySnapshot.specName
+        compatSnapshot.secondaryIcon = secondarySnapshot.specIcon
+        compatSnapshot.secondaryGroup = secondarySnapshot.group
+        compatSnapshot.secondaryMainTalentTree = secondarySnapshot.mainTalentTree
+    end
+
+    local previous = cache[name]
+    local snapshot = compatSnapshot
 
     cache[name] = snapshot
     if not silent and emitDisplayUpdate and not snapshotDisplayEqual(previous, snapshot) then
@@ -326,6 +441,26 @@ do
             return nil
         end
         return spec
+    end
+
+    function module:GetPlayerTalentSnapshot(playerName)
+        return module:GetPlayerSpecSnapshot(playerName)
+    end
+
+    function module:GetUnitTalentSnapshot(unit, playerName, reason, silent)
+        local name = normalizePlayerRow(playerName)
+        if not isNonEmptyString(name) then
+            name = unit
+        end
+        if not isNonEmptyString(name) or not isNonEmptyString(unit) then
+            return nil
+        end
+
+        local ok, snapshot = pcall(rebuildSnapshotFromLibrary, name, unit, reason or "unit", silent)
+        if not ok then
+            return nil
+        end
+        return snapshot
     end
 
     function module:RefreshPlayer(name, opts)

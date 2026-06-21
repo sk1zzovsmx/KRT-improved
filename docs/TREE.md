@@ -267,7 +267,8 @@
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-u1-ui-scaffold-infrastructure.md
 |   |   |   |-- 2026-06-14-docs-current-addon-state.md
 |   |   |   |-- 2026-06-15-raidinspect-attendance-redesign.md
-|   |   |   \\-- 2026-06-15-tools-current-state-refresh.md
+|   |   |   |-- 2026-06-15-tools-current-state-refresh.md
+|   |   |   \\-- 2026-06-16-equipinspect-specinspect-canonicalization.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       |-- 2026-06-05-master-loot-grid-design.md
