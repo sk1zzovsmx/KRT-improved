@@ -9,6 +9,7 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 local Timer = feature.Timer
 local Deformat = feature.Deformat
+local Strings = feature.Strings
 
 local Item = feature.Item or {}
 addon.Item = Item
@@ -81,6 +82,20 @@ local function buildItemFallbackLink(itemId)
         return nil
     end
     return "item:" .. tostring(itemId) .. ":0:0:0:0:0:0:0"
+end
+
+local function normalizeText(value)
+    if Strings and Strings.NormalizeText then
+        return Strings.NormalizeText(value, true)
+    end
+    if value == nil then
+        return nil
+    end
+    local text = tostring(value)
+    if text == "" then
+        return nil
+    end
+    return text
 end
 
 local function getItemSnapshot(itemRef)
@@ -262,6 +277,19 @@ function Item.GetItemStringFromLink(itemLink)
     end
 
     return nil
+end
+
+function Item.GetItemKey(itemKeyOrLink, itemLink)
+    local key = normalizeText(itemKeyOrLink)
+    local link = normalizeText(itemLink)
+
+    if link and type(Item.GetItemStringFromLink) == "function" then
+        key = Item.GetItemStringFromLink(link) or key
+    elseif key and key:find("|Hitem:", 1, true) and type(Item.GetItemStringFromLink) == "function" then
+        key = Item.GetItemStringFromLink(key) or key
+    end
+
+    return normalizeText(key or link)
 end
 
 function Item.WarmItemCache(itemLink)

@@ -12,6 +12,7 @@ local Widgets = feature.Widgets
 local UI = feature.UI
 local UIWidgets = UI.Widgets
 local Frames = UI.Frames
+local Primitives = UI.Primitives
 local Scaffold = UI.Scaffold
 local Popups = UI.Popups
 local Tooltips = UI.Tooltips
@@ -48,6 +49,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/Bus",
             "Modules/UI/Facade",
             "Modules/UI/Frames",
+            "Modules/UI/Visuals",
             "Services/Chat",
             "Services/Raid/State",
             "Services/Raid/Capabilities",
@@ -98,8 +100,6 @@ do
 
     local CHAT_MSG_MAX_LEN = 255
     local RESET_ALL_POPUP_KEY = "KRT_LOOTCOUNTER_RESET_ALL"
-    local SOLID_TEX = "Interface\\Buttons\\WHITE8x8"
-
     local COLOR_HEADER_TEXT = { 0.88, 0.88, 0.88 }
     local COLOR_ROW_BG_ODD = { 1, 1, 1, 0.06 }
     local COLOR_ROW_BG_EVEN = { 1, 1, 1, 0.03 }
@@ -111,13 +111,12 @@ do
     local COLOR_COUNT_OS = { 0.63, 0.80, 1.00 }
     local COLOR_COUNT_FREE = { 0.70, 0.98, 0.72 }
 
-    local function setTextureColor(tex, rgba)
-        if not (tex and rgba) then
-            return
+    local setTextureColor = Primitives.SetTextureColorRgba
+        or function(texture, rgba)
+            if texture and texture.SetTexture and rgba then
+                texture:SetTexture(rgba[1], rgba[2], rgba[3], rgba[4])
+            end
         end
-        tex:SetTexture(SOLID_TEX)
-        tex:SetVertexColor(rgba[1], rgba[2], rgba[3], rgba[4] or 1)
-    end
 
     local function setFontColor(fs, rgb)
         if not (fs and rgb) then

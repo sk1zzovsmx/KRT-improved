@@ -65,6 +65,20 @@ Responses.REASONS = Responses.REASONS
 
 local RESPONSE_STATUS = Responses.STATUS
 local reasonCodes = Responses.REASONS
+local GetOption = Options.GetValue
+    or function(namespace, key, defaultValue)
+        local cfg = Options and Options.Get and Options.Get(namespace) or nil
+        if cfg and cfg.Get then
+            local value = cfg:Get(key)
+            if value ~= nil then
+                return value
+            end
+        end
+        return defaultValue
+    end
+local IsDebugEnabled = Options.IsDebugEnabled or function()
+    return false
+end
 
 local RESPONSE_TRANSITIONS = {
     [RESPONSE_STATUS.ACTIVE] = {
@@ -103,18 +117,6 @@ local RESPONSE_TRANSITIONS = {
 }
 
 -- ----- Private helpers ----- --
-local function isDebugEnabled()
-    return addon.hasDebug ~= nil
-end
-
-local function getOption(namespace, key)
-    local cfg = Options and Options.Get and Options.Get(namespace)
-    if cfg and cfg.Get then
-        return cfg:Get(key)
-    end
-    return nil
-end
-
 local function assertContext(ctx)
     assert(type(ctx) == "table", "Rolls response context is required")
     assert(type(ctx.state) == "table", "Rolls response state is required")
@@ -208,7 +210,7 @@ local function isAwardRollType(rollType)
 end
 
 local function traceEligibility(name, eligibility)
-    if isDebugEnabled() then
+    if IsDebugEnabled() then
         addon:debug(
             Diag.D.LogRollsEligibility:format(
                 tostring(name),
@@ -342,7 +344,7 @@ end
 local function applyAcceptedRollResponse(ctx, name, roll, eligibility, source, isOutOfTime)
     local _, state = assertContext(ctx)
     local response = getOrCreateResponse(state, name)
-    local wantLow = getOption("Master", "sortAscending") == true
+    local wantLow = GetOption("Master", "sortAscending") == true
     local nextUsedRolls = (eligibility and tonumber(eligibility.usedRolls) or 0) + 1
 
     if response.bestRoll == nil then
@@ -367,7 +369,7 @@ local function applyAcceptedRollResponse(ctx, name, roll, eligibility, source, i
     response.isEligible = true
     response.isOutOfTime = isOutOfTime == true
 
-    if isDebugEnabled() then
+    if IsDebugEnabled() then
         addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
     end
 end
@@ -389,7 +391,7 @@ local function applyExplicitResponse(ctx, name, status, eligibility, reason, sou
     response.isEligible = eligibility and eligibility.ok == true or false
     response.isOutOfTime = false
 
-    if isDebugEnabled() then
+    if IsDebugEnabled() then
         addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
     end
 
@@ -640,7 +642,7 @@ function Responses.FinalizeMaterializedResponses(ctx, itemId, itemLink, rollType
             response.status = RESPONSE_STATUS.TIMED_OUT
             response.reason = reasonCodes.TIMED_OUT
             response.updatedAt = GetTime()
-            if isDebugEnabled() then
+            if IsDebugEnabled() then
                 addon:debug(Diag.D.LogRollsTimedOut:format(tostring(name)))
             end
         end
@@ -725,13 +727,13 @@ function Responses.SubmitIncomingRoll(ctx, player, roll, source)
             Comms.SendWhisper(player, denyMessage)
             state.deniedReasons[denyKey] = true
         end
-        if isDebugEnabled() then
+        if IsDebugEnabled() then
             addon:debug(Diag.D.LogRollsDeniedPlayer:format(player, tonumber(eligibility.usedRolls) or 0, tonumber(eligibility.allowedRolls) or 0))
         end
         return false, eligibility.reason
     end
 
-    if isDebugEnabled() then
+    if IsDebugEnabled() then
         addon:debug(Diag.D.LogRollsAcceptedPlayer:format(player, (tonumber(eligibility.usedRolls) or 0) + 1, tonumber(eligibility.allowedRolls) or 0))
     end
     if not canTransitionResponseState(state.responsesByPlayer[player] and state.responsesByPlayer[player].status, RESPONSE_STATUS.ROLL) then

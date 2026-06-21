@@ -56,13 +56,14 @@ Indexes map to the synthetic players in this order:
 3. `KRTDbgMag`
 4. `KRTDbgRog`
 
-## Master Loot Grid
+## Raid Grid
 
 | Command | Description |
 | --- | --- |
-| `/krt debug mlgrid` | Open the Master Loot grid debug preview with 25 fake players. |
-| `/krt debug mlgrid <1-40>` | Open the grid preview with the requested fake-player count. |
-| `/krt debug lootgrid <1-40>` | Alias for `/krt debug mlgrid <1-40>`. |
+| `/krt debug raidgrid` | Open the Raid Grid debug preview with 25 fake players. |
+| `/krt debug raidgrid <1-40>` | Open the grid preview with the requested fake-player count. |
+| `/krt debug mlgrid <1-40>` | Alias for `/krt debug raidgrid <1-40>`. |
+| `/krt debug lootgrid <1-40>` | Legacy alias for `/krt debug raidgrid <1-40>`. |
 
 The grid preview is for layout testing only. Fake rows never call
 `GiveMasterLoot` and never award loot.
@@ -107,13 +108,13 @@ smoke checks.
 /krt debug timers dur
 ```
 
-### Master Loot grid layout smoke
+### Raid Grid layout smoke
 
 ```text
 /krt debug on
-/krt debug mlgrid 5
-/krt debug mlgrid 25
-/krt debug mlgrid 40
+/krt debug raidgrid 5
+/krt debug raidgrid 25
+/krt debug raidgrid 40
 ```
 
 ### Normal synthetic roll smoke

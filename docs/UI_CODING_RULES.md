@@ -35,6 +35,17 @@ The WoW XML schema supports `<Scripts>` and widget handler tags, but KRT does no
 Keep all widget handlers in Lua so ownership and review stay local to Controllers, Widgets, or
 shared `Modules/UI/*` helpers.
 
+### Widget Facade Dispatch
+
+Feature widgets own their frames and internal lifecycle under `addon.Widgets.*`, but optional
+cross-owner calls should go through the shared widget facade:
+
+- widget files register public dispatch methods with `addon.UI.Widgets.Register(...)`
+- controllers and entrypoints call optional widget methods with `addon.UI.Widgets.Call(...)`
+- controllers should not direct-call `addon.Widgets.*` when the widget can be feature-gated
+  or absent in a focused test harness
+- services must not reference `addon.UI.Widgets`, `addon.Widgets`, controllers, or frames
+
 ## 2) Shared Template Policy
 
 Shared XML templates should describe UI role, not historical implementation. Keep the `KRT` prefix
@@ -137,9 +148,7 @@ local list = Lists.CreateController({
     rowTmpl = "KRTTableRowTemplate",
     _rowParts = { "Name", "Value", "ActionBtn" },
 
-    rowName = function(frameName, item, index)
-        return frameName .. "Row" .. index
-    end,
+    rowName = Lists.MakeIndexedRowName("Row"),
 
     getData = function(out)
         -- Fill out[] with display rows.
@@ -166,6 +175,10 @@ Required naming for standard list panels:
 - `FrameNameScrollFrame`
 - `FrameNameScrollFrameScrollChild`
 - `FrameNameRow1`, `FrameNameRow2`, ...
+
+Use `Lists.MakeIndexedRowName("Suffix")` when a list row name is just
+`frameName .. "Suffix" .. index`. Keep a custom `rowName` callback only when
+the row name depends on row data or another non-standard naming rule.
 
 Do not duplicate list-controller responsibilities in feature code:
 

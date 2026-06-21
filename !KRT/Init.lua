@@ -370,6 +370,7 @@ function Database.GetFeatureShared()
         Item = addon.Item,
         LootSourcesData = addon.LootSourcesData,
         LootSources = addon.LootSources,
+        LootSourceCandidates = addon.LootSourceCandidates,
         IgnoredItems = addon.IgnoredItems,
         IgnoredMobs = addon.IgnoredMobs,
 
@@ -381,8 +382,6 @@ function Database.GetFeatureShared()
         Minimap = addon.Minimap,
 
         EnsureServiceNamespace = core.EnsureServiceNamespace,
-        BindModuleRequestRefresh = core.BindModuleRequestRefresh,
-        BindModuleToggleHide = core.BindModuleToggleHide,
         MakeModuleFrameGetter = core.MakeModuleFrameGetter,
 
         UnitIsGroupLeader = addon.UnitIsGroupLeader,
@@ -611,26 +610,6 @@ do
         addon:RegisterEvent("ADDON_LOADED")
     end
 
-    local function bindModuleRequestRefresh(module, getFrame)
-        local requestRefresh = Frames.MakeEventDrivenRefresher(getFrame, function()
-            module:Refresh()
-        end)
-
-        function module:RequestRefresh()
-            requestRefresh()
-        end
-    end
-
-    local function bindModuleToggleHide(module, uiController)
-        function module:Toggle()
-            return uiController:Toggle()
-        end
-
-        function module:Hide()
-            return uiController:Hide()
-        end
-    end
-
     local function makeModuleFrameGetter(module, globalFrameName)
         local getGlobalFrame = Frames.MakeFrameGetter(globalFrameName)
         return function()
@@ -642,8 +621,6 @@ do
         end
     end
 
-    Database.BindModuleRequestRefresh = bindModuleRequestRefresh
-    Database.BindModuleToggleHide = bindModuleToggleHide
     Database.MakeModuleFrameGetter = makeModuleFrameGetter
 
     function Database.RequireServiceMethod(serviceName, serviceTable, methodName)
@@ -1082,8 +1059,7 @@ do
             return
         end
         local reservesService = getService("Reserves")
-        local reservesSync = reservesService and reservesService._Sync or nil
-        if reservesSync and reservesSync.HandleMessage and reservesSync:HandleMessage(prefix, msg, channel, sender) then
+        if reservesService and reservesService.HandleSyncMessage and reservesService:HandleSyncMessage(prefix, msg, channel, sender) then
             return
         end
         local lootService = getService("Loot")

@@ -77,8 +77,8 @@ do
     local queryCooldownSeconds = tonumber(C.RESERVES_QUERY_COOLDOWN_SECONDS) or 2
 
     -- ----- Private helpers ----- --
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
+    local isDebugEnabled = Options.IsDebugEnabled or function()
+        return false
     end
 
     local function hasReserveData()
@@ -617,7 +617,7 @@ do
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogReservesItemInfoReceived:format(itemId))
             end
-            if not (Reserves and Reserves._HasPendingItem and Reserves._HasPendingItem(itemId)) then
+            if not (Reserves and Reserves.HasPendingItem and Reserves:HasPendingItem(itemId)) then
                 return
             end
 

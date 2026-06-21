@@ -131,20 +131,22 @@ do
         newItemCounts, delItemCounts = addon.TablePool("k")
     end
     state.itemCounts = newItemCounts and newItemCounts() or {}
+    local GetOption = Options.GetValue
+        or function(namespace, key, defaultValue)
+            local cfg = Options and Options.Get and Options.Get(namespace) or nil
+            if cfg and cfg.Get then
+                local value = cfg:Get(key)
+                if value ~= nil then
+                    return value
+                end
+            end
+            return defaultValue
+        end
+    local IsDebugEnabled = Options.IsDebugEnabled or function()
+        return false
+    end
 
     -- ----- Private helpers ----- --
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
-    end
-
-    local function getOption(namespace, key)
-        local cfg = Options and Options.Get and Options.Get(namespace)
-        if cfg and cfg.Get then
-            return cfg:Get(key)
-        end
-        return nil
-    end
-
     -- ============================================================================
     -- Session helpers
     -- ============================================================================
@@ -214,6 +216,66 @@ do
         return Sessions.EnsureRollSession(getSessionsContext(), itemLink, rollType, source)
     end
 
+    local function captureLootRollBossContext(session, source, opts)
+        if type(session) ~= "table" or not session.id then
+            return 0
+        end
+
+        opts = opts or {}
+        local raid = getRaidService()
+        local raidNum = opts.raidNum or (Database.GetCurrentRaid and Database.GetCurrentRaid()) or nil
+        if not raidNum then
+            return tonumber(session.bossNid) or 0
+        end
+
+        local ttlSeconds = tonumber(opts.ttlSeconds) or 0
+        local sessionBossNid = tonumber(session.bossNid) or 0
+        if sessionBossNid > 0 and raid and raid.SetBossContextForLootSession then
+            raid:SetBossContextForLootSession(raidNum, session.id, sessionBossNid, ttlSeconds)
+            return sessionBossNid
+        end
+
+        if not (raid and raid.FindAndRememberBossContextForLootSession) then
+            return 0
+        end
+
+        sessionBossNid = tonumber(raid:FindAndRememberBossContextForLootSession(raidNum, session.id, {
+            allowLootWindowContext = source ~= "inventory",
+            allowContextRecovery = source ~= "inventory",
+            ttlSeconds = ttlSeconds,
+        })) or 0
+
+        if sessionBossNid > 0 then
+            session.bossNid = sessionBossNid
+        end
+
+        return sessionBossNid
+    end
+
+    local function ensureLootRollSession(itemLink, rollType, source, opts)
+        local session = ensureRollSession(itemLink, rollType, source)
+        if not session then
+            return nil
+        end
+
+        opts = opts or {}
+        if opts.fromInventory == true then
+            local raid = getRaidService()
+            local raidNum = opts.raidNum or (Database.GetCurrentRaid and Database.GetCurrentRaid()) or nil
+            local holderName = opts.holderName or (Database.GetPlayerName and Database.GetPlayerName()) or nil
+            local heldLootNid = 0
+            if raid and raid.ResolveHeldLootNid then
+                heldLootNid = tonumber(raid:ResolveHeldLootNid(itemLink or session.itemLink, session.lootNid, holderName, raidNum)) or 0
+            end
+            session.lootNid = heldLootNid
+            lootState.currentRollItem = heldLootNid
+        end
+
+        captureLootRollBossContext(session, source, opts)
+        syncSessionStateFromRollSession(session)
+        return session
+    end
+
     local function updateSessionRollWindow(opened)
         Sessions.UpdateSessionRollWindow(getSessionsContext(), opened)
     end
@@ -238,7 +300,7 @@ do
         local session = getRollSession()
         local sessionItemId = session and tonumber(session.itemId) or nil
         if sessionItemId and sessionItemId > 0 then
-            if isDebugEnabled() then
+            if IsDebugEnabled() then
                 addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(sessionItemId)))
             end
             return sessionItemId
@@ -256,7 +318,7 @@ do
             session.itemLink = itemLink
             session.itemKey = Item.GetItemStringFromLink(itemLink) or itemLink
         end
-        if isDebugEnabled() then
+        if IsDebugEnabled() then
             addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
         end
         return itemId
@@ -285,7 +347,7 @@ do
                 return response and response.bestRoll or nil
             end,
             isSortAscending = function()
-                return getOption("Master", "sortAscending") == true
+                return GetOption("Master", "sortAscending") == true
             end,
         }
         return historyContext
@@ -412,10 +474,10 @@ do
             getPlusForItem = getPlusForItem,
             isPlusSystemEnabled = isPlusSystemEnabled,
             isSortAscending = function()
-                return getOption("Master", "sortAscending") == true
+                return GetOption("Master", "sortAscending") == true
             end,
             shouldShowLootCounterDuringMSRoll = function()
-                return getOption("LootCounter", "showLootCounterDuringMSRoll") == true
+                return GetOption("LootCounter", "showLootCounterDuringMSRoll") == true
             end,
             getRaidService = getRaidService,
             getItemReserveContext = getItemReserveContext,
@@ -473,7 +535,7 @@ do
 
         if used >= allowed then
             addon:info(L.ChatOnlyRollOnce)
-            if isDebugEnabled() then
+            if IsDebugEnabled() then
                 addon:debug(Diag.D.LogRollsBlockedPlayer:format(name, used, allowed))
             end
             return
@@ -482,7 +544,7 @@ do
         RandomRoll(1, 100)
         incrementLocalPlayerRollCount(itemId)
         updateLocalRollState(itemId, name)
-        if isDebugEnabled() then
+        if IsDebugEnabled() then
             addon:debug(Diag.D.LogRollsPlayerRolled:format(name, itemId))
         end
     end
@@ -520,7 +582,7 @@ do
         end
         updateSessionRollWindow(on)
 
-        if isDebugEnabled() then
+        if IsDebugEnabled() then
             addon:debug(Diag.D.LogRollsRecordState:format(tostring(bool)))
         end
     end
@@ -652,7 +714,7 @@ do
             seedTieReroll = true,
         })
 
-        if isDebugEnabled() then
+        if IsDebugEnabled() then
             addon:debug(Diag.D.LogRollsTieReroll:format(tostring(itemLink), tconcat(reroll.ordered, ",")))
         end
         module:GetDisplayModel()
@@ -684,6 +746,10 @@ do
 
     function module:EnsureRollSession(itemLink, rollType, source)
         return ensureRollSession(itemLink, rollType, source)
+    end
+
+    function module:EnsureLootRollSession(itemLink, rollType, source, opts)
+        return ensureLootRollSession(itemLink, rollType, source, opts)
     end
 
     function module:SyncSessionState(session)
@@ -732,6 +798,8 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Services/Rolls/Strategies",
             "Services/Rolls/Resolution",
             "Services/Rolls/Display",
+            "Services/Raid/State",
+            "Services/Raid/LootRecords",
         },
     })
     registry.SetLoaded("Services/Rolls/Service")

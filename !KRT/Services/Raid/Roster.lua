@@ -52,8 +52,8 @@ do
     local isUnknownName = assert(module._IsUnknownNameInternal, "Raid unknown-name helper is not initialized")
 
     -- ----- Private helpers ----- --
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
+    local isDebugEnabled = feature.Options.IsDebugEnabled or function()
+        return false
     end
 
     local function resetLiveUnitCaches()

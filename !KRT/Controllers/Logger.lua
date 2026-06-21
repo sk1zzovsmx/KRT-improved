@@ -74,16 +74,20 @@ local strlower = string.lower
 local IsTrashMobName = IgnoredMobs.IsTrashMobName
 local GetTrashMobName = IgnoredMobs.GetTrashMobName
 
-local loggerPanelNames = {
-    "KRTLoggerRaids",
-    "KRTLoggerBosses",
-    "KRTLoggerBossAttendees",
-    "KRTLoggerRaidAttendees",
-    "KRTLoggerLoot",
-    "KRTRaidAttendanceRaids",
-    "KRTRaidAttendanceRaidAttendees",
-    "KRTRaidAttendanceBosses",
-}
+Controllers.Logger = Controllers.Logger or {}
+local module = Controllers.Logger
+
+module._loggerPanelNames = module._loggerPanelNames
+    or {
+        "KRTLoggerRaids",
+        "KRTLoggerBosses",
+        "KRTLoggerBossAttendees",
+        "KRTLoggerRaidAttendees",
+        "KRTLoggerLoot",
+        "KRTRaidAttendanceRaids",
+        "KRTRaidAttendanceRaidAttendees",
+        "KRTRaidAttendanceBosses",
+    }
 
 local LOGGER_COMPACT_ROW_HEIGHT = 22
 local LOGGER_LOOT_ROW_HEIGHT = 32
@@ -142,41 +146,34 @@ local LOGGER_BOSS_COLUMN_RATIOS = {
     mode = 0.15,
 }
 
-local SetSelectedRaid
-local deleteSelectedAttendees
-local setFrameLabel
-local setPanelTitle
-local getSelectedRaidRecord
-local setFrameHint
-local needRaid
-local needBoss
-local needLoot
-local runWithSelectedRaid
-local resetSelections
-local isLoggerViewingCurrentRaid
-local requestRosterBoundListsRefresh
-local selectRaid
-local selectBoss
-local selectBossPlayer
-local selectPlayer
-local selectItem
-local onLootRowEnter
-local onLootRowLeave
-local fillBossBox
-local selectionEvents = {
-    selectedRaid = InternalEvents.LoggerSelectRaid,
-    selectedBoss = InternalEvents.LoggerSelectBoss,
-    selectedPlayer = InternalEvents.LoggerSelectPlayer,
-    selectedBossPlayer = InternalEvents.LoggerSelectBossPlayer,
-    selectedItem = InternalEvents.LoggerSelectItem,
-}
+module._selectionEvents = module._selectionEvents
+    or {
+        selectedRaid = InternalEvents.LoggerSelectRaid,
+        selectedBoss = InternalEvents.LoggerSelectBoss,
+        selectedPlayer = InternalEvents.LoggerSelectPlayer,
+        selectedBossPlayer = InternalEvents.LoggerSelectBossPlayer,
+        selectedItem = InternalEvents.LoggerSelectItem,
+    }
 
 local function triggerSelectionEvent(target, key, ...)
-    local eventName = selectionEvents[key]
+    local eventName = module._selectionEvents[key]
     if not eventName then
         return
     end
     Bus.TriggerEvent(eventName, target[key], ...)
+end
+
+local function getActionCommitOpts(extra)
+    local opts = {
+        selectionState = module,
+        triggerSelectionEvent = triggerSelectionEvent,
+    }
+    if type(extra) == "table" then
+        for key, value in pairs(extra) do
+            opts[key] = value
+        end
+    end
+    return opts
 end
 
 local RAID_SORT_HEADERS = {
@@ -481,8 +478,6 @@ local function fillRaidListData(out, contextTag)
     end
 end
 
-Controllers.Logger = Controllers.Logger or {}
-local module = Controllers.Logger
 local uiState = UI.Scaffold.EnsureModuleState(module)
 
 local function getCountTitle(baseText, count)
@@ -653,9 +648,6 @@ do
     module.Export = Export
     module.Actions = Actions
 
-    -- Bind controller reference so Logger actions can validate selections.
-    Actions:BindController(module, triggerSelectionEvent)
-
     -- ----- Private helpers ----- --
 
     function uiState.AcquireRefs(frame)
@@ -697,7 +689,7 @@ do
         end
     end
 
-    setFrameLabel = function(frameName, suffix, text)
+    module._setFrameLabel = function(frameName, suffix, text)
         local label = frameName and _G[frameName .. suffix] or nil
         if not label then
             return nil
@@ -709,18 +701,18 @@ do
         return label
     end
 
-    setPanelTitle = function(frameName, text)
-        setFrameLabel(frameName, "Title", text)
+    module._setPanelTitle = function(frameName, text)
+        module._setFrameLabel(frameName, "Title", text)
     end
 
-    setFrameHint = function(frameName, suffix, text)
-        local label = setFrameLabel(frameName, suffix, text or "")
+    module._setFrameHint = function(frameName, suffix, text)
+        local label = module._setFrameLabel(frameName, suffix, text or "")
         if label then
             UI.Primitives.SetShown(label, type(text) == "string" and text ~= "")
         end
     end
 
-    getSelectedRaidRecord = function()
+    module._getSelectedRaidRecord = function()
         if not module.selectedRaid then
             return nil
         end
@@ -809,7 +801,7 @@ do
     module.selectedBossPlayer = nil
     module.selectedItem = nil
     module.activeTab = module.activeTab or "loot"
-    SetSelectedRaid = function(raidId)
+    module._SetSelectedRaid = function(raidId)
         if raidId == nil then
             module.selectedRaid = nil
         else
@@ -942,8 +934,8 @@ do
         triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
-    deleteSelectedAttendees = function(ctx, deleteFn, onRemoved)
-        runWithSelectedRaid(function(_, rID)
+    module._deleteSelectedAttendees = function(ctx, deleteFn, onRemoved)
+        module._runWithSelectedRaid(function(_, rID)
             local ids = UI.Selection.GetSelected(ctx)
             if not (ids and #ids > 0) then
                 return
@@ -963,7 +955,7 @@ do
 
     local rosterUiRefreshDebounceSeconds = 0.25
 
-    isLoggerViewingCurrentRaid = function()
+    module._isLoggerViewingCurrentRaid = function()
         local frame = module.frame or getFrame()
         if not (frame and frame.IsShown and frame:IsShown()) then
             return false
@@ -982,14 +974,14 @@ do
         end
     end
 
-    requestRosterBoundListsRefresh = function()
+    module._requestRosterBoundListsRefresh = function()
         if module._rosterUiHandle then
             module:CancelTimer(module._rosterUiHandle)
             module._rosterUiHandle = nil
         end
         module._rosterUiHandle = module:ScheduleTimer(function()
             module._rosterUiHandle = nil
-            if not isLoggerViewingCurrentRaid() then
+            if not module._isLoggerViewingCurrentRaid() then
                 return
             end
             refreshRosterBoundLists()
@@ -997,14 +989,14 @@ do
     end
 
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
-    needRaid = function()
+    module._needRaid = function()
         local rID = module.selectedRaid
         local raid = rID and Store:GetRaid(rID) or nil
         return raid, rID
     end
 
-    needBoss = function(raid)
-        raid = raid or (select(1, needRaid()))
+    module._needBoss = function(raid)
+        raid = raid or (select(1, module._needRaid()))
         if not raid then
             return nil
         end
@@ -1015,8 +1007,8 @@ do
         return Store:GetBoss(raid, bNid)
     end
 
-    needLoot = function(raid)
-        raid = raid or (select(1, needRaid()))
+    module._needLoot = function(raid)
+        raid = raid or (select(1, module._needRaid()))
         if not raid then
             return nil
         end
@@ -1027,8 +1019,8 @@ do
         return Store:GetLoot(raid, lNid)
     end
 
-    runWithSelectedRaid = function(fn, refreshEvent)
-        local raid, rID = needRaid()
+    module._runWithSelectedRaid = function(fn, refreshEvent)
+        local raid, rID = module._needRaid()
         if not raid then
             return
         end
@@ -1150,7 +1142,7 @@ do
             return false
         end
 
-        local raid = needRaid()
+        local raid = module._needRaid()
         if not raid then
             addon:error(L.ErrLoggerInvalidRaid)
             return false
@@ -1223,7 +1215,7 @@ do
     end
 
     showLoggerExportFrame = function()
-        local raid = needRaid()
+        local raid = module._needRaid()
         if not raid then
             addon:error(L.ErrLoggerInvalidRaid)
             return false
@@ -1242,7 +1234,7 @@ do
         return true
     end
 
-    resetSelections = function()
+    module._resetSelections = function()
         clearSelections()
     end
 
@@ -1251,14 +1243,14 @@ do
             enableDrag = true,
             hookOnShow = function()
                 if not module.selectedRaid then
-                    SetSelectedRaid(Database.GetCurrentRaid())
+                    module._SetSelectedRaid(Database.GetCurrentRaid())
                 end
                 clearSelections()
                 refreshLoggerTabLayout()
                 triggerSelectionEvent(module, "selectedRaid", "ui")
             end,
             hookOnHide = function()
-                SetSelectedRaid(Database.GetCurrentRaid())
+                module._SetSelectedRaid(Database.GetCurrentRaid())
                 clearSelections()
             end,
         }) or uiState.FrameName
@@ -1275,7 +1267,7 @@ do
             return
         end
         if not module.selectedRaid then
-            SetSelectedRaid(Database.GetCurrentRaid())
+            module._SetSelectedRaid(Database.GetCurrentRaid())
         end
         clearSelections()
         refreshLoggerTabLayout()
@@ -1316,7 +1308,7 @@ do
             local pair = onLoadPairs[i]
             ensureSubmoduleOnLoad(pair.moduleRef, pair.frameRef)
         end
-        Rows.ApplyLoggerSkin(loggerPanelNames)
+        Rows.ApplyLoggerSkin(module._loggerPanelNames)
         refreshLoggerTabLayout()
     end
 
@@ -1345,7 +1337,7 @@ do
     end
 
     -- Selectors
-    selectRaid = function(btn, button, opts)
+    module._selectRaid = function(btn, button, opts)
         if button and button ~= "LeftButton" then
             return
         end
@@ -1373,7 +1365,7 @@ do
             isMulti = isMulti,
             isRange = isRange,
             allowDeselect = opts and opts.allowDeselect,
-            setFocus = SetSelectedRaid,
+            setFocus = module._SetSelectedRaid,
             mapSelectedToFocus = function(nid)
                 return nid and Database.GetRaidIdByNid(nid) or nil
             end,
@@ -1404,7 +1396,7 @@ do
         triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
-    selectBoss = function(btn, button)
+    module._selectBoss = function(btn, button)
         if button and button ~= "LeftButton" then
             return
         end
@@ -1444,7 +1436,7 @@ do
     end
 
     -- Player filter: only one active at a time
-    selectBossPlayer = function(btn, button)
+    module._selectBossPlayer = function(btn, button)
         if button and button ~= "LeftButton" then
             return
         end
@@ -1485,7 +1477,7 @@ do
         triggerSelectionEvent(module, "selectedPlayer")
     end
 
-    selectPlayer = function(btn, button)
+    module._selectPlayer = function(btn, button)
         if button and button ~= "LeftButton" then
             return
         end
@@ -1751,7 +1743,7 @@ do
             }, f, "cursor", 0, 0, "MENU")
         end
 
-        selectItem = function(btn, button)
+        module._selectItem = function(btn, button)
             local id = btn and btn.GetID and btn:GetID()
             if not id then
                 return
@@ -1793,11 +1785,11 @@ do
         end
 
         -- Keep row hover neutral; item tooltip is bound to icon hover only.
-        onLootRowEnter = function(_row)
+        module._onLootRowEnter = function(_row)
             -- No-op.
         end
 
-        onLootRowLeave = function(_row)
+        module._onLootRowLeave = function(_row)
             -- No-op.
         end
 
@@ -1945,15 +1937,13 @@ do
                 fillRaidListData(out, "Logger.Raids.GetData")
             end,
 
-            rowName = function(n, _, i)
-                return n .. "RaidBtn" .. i
-            end,
+            rowName = UI.Lists.MakeIndexedRowName("RaidBtn"),
             rowTmpl = "KRTLoggerRaidButton",
 
             drawRow = UI.Lists.CreateRowRenderer(function(row, it)
                 if not row._krtBound then
                     UI.Frames.SetScriptSafely(row, "OnClick", function(self, button)
-                        selectRaid(self, button)
+                        module._selectRaid(self, button)
                     end)
                     row._krtBound = true
                 end
@@ -2014,8 +2004,8 @@ do
                 local delBtn = _G[n .. "DeleteBtn"]
                 UI.Primitives.SetButtonCount(delBtn, L.BtnDelete, selCount)
                 UI.Primitives.SetEnabled(delBtn, canDelete)
-                setPanelTitle(n, getCountTitle(L.StrRaidsList, count))
-                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
+                module._setPanelTitle(n, getCountTitle(L.StrRaidsList, count))
+                module._setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
             end,
 
             sorters = {
@@ -2055,8 +2045,8 @@ do
         end
         if module.Actions:SetCurrentRaid(sel) then
             -- Context change: clear dependent selections and redraw all module panels.
-            SetSelectedRaid(sel)
-            resetSelections()
+            module._SetSelectedRaid(sel)
+            module._resetSelections()
             triggerSelectionEvent(module, "selectedRaid", "ui")
         end
     end
@@ -2118,8 +2108,8 @@ do
                 end
             end
 
-            SetSelectedRaid(newFocus)
-            resetSelections()
+            module._SetSelectedRaid(newFocus)
+            module._resetSelections()
             controller:Dirty()
             triggerSelectionEvent(module, "selectedRaid", "ui")
         end
@@ -2134,8 +2124,8 @@ do
 
     Bus.RegisterCallback(InternalEvents.RaidCreate, function(_, num)
         -- Context change: selecting a different raid must clear dependent selections.
-        SetSelectedRaid(tonumber(num))
-        resetSelections()
+        module._SetSelectedRaid(tonumber(num))
+        module._resetSelections()
         controller:Dirty()
         triggerSelectionEvent(module, "selectedRaid", "ui")
     end)
@@ -2152,10 +2142,10 @@ do
         end
 
         local prevRaid = module.selectedRaid
-        SetSelectedRaid(raidId)
+        module._SetSelectedRaid(raidId)
 
         if prevRaid ~= module.selectedRaid then
-            resetSelections()
+            module._resetSelections()
         end
 
         if reason == "sync" then
@@ -2187,12 +2177,12 @@ do
         if raidIdType ~= "number" and raidIdType ~= "string" then
             return
         end
-        local loggerOpen = isLoggerViewingCurrentRaid()
+        local loggerOpen = module._isLoggerViewingCurrentRaid()
         local attendanceViewOpen = module._isRaidAttendanceViewingCurrentRaid
         local attendanceRefresh = module._requestAttendanceBoundListsRefresh
         local attendanceOpen = attendanceViewOpen and attendanceViewOpen()
         if loggerOpen then
-            requestRosterBoundListsRefresh()
+            module._requestRosterBoundListsRefresh()
         end
         if attendanceOpen and attendanceRefresh then
             attendanceRefresh()
@@ -2263,7 +2253,7 @@ do
         end,
 
         getData = function(out)
-            local raid = needRaid()
+            local raid = module._needRaid()
             if not raid then
                 return
             end
@@ -2274,16 +2264,14 @@ do
             View:FillBossList(out, raid)
         end,
 
-        rowName = function(n, _, i)
-            return n .. "BossBtn" .. i
-        end,
+        rowName = UI.Lists.MakeIndexedRowName("BossBtn"),
         rowTmpl = "KRTLoggerBossButton",
 
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
             if not row._krtBound then
                 UI.Frames.SetScriptSafely(row, "OnClick", function(self, button)
                     if module.activeTab ~= "attendance" then
-                        selectBoss(self, button)
+                        module._selectBoss(self, button)
                     end
                 end)
                 row._krtBound = true
@@ -2316,17 +2304,17 @@ do
             UI.Primitives.SetEnabled(delBtn, (bossSelCount and bossSelCount > 0) or false)
             if isAttendanceTab then
                 local playerLabel = getPlayerContextLabel(module.selectedRaid, module.selectedPlayer)
-                setPanelTitle(n, getCountContextTitle(L.StrBossParticipation, count, playerLabel, nil))
+                module._setPanelTitle(n, getCountContextTitle(L.StrBossParticipation, count, playerLabel, nil))
                 if not module.selectedRaid then
-                    setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectRaid)
+                    module._setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectRaid)
                 elseif not module.selectedPlayer then
-                    setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectPlayer)
+                    module._setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectPlayer)
                 else
-                    setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyBossParticipation or "")
+                    module._setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyBossParticipation or "")
                 end
             else
-                setPanelTitle(n, getCountContextTitle(L.StrBosses, count, getRaidContextLabel(module.selectedRaid), nil))
-                setFrameHint(n, "EmptyState", getBossEmptyStateText(count, module.selectedRaid))
+                module._setPanelTitle(n, getCountContextTitle(L.StrBosses, count, getRaidContextLabel(module.selectedRaid), nil))
+                module._setFrameHint(n, "EmptyState", getBossEmptyStateText(count, module.selectedRaid))
             end
         end,
 
@@ -2356,13 +2344,13 @@ do
 
     editSelectedBoss = function()
         if module.selectedBoss then
-            fillBossBox()
+            module._fillBossBox()
         end
     end
 
     do
         local function deleteBosses()
-            runWithSelectedRaid(function(_, rID)
+            module._runWithSelectedRaid(function(_, rID)
                 local ctx = module._msBossCtx
                 local ids = UI.Selection.GetSelected(ctx)
                 if not (ids and #ids > 0) then
@@ -2371,7 +2359,7 @@ do
 
                 for i = 1, #ids do
                     local bNid = ids[i]
-                    local lootRemoved = Actions:DeleteBoss(rID, bNid)
+                    local lootRemoved = Actions:DeleteBoss(rID, bNid, getActionCommitOpts())
                     if addon.hasDebug then
                         addon:debug(Diag.D.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
                     end
@@ -2466,15 +2454,13 @@ do
             View:FillBossAttendeesList(out, raid, bID)
         end,
 
-        rowName = function(n, _, i)
-            return n .. "PlayerBtn" .. i
-        end,
+        rowName = UI.Lists.MakeIndexedRowName("PlayerBtn"),
         rowTmpl = "KRTLoggerBossAttendeeButton",
 
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
             if not row._krtBound then
                 UI.Frames.SetScriptSafely(row, "OnClick", function(self, button)
-                    selectBossPlayer(self, button)
+                    module._selectBossPlayer(self, button)
                 end)
                 row._krtBound = true
             end
@@ -2490,8 +2476,8 @@ do
             local removeBtn = _G[n .. "RemoveBtn"]
             local attSelCount = UI.Selection.GetCount(module._msBossAttCtx)
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, getCountContextTitle(L.StrBossAttendees, count, getBossContextLabel(module.selectedRaid, module.selectedBoss), nil))
-            setFrameHint(n, "EmptyState", getBossAttendeesEmptyStateText(count, module.selectedRaid, module.selectedBoss))
+            module._setPanelTitle(n, getCountContextTitle(L.StrBossAttendees, count, getBossContextLabel(module.selectedRaid, module.selectedBoss), nil))
+            module._setFrameHint(n, "EmptyState", getBossAttendeesEmptyStateText(count, module.selectedRaid, module.selectedBoss))
             if addBtn then
                 UI.Primitives.SetEnabled(addBtn, bSel and ((attSelCount or 0) == 0))
             end
@@ -2517,7 +2503,7 @@ do
 
     do
         local function deleteSelectedBossAttendees()
-            deleteSelectedAttendees(module._msBossAttCtx, function(rID, ids)
+            module._deleteSelectedAttendees(module._msBossAttCtx, function(rID, ids)
                 local bNid = module.selectedBoss
                 if not bNid then
                     return 0
@@ -2610,22 +2596,20 @@ do
         end,
 
         getData = function(out)
-            local raid = needRaid()
+            local raid = module._needRaid()
             if not raid then
                 return
             end
             View:FillRaidAttendeesList(out, raid)
         end,
 
-        rowName = function(n, _, i)
-            return n .. "PlayerBtn" .. i
-        end,
+        rowName = UI.Lists.MakeIndexedRowName("PlayerBtn"),
         rowTmpl = "KRTLoggerRaidAttendeeButton",
 
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
             if not row._krtBound then
                 UI.Frames.SetScriptSafely(row, "OnClick", function(self, button)
-                    selectPlayer(self, button)
+                    module._selectPlayer(self, button)
                 end)
                 row._krtBound = true
             end
@@ -2643,8 +2627,8 @@ do
 
             local deleteBtn = _G[n .. "DeleteBtn"]
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, getCountContextTitle(L.StrRaidAttendees, count, getRaidContextLabel(module.selectedRaid), nil))
-            setFrameHint(n, "EmptyState", getRaidAttendeesEmptyStateText(count, module.selectedRaid))
+            module._setPanelTitle(n, getCountContextTitle(L.StrRaidAttendees, count, getRaidContextLabel(module.selectedRaid), nil))
+            module._setFrameHint(n, "EmptyState", getRaidAttendeesEmptyStateText(count, module.selectedRaid))
             if deleteBtn then
                 local attSelCount = UI.Selection.GetCount(module._msRaidAttCtx)
                 UI.Primitives.SetButtonCount(deleteBtn, L.BtnDelete, attSelCount)
@@ -2679,7 +2663,7 @@ do
     -- Update raid roster from the live in-game raid roster (current raid only).
     -- Bound to the "Add" button in the RaidAttendees frame (repurposed as Update).
     function updateRaidAttendeesFromRoster()
-        runWithSelectedRaid(function(_, rID)
+        module._runWithSelectedRaid(function(_, rID)
             local sel = tonumber(rID)
             if not sel then
                 return
@@ -2712,8 +2696,8 @@ do
 
     do
         local function deleteSelectedRaidAttendees()
-            deleteSelectedAttendees(module._msRaidAttCtx, function(rID, ids)
-                local removed = Actions:DeleteRaidAttendeeMany(rID, ids)
+            module._deleteSelectedAttendees(module._msRaidAttCtx, function(rID, ids)
+                local removed = Actions:DeleteRaidAttendeeMany(rID, ids, getActionCommitOpts({ clearPlayers = true }))
                 return tonumber(removed) or 0
             end, function()
                 module.selectedPlayer = nil
@@ -2835,7 +2819,7 @@ do
         end,
 
         getData = function(out)
-            local raid = needRaid()
+            local raid = module._needRaid()
             if not raid then
                 return
             end
@@ -2843,9 +2827,7 @@ do
             View:FillLootList(out, raid, nil, nil)
         end,
 
-        rowName = function(n, _, i)
-            return n .. "ItemBtn" .. i
-        end,
+        rowName = UI.Lists.MakeIndexedRowName("ItemBtn"),
         rowTmpl = "KRTLoggerLootButton",
 
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
@@ -2856,13 +2838,13 @@ do
                     row:RegisterForClicks("AnyUp")
                 end
                 UI.Frames.SetScriptSafely(row, "OnClick", function(self, button)
-                    selectItem(self, button)
+                    module._selectItem(self, button)
                 end)
                 UI.Frames.SetScriptSafely(row, "OnEnter", function(self)
-                    onLootRowEnter(self)
+                    module._onLootRowEnter(self)
                 end)
                 UI.Frames.SetScriptSafely(row, "OnLeave", function(self)
-                    onLootRowLeave(self)
+                    module._onLootRowLeave(self)
                 end)
                 local itemButton = row.GetName and _G[row:GetName() .. "Item"] or nil
                 if itemButton and itemButton.EnableMouse then
@@ -2874,7 +2856,7 @@ do
                 if itemButton then
                     itemButton._krtRow = row
                     UI.Frames.SetScriptSafely(itemButton, "OnClick", function(_, button)
-                        selectItem(row, button)
+                        module._selectItem(row, button)
                     end)
                     UI.Frames.SetScriptSafely(itemButton, "OnEnter", function(self)
                         showLootTooltip(self)
@@ -2986,8 +2968,8 @@ do
             UI.Primitives.SetEnabled(exportBtn, module.selectedRaid ~= nil)
             UI.Primitives.SetButtonCount(delBtn, L.BtnDelete, lootSelCount)
             UI.Primitives.SetEnabled(delBtn, (lootSelCount or 0) > 0)
-            setPanelTitle(n, getCountContextTitle(L.StrRaidLoot, count, getLootPanelContextLabel(module), nil))
-            setFrameHint(n, "EmptyState", getLootEmptyStateText(count, module))
+            module._setPanelTitle(n, getCountContextTitle(L.StrRaidLoot, count, getLootPanelContextLabel(module), nil))
+            module._setFrameHint(n, "EmptyState", getLootEmptyStateText(count, module))
         end,
 
         sorters = {
@@ -3122,14 +3104,14 @@ do
 
     do
         local function deleteItem()
-            runWithSelectedRaid(function(_, rID)
+            module._runWithSelectedRaid(function(_, rID)
                 local ctx = module._msLootCtx
                 local selected = UI.Selection.GetSelected(ctx)
                 if not selected or #selected == 0 then
                     return
                 end
 
-                local removed = Actions:DeleteLootMany(rID, selected)
+                local removed = Actions:DeleteLootMany(rID, selected, getActionCommitOpts())
                 if removed > 0 then
                     UI.Selection.EnsureState(ctx)
                     module.selectedItem = nil
@@ -3383,7 +3365,7 @@ local function initializeRaidAttendanceFrame()
             _rowParts = { "ID", "Date", "Zone", "Size" },
 
             localize = function(n)
-                setPanelTitle(n, L.StrRaidsList)
+                module._setPanelTitle(n, L.StrRaidsList)
                 _G[n .. "HeaderNum"]:SetText(L.StrNumber)
                 _G[n .. "HeaderDate"]:SetText(L.StrDate)
                 _G[n .. "HeaderZone"]:SetText(L.StrZone)
@@ -3398,9 +3380,7 @@ local function initializeRaidAttendanceFrame()
                 fillRaidListData(out, "Logger.Attendance.Raids.GetData")
             end,
 
-            rowName = function(n, _, i)
-                return n .. "RaidBtn" .. i
-            end,
+            rowName = UI.Lists.MakeIndexedRowName("RaidBtn"),
             rowTmpl = "KRTLoggerRaidButton",
 
             drawRow = UI.Lists.CreateRowRenderer(function(row, it)
@@ -3424,8 +3404,8 @@ local function initializeRaidAttendanceFrame()
                 if attendanceRaidsController and attendanceRaidsController.data then
                     count = #attendanceRaidsController.data
                 end
-                setPanelTitle(n, getCountTitle(L.StrRaidsList, count))
-                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
+                module._setPanelTitle(n, getCountTitle(L.StrRaidsList, count))
+                module._setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
             end,
 
             sorters = {
@@ -3462,7 +3442,7 @@ local function initializeRaidAttendanceFrame()
         _rowParts = { "Name", "Join", "Leave" },
 
         localize = function(n)
-            setPanelTitle(n, L.StrRaidAttendees)
+            module._setPanelTitle(n, L.StrRaidAttendees)
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
@@ -3503,9 +3483,7 @@ local function initializeRaidAttendanceFrame()
             View:FillRaidAttendeesList(out, raid)
         end,
 
-        rowName = function(n, _, i)
-            return n .. "PlayerBtn" .. i
-        end,
+        rowName = UI.Lists.MakeIndexedRowName("PlayerBtn"),
         rowTmpl = "KRTLoggerRaidAttendeeButton",
 
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
@@ -3531,8 +3509,8 @@ local function initializeRaidAttendanceFrame()
                 count = #attendancePlayersController.data
             end
             local title = getCountContextTitle(L.StrRaidAttendees, count, getRaidContextLabel(module.attendanceSelectedRaid), nil)
-            setPanelTitle(n, title)
-            setFrameHint(n, "EmptyState", getRaidAttendeesEmptyStateText(count, module.attendanceSelectedRaid))
+            module._setPanelTitle(n, title)
+            module._setFrameHint(n, "EmptyState", getRaidAttendeesEmptyStateText(count, module.attendanceSelectedRaid))
 
             local addBtn = _G[n .. "AddBtn"]
             if addBtn then
@@ -3569,7 +3547,7 @@ local function initializeRaidAttendanceFrame()
         _rowParts = { "ID", "Name", "Time", "Mode" },
 
         localize = function(n)
-            setPanelTitle(n, L.StrBossParticipation)
+            module._setPanelTitle(n, L.StrBossParticipation)
             _G[n .. "HeaderNum"]:SetText(L.StrNumber)
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
@@ -3605,9 +3583,7 @@ local function initializeRaidAttendanceFrame()
             View:GetPlayerBossParticipationList(out, raid, module.attendanceSelectedPlayer)
         end,
 
-        rowName = function(n, _, i)
-            return n .. "BossBtn" .. i
-        end,
+        rowName = UI.Lists.MakeIndexedRowName("BossBtn"),
         rowTmpl = "KRTLoggerBossButton",
 
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
@@ -3626,13 +3602,13 @@ local function initializeRaidAttendanceFrame()
                 count = #attendanceBossesController.data
             end
             local playerLabel = getPlayerContextLabel(module.attendanceSelectedRaid, module.attendanceSelectedPlayer)
-            setPanelTitle(n, getCountContextTitle(L.StrBossParticipation, count, playerLabel, nil))
+            module._setPanelTitle(n, getCountContextTitle(L.StrBossParticipation, count, playerLabel, nil))
             if not module.attendanceSelectedRaid then
-                setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectRaid)
+                module._setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectRaid)
             elseif not module.attendanceSelectedPlayer then
-                setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectPlayer)
+                module._setFrameHint(n, "EmptyState", L.StrLoggerEmptyBossParticipationSelectPlayer)
             else
-                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyBossParticipation or "")
+                module._setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyBossParticipation or "")
             end
         end,
 
@@ -3681,7 +3657,7 @@ local function initializeRaidAttendanceFrame()
             return
         end
 
-        local removed = Actions:DeleteRaidAttendeeMany(selectedRaid, { playerNid })
+        local removed = Actions:DeleteRaidAttendeeMany(selectedRaid, { playerNid }, getActionCommitOpts({ clearPlayers = true }))
         if removed and removed > 0 then
             module.attendanceSelectedPlayer = nil
             markAttendanceListsDirty()
@@ -3726,7 +3702,7 @@ local function initializeRaidAttendanceFrame()
         attendancePlayersController:OnLoad(attendanceUi.refs.raidAttendees)
         attendanceBossesController:OnLoad(attendanceUi.refs.bosses)
 
-        Rows.ApplyLoggerSkin(loggerPanelNames)
+        Rows.ApplyLoggerSkin(module._loggerPanelNames)
         refreshRaidAttendanceLayout()
         attendanceUi.Bound = true
         return frame
@@ -3891,7 +3867,7 @@ do
     -- Uniform fields:
     --   bossData.time : timestamp
     --   bossData.mode : "h" | "n"
-    fillBossBox = function()
+    module._fillBossBox = function()
         local rID, bID = module.selectedRaid, module.selectedBoss
         if not (rID and bID) then
             return
@@ -3969,13 +3945,13 @@ do
         local mode = (modeT == "h") and "h" or "n"
 
         local bossNid = isEdit and editBossNid or nil
-        local savedNid = module.Actions:UpsertBossKill(rID, bossNid, name, time(killDate), mode)
+        local savedNid = module.Actions:UpsertBossKill(rID, bossNid, name, time(killDate), mode, getActionCommitOpts())
         if not savedNid then
             return
         end
 
         Box:Hide()
-        resetSelections()
+        module._resetSelections()
         triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
@@ -4036,7 +4012,7 @@ do
             return
         end
         local name = TrimText(nameBox:GetText())
-        if module.Actions:AddBossAttendee(rID, bID, name) then
+        if module.Actions:AddBossAttendee(rID, bID, name, getActionCommitOpts()) then
             Box:Toggle()
             triggerSelectionEvent(module, "selectedBoss")
         end

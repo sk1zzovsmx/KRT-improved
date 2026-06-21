@@ -113,13 +113,17 @@ local function printHelp(cmd, desc)
     addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Colors.NormalizeHexColor(RT_COLOR)), desc))
 end
 
-local function getOption(namespace, key)
-    local cfg = Options and Options.Get and Options.Get(namespace)
-    if cfg and cfg.Get then
-        return cfg:Get(key)
+local GetOption = Options.GetValue
+    or function(namespace, key, defaultValue)
+        local cfg = Options and Options.Get and Options.Get(namespace) or nil
+        if cfg and cfg.Get then
+            local value = cfg:Get(key)
+            if value ~= nil then
+                return value
+            end
+        end
+        return defaultValue
     end
-    return nil
-end
 
 local function setOption(namespace, key, value)
     local cfg = Options and Options.Get and Options.Get(namespace)
@@ -477,7 +481,7 @@ local function showBugReport()
     addon:info(L.MsgBugReportRole:format(yesNo(role.inRaid), yesNo(role.isLeader), yesNo(role.isAssistant), yesNo(role.isMasterLooter)))
 end
 
-local function handleDebugMasterLootGridCommand(arg)
+local function handleDebugRaidGridCommand(arg)
     local countArg, extra = Strings.SplitArgs(arg)
     local count
 
@@ -485,24 +489,24 @@ local function handleDebugMasterLootGridCommand(arg)
         countArg = nil
     end
     if extra and extra ~= "" then
-        addon:warn(L.MsgDebugMasterLootGridInvalidCount)
+        addon:warn(L.MsgDebugRaidGridInvalidCount)
         return
     end
 
     if countArg then
         count = tonumber(countArg)
         if not count or count < 1 or count > 40 or count ~= floor(count) then
-            addon:warn(L.MsgDebugMasterLootGridInvalidCount)
+            addon:warn(L.MsgDebugRaidGridInvalidCount)
             return
         end
     end
 
-    local shown = Database.RequestControllerMethod("Master", "ShowDebugMasterLootGrid", count or 25)
+    local shown = Database.RequestControllerMethod("Master", "ShowDebugRaidGrid", count or 25)
     if not shown then
-        addon:warn(L.MsgFeatureUnavailable, "Master", "debug mlgrid")
+        addon:warn(L.MsgFeatureUnavailable, "Master", "debug raidgrid")
         return
     end
-    addon:info(L.MsgDebugMasterLootGridShown, shown)
+    addon:info(L.MsgDebugRaidGridShown, shown)
 end
 
 local function handleDebugCommand(rest)
@@ -558,8 +562,8 @@ local function handleDebugCommand(rest)
         return
     end
 
-    if subCmd == "mlgrid" or subCmd == "lootgrid" then
-        handleDebugMasterLootGridCommand(arg)
+    if subCmd == "raidgrid" or subCmd == "mlgrid" or subCmd == "lootgrid" then
+        handleDebugRaidGridCommand(arg)
         return
     end
 
@@ -668,7 +672,7 @@ local function handleMinimapCommand(rest)
             addon:info(L.MsgMinimapPosSet, angle)
         end
     elseif sub == "pos" then
-        addon:info(L.MsgMinimapPosSet, getOption("Minimap", "minimapPos") or 325)
+        addon:info(L.MsgMinimapPosSet, GetOption("Minimap", "minimapPos") or 325)
     else
         addon:info(format(L.StrCmdCommands, "krt minimap"), "KRT")
         printHelp("on", L.StrCmdToggle)
@@ -910,7 +914,6 @@ end
 local function handleReservesCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     local reserves = Services and Services.Reserves or nil
-    local sync = reserves and reserves._Sync or nil
     if isToggleCommand(sub) then
         callWidget("Reserves", "Toggle")
     elseif sub == "import" then
@@ -948,8 +951,8 @@ local function handleReservesCommand(rest)
             end
         end
     elseif sub == "sync" then
-        if sync and sync.RequestMetadata then
-            sync:RequestMetadata()
+        if reserves and reserves.RequestSyncMetadata and reserves:RequestSyncMetadata() then
+            return
         else
             addon:warn(L.MsgFeatureUnavailable, "Reserves", "sync")
         end
@@ -1089,7 +1092,7 @@ local function handleHelpCommand(rest)
         printHelp("off", L.StrCmdToggle)
         printHelp("level <name|num>", L.StrCmdDebugLevel)
         printHelp("raid", L.StrCmdDebugRaid)
-        printHelp("mlgrid [1-40]", L.StrCmdDebugMasterLootGrid)
+        printHelp("raidgrid [1-40]", L.StrCmdDebugRaidGrid)
     elseif topic == "perf" or topic == "performance" then
         handlePerfCommand("help")
     elseif topic == "rw" or topic == "warn" or topic == "warning" or topic == "warnings" then

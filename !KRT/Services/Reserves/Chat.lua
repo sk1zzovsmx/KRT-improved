@@ -41,12 +41,7 @@ local REQUESTS = {
 }
 
 -- ----- Private helpers ----- --
-local function trimText(value)
-    if Strings and Strings.TrimText then
-        return Strings.TrimText(value)
-    end
-    return tostring(value or ""):match("^%s*(.-)%s*$")
-end
+local trimText = Strings.TrimText
 
 local function isRequest(text)
     local normalized = lower(trimText(text or ""))
@@ -67,13 +62,17 @@ local function canReplyFromCurrentClient()
     return role.isMasterLooter == true or raid:CanUseCapability("loot") or raid:CanUseCapability("raid_leadership")
 end
 
-local function getOption(namespace, key)
-    local cfg = Options and Options.Get and Options.Get(namespace)
-    if cfg and cfg.Get then
-        return cfg:Get(key)
+local GetOption = Options.GetValue
+    or function(namespace, key, defaultValue)
+        local cfg = Options and Options.Get and Options.Get(namespace) or nil
+        if cfg and cfg.Get then
+            local value = cfg:Get(key)
+            if value ~= nil then
+                return value
+            end
+        end
+        return defaultValue
     end
-    return nil
-end
 
 local function buildFallbackItemText(entry)
     local itemName = entry.itemName
@@ -149,7 +148,7 @@ requestWhisperReply = function(msg, sender)
         return true
     end
 
-    if getOption("Reserves", "softResWhisperReplies") ~= true then
+    if GetOption("Reserves", "softResWhisperReplies") ~= true then
         return true
     end
 

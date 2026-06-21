@@ -13,6 +13,7 @@ local C = feature.C
 local Database = feature.Database
 local Deformat = feature.Deformat
 local Item = feature.Item
+local Options = feature.Options
 local Services = feature.Services
 local Strings = feature.Strings
 local raidState = feature.raidState
@@ -41,19 +42,8 @@ local buildParsedGroupLootResult
 local rememberParsedGroupLootResult
 
 -- ----- Private helpers ----- --
-local function isDebugEnabled()
-    return addon.hasDebug ~= nil
-end
-
-local function getLootMethodName()
-    if type(GetLootMethod) ~= "function" then
-        return nil
-    end
-    local method = select(1, GetLootMethod())
-    if type(method) ~= "string" or method == "" then
-        return nil
-    end
-    return method
+local isDebugEnabled = Options.IsDebugEnabled or function()
+    return false
 end
 
 local function getPassiveLootRollState()
@@ -727,7 +717,14 @@ end
 
 -- ----- Public methods ----- --
 function PassiveGroupLoot.IsPassiveGroupLootMethod(method)
-    local resolvedMethod = method or getLootMethodName()
+    local resolvedMethod = method
+    if not resolvedMethod then
+        local Raid = Services and Services.Raid or nil
+        resolvedMethod = Raid and Raid.GetLootMethodName and Raid:GetLootMethodName() or nil
+        if not resolvedMethod and type(GetLootMethod) == "function" then
+            resolvedMethod = select(1, GetLootMethod())
+        end
+    end
     return resolvedMethod == "group" or resolvedMethod == "needbeforegreed"
 end
 

@@ -8,7 +8,7 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
-local coreState = feature.coreState
+local Options = feature.Options
 
 local pairs, tostring, tonumber, type = pairs, tostring, tonumber, type
 
@@ -61,8 +61,8 @@ if not modifierPolicyByScope._default then
     modifierPolicyByScope._default = normalizeModifierPolicy(nil)
 end
 
-local function isDebugEnabled()
-    return coreState and coreState.debugEnabled == true
+local isDebugEnabled = Options.IsDebugEnabled or function()
+    return false
 end
 
 local function debugLog(msg)

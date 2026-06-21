@@ -264,9 +264,7 @@ do
             end
         end,
 
-        rowName = function(n, _, i)
-            return n .. "WarningBtn" .. i
-        end,
+        rowName = Lists.MakeIndexedRowName("WarningBtn"),
         rowTmpl = "KRTWarningButtonTemplate",
 
         drawRow = Lists.CreateRowRenderer(function(row, it)

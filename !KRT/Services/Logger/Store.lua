@@ -16,6 +16,7 @@ local type, tostring, tonumber = type, tostring, tonumber
 feature.EnsureServiceNamespace("Logger", "Store")
 local Logger = Services.Logger
 local Store = Logger.Store
+local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
 local bossIdx
 local lootIdx
 local playerIdx
@@ -27,6 +28,12 @@ local resolveLootLooterClass
 local invalidateIndexes
 
 -- ----- Private helpers ----- --
+local function getRaidQueries()
+    if not RaidQueries and Database.GetRaidQueries then
+        RaidQueries = Database.GetRaidQueries()
+    end
+    return RaidQueries
+end
 
 -- ----- Public methods ----- --
 
@@ -65,15 +72,9 @@ resolveLootLooterNid = function(raid, looter)
 end
 
 resolveLootLooterName = function(raid, loot)
-    if type(loot) ~= "table" then
-        return nil
-    end
-    local looterNid = tonumber(loot.looterNid)
-    if looterNid and looterNid > 0 then
-        local playerName = resolvePlayerNameByNid(raid, looterNid)
-        if playerName and playerName ~= "" then
-            return playerName
-        end
+    local queries = getRaidQueries()
+    if queries and queries.ResolveLootLooterName then
+        return queries:ResolveLootLooterName(raid, loot)
     end
     return nil
 end
@@ -215,6 +216,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Database/DBRaidQueries",
             "Modules/Strings",
         },
     })

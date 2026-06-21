@@ -297,6 +297,16 @@ function Primitives.SetButtonGlow(button, enabled, r, g, b, style, options)
     end
 end
 
+function Primitives.SetTextureColor(texture, r, g, b, a)
+    setTextureColor(texture, r, g, b, a)
+end
+
+function Primitives.SetTextureColorRgba(texture, rgba)
+    if texture and rgba then
+        setTextureColor(texture, rgba[1], rgba[2], rgba[3], rgba[4])
+    end
+end
+
 function Primitives.SetText(frame, str1, str2, cond)
     if not frame then
         return

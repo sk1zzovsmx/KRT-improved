@@ -9,13 +9,15 @@ local feature = addon.Database.GetFeatureShared()
 local DB = feature.DB
 local Database = feature.Database
 local Sort = feature.Sort
+local Strings = feature.Strings
+local LootSourceCandidates = feature.LootSourceCandidates
 local GetLootSortName = Sort and Sort.GetLootSortName
 
 local pairs, type = pairs, type
 local tonumber, tostring = tonumber, tostring
-local isBossFightRecord = Database._IsBossFightRecord
-local SHARED_SOURCE_LABEL = "Shared"
-local SHARED_SOURCE_PREFIX = "Shared:"
+
+local isBossFightRecord = Database.IsBossFightRecord
+local SHARED_SOURCE_LABEL = LootSourceCandidates.GetSharedLabel()
 
 -- Raid read-only projection/query service.
 do
@@ -31,6 +33,13 @@ do
             return raidStore:NormalizeRaidRecord(raid)
         end
         return raid
+    end
+
+    local function normalizeRaidForQuery(raid, opts)
+        if type(opts) == "table" and opts.raw == true then
+            return raid
+        end
+        return normalizeRaid(raid)
     end
 
     local function ensureRuntime(raid)
@@ -53,82 +62,6 @@ do
         end
     end
 
-    local function trimText(value)
-        if value == nil then
-            return ""
-        end
-        return tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
-    end
-
-    local function isLegacySharedText(value)
-        return type(value) == "string" and string.sub(value, 1, string.len(SHARED_SOURCE_PREFIX)) == SHARED_SOURCE_PREFIX
-    end
-
-    local function appendSourceCandidate(out, seen, rawName, rawNpcId, rawKind, rawSourceKey)
-        local name = trimText(rawName)
-        if name == "" or seen[name] then
-            return
-        end
-        seen[name] = true
-
-        local candidate = {
-            name = name,
-            kind = trimText(rawKind),
-        }
-        if candidate.kind == "" then
-            candidate.kind = "boss"
-        end
-        local sourceKey = trimText(rawSourceKey)
-        if sourceKey ~= "" then
-            candidate.sourceKey = sourceKey
-        end
-
-        local npcId = tonumber(rawNpcId) or 0
-        if npcId > 0 then
-            candidate.npcId = npcId
-        end
-        out[#out + 1] = candidate
-    end
-
-    local function parseSharedCandidatesFromText(value)
-        local text = trimText(value)
-        if not isLegacySharedText(text) then
-            return nil
-        end
-
-        text = trimText(string.sub(text, string.len(SHARED_SOURCE_PREFIX) + 1))
-        local out = {}
-        local seen = {}
-        for name in string.gmatch(text, "[^/]+") do
-            appendSourceCandidate(out, seen, name, nil, "boss")
-        end
-        return (#out > 0) and out or nil
-    end
-
-    local function copySourceCandidates(candidates, fallbackText)
-        local copied = {}
-        local seen = {}
-        if type(candidates) == "table" then
-            for i = 1, #candidates do
-                local candidate = candidates[i]
-                if type(candidate) == "table" then
-                    appendSourceCandidate(copied, seen, candidate.name or candidate.npcName, candidate.npcId or candidate.sourceNpcId, candidate.kind, candidate.sourceKey)
-                end
-            end
-        end
-
-        if #copied == 0 then
-            local parsed = parseSharedCandidatesFromText(fallbackText)
-            if type(parsed) == "table" then
-                for i = 1, #parsed do
-                    appendSourceCandidate(copied, seen, parsed[i].name, parsed[i].npcId, parsed[i].kind, parsed[i].sourceKey)
-                end
-            end
-        end
-
-        return (#copied > 0) and copied or nil
-    end
-
     local function getLootSourceModel(loot, boss)
         local lootSource = type(loot and loot.lootSource) == "table" and loot.lootSource or nil
         local sourceKind = (lootSource and lootSource.kind) or (boss and boss.sourceKind) or nil
@@ -137,8 +70,8 @@ do
         local sourceName = lootSourceName or bossName or ""
         local sourceKey = lootSource and lootSource.sourceKey or boss and boss.sourceKey or nil
 
-        if sourceKind == "shared" or isLegacySharedText(sourceName) or isLegacySharedText(bossName) then
-            return SHARED_SOURCE_LABEL, "shared", copySourceCandidates(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
+        if sourceKind == "shared" or LootSourceCandidates.IsLegacySharedText(sourceName) or LootSourceCandidates.IsLegacySharedText(bossName) then
+            return SHARED_SOURCE_LABEL, "shared", LootSourceCandidates.Copy(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
         end
 
         return sourceName, sourceKind, nil, sourceKey
@@ -169,6 +102,73 @@ do
         return nil
     end
 
+    local function findBossByNid(raid, bossNid)
+        local resolvedBossNid = tonumber(bossNid) or 0
+        if resolvedBossNid <= 0 then
+            return nil
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            if boss and tonumber(boss.bossNid) == resolvedBossNid then
+                return boss
+            end
+        end
+        return nil
+    end
+
+    local function findBossByName(raid, bossName)
+        local resolvedBossName = Strings.NormalizeLower(bossName, true)
+        if not resolvedBossName or resolvedBossName == "" then
+            return nil
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = #bosses, 1, -1 do
+            local boss = bosses[i]
+            if boss then
+                local candidateName = Strings.NormalizeLower(boss.name or boss.boss, true)
+                if candidateName == resolvedBossName then
+                    return boss
+                end
+            end
+        end
+        return nil
+    end
+
+    local function findBossBySourceNpcId(raid, sourceNpcId)
+        local resolvedNpcId = tonumber(sourceNpcId) or 0
+        if resolvedNpcId <= 0 then
+            return nil
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = #bosses, 1, -1 do
+            local boss = bosses[i]
+            if boss and (tonumber(boss.sourceNpcId) or 0) == resolvedNpcId then
+                return boss
+            end
+        end
+        return nil
+    end
+
+    local function findBossBySourceKey(raid, sourceKey)
+        local queryKey = Strings.TrimText(sourceKey, true)
+        if not queryKey then
+            return nil
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = #bosses, 1, -1 do
+            local boss = bosses[i]
+            if boss and Strings.TrimText(boss.sourceKey, true) == queryKey then
+                return boss
+            end
+        end
+        return nil
+    end
+
     local function resolveLootLooterNid(loot)
         if type(loot) ~= "table" then
             return nil
@@ -190,6 +190,17 @@ do
             return nil, looterNid
         end
         return nil, nil
+    end
+
+    local function resolveLootLooterNameFromMap(loot, playerNameByNid)
+        local looterNid = resolveLootLooterNid(loot)
+        if looterNid then
+            local playerName = playerNameByNid and playerNameByNid[looterNid] or nil
+            if playerName and playerName ~= "" then
+                return playerName
+            end
+        end
+        return ""
     end
 
     local function getAttendanceEntry(raid, playerNid)
@@ -250,6 +261,36 @@ do
     end
 
     -- ----- Public methods ----- --
+    function module:FindBossByNid(raid, bossNid, opts)
+        return findBossByNid(normalizeRaidForQuery(raid, opts), bossNid)
+    end
+
+    function module:FindBossByName(raid, bossName, opts)
+        return findBossByName(normalizeRaidForQuery(raid, opts), bossName)
+    end
+
+    function module:FindBossBySourceNpcId(raid, sourceNpcId, opts)
+        return findBossBySourceNpcId(normalizeRaidForQuery(raid, opts), sourceNpcId)
+    end
+
+    function module:FindBossBySourceKey(raid, sourceKey, opts)
+        return findBossBySourceKey(normalizeRaidForQuery(raid, opts), sourceKey)
+    end
+
+    function module:ResolveLootLooterNid(loot)
+        return resolveLootLooterNid(loot)
+    end
+
+    function module:ResolveLootLooterName(raid, loot, runtime)
+        raid = normalizeRaid(raid)
+        runtime = runtime or ensureRuntime(raid)
+        return resolveLootLooterName(raid, runtime, loot)
+    end
+
+    function module:ResolveLootLooterNameFromMap(loot, playerNameByNid)
+        return resolveLootLooterNameFromMap(loot, playerNameByNid)
+    end
+
     function module:GetRaidSummary(raid)
         raid = normalizeRaid(raid)
         if type(raid) ~= "table" then
@@ -317,7 +358,8 @@ do
             if type(player) == "table" then
                 local joinTime = tonumber(player.join)
                 local leaveTime = tonumber(player.leave)
-                local totalSeconds, onlineSeconds, offlineSeconds, segmentCount = summarizeAttendance(getAttendanceEntry(raid, player.playerNid), joinTime, leaveTime)
+                local attendanceEntry = getAttendanceEntry(raid, player.playerNid)
+                local totalSeconds, onlineSeconds, offlineSeconds, segmentCount = summarizeAttendance(attendanceEntry, joinTime, leaveTime)
                 rows[#rows + 1] = {
                     id = tonumber(player.playerNid),
                     name = player.name,
@@ -463,6 +505,16 @@ end
 
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
-    registry.AddModule("Database/DBRaidQueries", { deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBRaidStore", "Modules/Sort" } })
+    registry.AddModule("Database/DBRaidQueries", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Database/DB",
+            "Database/DBRaidStore",
+            "Modules/Strings",
+            "Modules/Sort",
+            "Modules/LootSourceCandidates",
+        },
+    })
     registry.SetLoaded("Database/DBRaidQueries")
 end

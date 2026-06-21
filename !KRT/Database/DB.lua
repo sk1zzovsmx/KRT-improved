@@ -86,7 +86,11 @@ local function isBossFightRecord(boss)
     return true
 end
 
-Database._IsBossFightRecord = isBossFightRecord
+function Database.IsBossFightRecord(boss)
+    return isBossFightRecord(boss)
+end
+
+Database._IsBossFightRecord = Database.IsBossFightRecord
 
 -- ----- Public methods ----- --
 function DB.SetManager(manager)

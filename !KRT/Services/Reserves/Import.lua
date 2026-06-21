@@ -10,6 +10,7 @@ local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
+local Options = feature.Options
 local Strings = feature.Strings
 local Base64 = feature.Base64
 local Json = feature.Json
@@ -30,37 +31,17 @@ module._Import = module._Import or {}
 local Import = module._Import
 
 -- ----- Private helpers ----- --
-local function isDebugEnabled()
-    return addon.hasDebug ~= nil
+local isDebugEnabled = Options.IsDebugEnabled or function()
+    return false
 end
 
-local function trimText(value, nilIfEmpty)
-    if value == nil then
-        return nil
-    end
-    if Strings and type(Strings.TrimText) == "function" then
-        return Strings.TrimText(value, nilIfEmpty)
-    end
-    local out = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
-    if nilIfEmpty and out == "" then
-        return nil
-    end
-    return out
-end
-
-local function normalizeLower(value)
-    if Strings and type(Strings.NormalizeLower) == "function" then
-        return Strings.NormalizeLower(value, true)
-    end
-    local normalized = trimText(value, true)
-    return normalized and string.lower(normalized) or nil
-end
+local normalizeLower = Strings.NormalizeLower
 
 local function cleanCSVField(field)
     if not field then
         return nil
     end
-    return trimText(field:gsub('^"(.-)"$', "%1"), true)
+    return Strings.NormalizeText(field:gsub('^"(.-)"$', "%1"), true)
 end
 
 local function splitCSVLine(line)

@@ -9,6 +9,38 @@ local feature = addon.Database.GetFeatureShared()
 local Sort = feature.Sort
 local Database = feature.Database
 local Services = feature.Services
+local LootSourceCandidates = feature.LootSourceCandidates
+
+if type(LootSourceCandidates) ~= "table" then
+    LootSourceCandidates = {}
+
+    function LootSourceCandidates.GetSharedLabel()
+        return "Shared"
+    end
+
+    function LootSourceCandidates.IsLegacySharedText(value)
+        return type(value) == "string" and string.sub(value, 1, 7) == "Shared:"
+    end
+
+    function LootSourceCandidates.Copy(candidates)
+        if type(candidates) ~= "table" then
+            return nil
+        end
+        local copied = {}
+        for i = 1, #candidates do
+            local candidate = candidates[i]
+            if type(candidate) == "table" and (candidate.name or candidate.npcName) then
+                copied[#copied + 1] = {
+                    name = candidate.name or candidate.npcName,
+                    kind = candidate.kind or "boss",
+                    npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or nil,
+                    sourceKey = candidate.sourceKey,
+                }
+            end
+        end
+        return (#copied > 0) and copied or nil
+    end
+end
 
 local GetLootSortName = Sort.GetLootSortName
 
@@ -22,117 +54,15 @@ local Logger = Services.Logger
 local View = Logger.View
 local Store = Logger.Store
 local buildRows
-local SHARED_SOURCE_LABEL = "Shared"
-local SHARED_SOURCE_PREFIX = "Shared:"
+local SHARED_SOURCE_LABEL = LootSourceCandidates.GetSharedLabel()
+local isBossFightRecord = Database.IsBossFightRecord
 
 -- ----- Private helpers ----- --
-local function isBossFightRecord(boss)
-    if type(Database._IsBossFightRecord) == "function" then
-        return Database._IsBossFightRecord(boss)
-    end
-
-    if type(boss) ~= "table" then
-        return false
-    end
-
-    local sourceKind = boss.sourceKind
-    if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
-        return false
-    end
-
-    if boss.source == "LootSources" then
-        return false
-    end
-
-    local name = boss.name or boss.boss
-    if type(name) == "string" and string.sub(name, 1, 7) == "Shared:" then
-        return false
-    end
-
-    return true
-end
-
 local function getRaidQueries()
     if Database.GetRaidQueries then
         return Database.GetRaidQueries()
     end
     return nil
-end
-
-local function trimText(value)
-    if value == nil then
-        return ""
-    end
-    return tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
-end
-
-local function isLegacySharedText(value)
-    return type(value) == "string" and string.sub(value, 1, string.len(SHARED_SOURCE_PREFIX)) == SHARED_SOURCE_PREFIX
-end
-
-local function appendSourceCandidate(out, seen, rawName, rawNpcId, rawKind, rawSourceKey)
-    local name = trimText(rawName)
-    if name == "" or seen[name] then
-        return
-    end
-    seen[name] = true
-
-    local candidate = {
-        name = name,
-        kind = trimText(rawKind),
-    }
-    if candidate.kind == "" then
-        candidate.kind = "boss"
-    end
-    local sourceKey = trimText(rawSourceKey)
-    if sourceKey ~= "" then
-        candidate.sourceKey = sourceKey
-    end
-
-    local npcId = tonumber(rawNpcId) or 0
-    if npcId > 0 then
-        candidate.npcId = npcId
-    end
-    out[#out + 1] = candidate
-end
-
-local function parseSharedCandidatesFromText(value)
-    local text = trimText(value)
-    if not isLegacySharedText(text) then
-        return nil
-    end
-
-    text = trimText(string.sub(text, string.len(SHARED_SOURCE_PREFIX) + 1))
-    local out = {}
-    local seen = {}
-    for name in string.gmatch(text, "[^/]+") do
-        appendSourceCandidate(out, seen, name, nil, "boss")
-    end
-    return (#out > 0) and out or nil
-end
-
-local function copySourceCandidates(candidates, fallbackText)
-    local copied = {}
-    local seen = {}
-    if type(candidates) == "table" then
-        for i = 1, #candidates do
-            local candidate = candidates[i]
-            if type(candidate) == "table" then
-                appendSourceCandidate(copied, seen, candidate.name or candidate.npcName, candidate.npcId or candidate.sourceNpcId, candidate.kind, candidate.sourceKey)
-            end
-        end
-    end
-
-    if #copied == 0 then
-        local parsed = parseSharedCandidatesFromText(fallbackText)
-        if type(parsed) == "table" then
-            for i = 1, #parsed do
-                appendSourceCandidate(copied, seen, parsed[i].name, parsed[i].npcId, parsed[i].kind, parsed[i].sourceKey)
-            end
-        end
-    end
-
-    return (#copied > 0) and copied or nil
 end
 
 local function getLootSourceModel(loot, boss)
@@ -143,8 +73,8 @@ local function getLootSourceModel(loot, boss)
     local sourceName = lootSourceName or bossName or ""
     local sourceKey = lootSource and lootSource.sourceKey or boss and boss.sourceKey or nil
 
-    if sourceKind == "shared" or isLegacySharedText(sourceName) or isLegacySharedText(bossName) then
-        return SHARED_SOURCE_LABEL, "shared", copySourceCandidates(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
+    if sourceKind == "shared" or LootSourceCandidates.IsLegacySharedText(sourceName) or LootSourceCandidates.IsLegacySharedText(bossName) then
+        return SHARED_SOURCE_LABEL, "shared", LootSourceCandidates.Copy(lootSource and lootSource.candidates, lootSourceName or bossName), sourceKey
     end
 
     return sourceName, sourceKind, nil, sourceKey

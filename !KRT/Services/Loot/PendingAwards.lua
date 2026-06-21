@@ -11,6 +11,7 @@ local feature = addon.Database.GetFeatureShared()
 local Diag = feature.Diag
 local C = feature.C
 local Item = feature.Item
+local Options = feature.Options
 local Services = feature.Services
 local lootState = feature.lootState
 
@@ -32,8 +33,8 @@ local PENDING_AWARD_TTL_SECONDS = tonumber(C.PENDING_AWARD_TTL_SECONDS) or 8
 local GROUP_LOOT_SESSION_PREFIX = "GL:"
 
 -- ----- Private helpers ----- --
-local function isDebugEnabled()
-    return addon.hasDebug ~= nil
+local isDebugEnabled = Options.IsDebugEnabled or function()
+    return false
 end
 
 local function normalizePendingAwardItemKey(itemLink)

@@ -11,6 +11,7 @@ local feature = addon.Database.GetFeatureShared()
 local Diag = feature.Diag
 local Events = feature.Events
 local Bus = feature.Bus
+local Options = feature.Options
 local Services = feature.Services
 
 local rollTypes = feature.rollTypes
@@ -27,8 +28,8 @@ local History = module._History
 local InternalEvents = Events and Events.Internal or nil
 
 -- ----- Private helpers ----- --
-local function isDebugEnabled()
-    return addon.hasDebug ~= nil
+local isDebugEnabled = Options.IsDebugEnabled or function()
+    return false
 end
 
 local function assertContext(ctx)

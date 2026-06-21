@@ -116,6 +116,12 @@ Feature UI controllers:
 - `addon.Widgets.LootCounter`
 - `addon.Widgets.ReservesUI`
 - `addon.Widgets.Config`
+- `addon.Widgets.RaidGrid`
+- `addon.Widgets.LootHints`
+
+Controller and entrypoint callers should use `addon.UI.Widgets.Call(...)` for optional
+widget actions. `addon.Widgets.*` remains the widget owner namespace, while widget
+registration and cross-owner dispatch go through the UI widget facade.
 
 ### EntryPoints
 
@@ -139,12 +145,20 @@ Common infra under `!KRT/Modules/`:
 - Messaging: `Bus`
 - Feature toggles: `Features`
 
+Vendored runtime libraries under `!KRT/Libs/**` are intentionally outside KRT
+cleanup scope, including nested compatibility copies that look duplicated. Keep
+those package contents intact unless the release-packaging policy explicitly
+changes first.
+
 ## Public API Notes
 
 - Canonical owners are namespaced (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).
 - Retired top-level aliases (`addon.Master`, `addon.Logger`, ...) must not be reintroduced.
 - Root compatibility tables that remain public are exported after binding through `feature.*`;
   do not read them through `feature.* or addon.*` fallback chains.
+- `addon.Comms.Payload` is the public addon-message payload helper surface for
+  encode/decode and field pack/split helpers. `addon.Comms._Payload` is only a
+  compatibility alias and should not be used by new production consumers.
 - For announce and shared warning output, use `addon.Services.Chat`.
   For capability queries and shared master-only access guards, use
   `addon.Services.Raid`.
@@ -153,12 +167,16 @@ Common infra under `!KRT/Modules/`:
   are intentionally absent.
 - `addon:Print` remains a compatibility hook for `LibLogger-1.0`.
 - For reserves, use `addon.Services.Reserves` as the canonical public surface.
-  Do not rely on nested `.Service` alias surfaces.
+  Do not rely on nested `.Service` alias surfaces. Sync callers should use
+  `RequestSyncMetadata`, `HandleSyncMessage`, `GetSyncPayload`, `SetSyncedData`,
+  and the public cache APIs on the parent facade rather than `addon.Services.Reserves._Sync`.
 - For DB-manager-backed accessors, use `addon.Database.GetRaidStore`,
   `addon.Database.GetRaidStoreOrNil`, `addon.Database.GetRaidQueries`,
   `addon.Database.GetRaidMigrations`, `addon.Database.GetRaidValidator`, and
   `addon.Database.GetSyncer` as the canonical public surface.
   Use `addon.Database.GetRaidSchemaVersion` as the canonical schema-version accessor.
+  Use `addon.Database.IsBossFightRecord` as the canonical boss/trash/shared
+  raid-record predicate; `_IsBossFightRecord` remains a compatibility alias.
   `addon.DB` remains the concrete DB namespace (`RaidStore`, `RaidQueries`,
   `RaidMigrations`, `RaidValidator`, `Syncer`) plus manager state, and
   `addon.DBSchema` remains the concrete schema namespace.

@@ -42,12 +42,13 @@ local NormalizeLower = Strings.NormalizeLower
 local TrimText = Strings.TrimText
 
 local InternalEvents = Events.Internal
-local Payload = assert(Comms and Comms._Payload, "Comms payload helpers are not initialized")
+local Payload = assert(Comms and Comms.Payload, "Comms payload helpers are not initialized")
 
 -- Logger synchronization module.
 do
     DB.Syncer = DB.Syncer or {}
     local module = DB.Syncer
+    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
 
     -- ----- Internal state ----- --
     local COMM_PREFIX = "KRTLogSync"
@@ -56,8 +57,8 @@ do
     local FIELD_SEP = "\t"
     local RECORD_SEP = "\n"
     local LIST_SEP = "\031"
-    local splitFields = Payload._SplitFields
-    local packFields = Payload._PackFields
+    local splitFields = Payload.SplitFields
+    local packFields = Payload.PackFields
 
     local MSG_REQUEST = "RQ"
     local MSG_SNAPSHOT = "SN"
@@ -109,13 +110,14 @@ do
         return n
     end
 
-    local function normalizeSender(sender)
-        if type(sender) ~= "string" then
-            return nil
+    local normalizeSender = Comms.NormalizeSender
+        or function(sender)
+            if type(sender) ~= "string" then
+                return nil
+            end
+            local short = sender:match("^([^%-]+)") or sender
+            return NormalizeName(short, true) or short
         end
-        local short = sender:match("^([^%-]+)") or sender
-        return NormalizeName(short, true) or short
-    end
 
     local function isSelfSender(sender)
         local selfName = Database.GetPlayerName()
@@ -127,28 +129,28 @@ do
         return (a ~= nil and b ~= nil and a == b)
     end
 
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
+    local isDebugEnabled = Options.IsDebugEnabled or function()
+        return false
     end
 
-    local function encodeText(value)
+    local encodeText = function(value)
         if value == nil or value == "" then
             return ""
         end
         local input = tostring(value or "")
-        local out = Payload._EncodeText(input)
+        local out = Payload.EncodeText(input)
         if out == "" and input ~= "" and isDebugEnabled() then
             addon:debug(Diag.D.LogSyncBase64EncodeFailed)
         end
         return out
     end
 
-    local function decodeText(value)
+    local decodeText = function(value)
         local input = tostring(value or "")
         if input == "" then
             return ""
         end
-        local out = Payload._DecodeText(input)
+        local out = Payload.DecodeText(input)
         if out == nil and isDebugEnabled() then
             addon:debug(Diag.D.LogSyncBase64DecodeFailed)
         end
@@ -218,16 +220,17 @@ do
         return splitFields(raw, LIST_SEP, names)
     end
 
-    local function resolveLootLooterName(loot, playerNameByNid)
-        if type(loot) ~= "table" then
-            return ""
+    local function getRaidQueries()
+        if not RaidQueries and Database.GetRaidQueries then
+            RaidQueries = Database.GetRaidQueries()
         end
-        local looterNid = tonumber(loot.looterNid)
-        if looterNid and looterNid > 0 then
-            local playerName = playerNameByNid and playerNameByNid[looterNid] or nil
-            if playerName and playerName ~= "" then
-                return playerName
-            end
+        return RaidQueries
+    end
+
+    local function resolveLootLooterNameFromMap(loot, playerNameByNid)
+        local queries = getRaidQueries()
+        if queries and queries.ResolveLootLooterNameFromMap then
+            return queries:ResolveLootLooterNameFromMap(loot, playerNameByNid)
         end
         return ""
     end
@@ -375,10 +378,7 @@ do
         return loggerOptions and loggerOptions:Get("persistentSync") == true
     end
 
-    local function nextRequestId(syncer)
-        syncer._nextRequestId = (tonumber(syncer._nextRequestId) or 0) + 1
-        return tostring(syncer._nextRequestId)
-    end
+    local nextRequestId = Comms.NextRequestId
 
     local function trackPendingRequest(syncer, requestId, pendingState)
         syncer._pendingRequests[requestId] = pendingState
@@ -516,7 +516,7 @@ do
                 tonumber(loot.itemRarity) or 0,
                 encodeText(loot.itemTexture),
                 tonumber(loot.itemCount) or 1,
-                encodeText(resolveLootLooterName(loot, playerNameByNid)),
+                encodeText(resolveLootLooterNameFromMap(loot, playerNameByNid)),
                 tonumber(loot.rollType) or 0,
                 tonumber(loot.rollValue) or 0,
                 tonumber(loot.bossNid) or 0,

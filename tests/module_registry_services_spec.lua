@@ -674,6 +674,137 @@ local expectedDebugServices = {
     },
 }
 
+local expectedMasterServices = {
+    {
+        name = "Services/Master/SoftRes",
+        path = "!KRT/Services/Master/SoftRes.lua",
+        owner = "SoftRes",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master SoftRes summary models",
+    },
+    {
+        name = "Services/Master/SessionWinners",
+        path = "!KRT/Services/Master/SessionWinners.lua",
+        owner = "SessionWinners",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master session winner display models",
+    },
+    {
+        name = "Services/Master/FlowState",
+        path = "!KRT/Services/Master/FlowState.lua",
+        owner = "FlowState",
+        separator = ".",
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Services/Master/SoftRes",
+            "Services/Master/SessionWinners",
+        },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master workflow state models",
+    },
+    {
+        name = "Services/Master/ButtonState",
+        path = "!KRT/Services/Master/ButtonState.lua",
+        owner = "ButtonState",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master button and tooltip state models",
+    },
+    {
+        name = "Services/Master/RollRows",
+        path = "!KRT/Services/Master/RollRows.lua",
+        owner = "RollRows",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master roll row display models",
+    },
+    {
+        name = "Services/Master/AssignmentCandidates",
+        path = "!KRT/Services/Master/AssignmentCandidates.lua",
+        owner = "AssignmentCandidates",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master assignment candidate row models",
+    },
+    {
+        name = "Services/Master/AssignmentTargets",
+        path = "!KRT/Services/Master/AssignmentTargets.lua",
+        owner = "AssignmentTargets",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master assignment target row models",
+    },
+    {
+        name = "Services/Master/DebugRaidGrid",
+        path = "!KRT/Services/Master/DebugRaidGrid.lua",
+        owner = "DebugRaidGrid",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master debug raid grid row models",
+    },
+    {
+        name = "Services/Master/AwardMessages",
+        path = "!KRT/Services/Master/AwardMessages.lua",
+        owner = "AwardMessages",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master award chat message models",
+    },
+    {
+        name = "Services/Master/LootSpam",
+        path = "!KRT/Services/Master/LootSpam.lua",
+        owner = "LootSpam",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: pure Master loot spam message models",
+    },
+    {
+        name = "Services/Master/Service",
+        path = "!KRT/Services/Master/Service.lua",
+        owner = "Master",
+        separator = ".",
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Services/Master/SoftRes",
+            "Services/Master/SessionWinners",
+            "Services/Master/FlowState",
+            "Services/Master/ButtonState",
+            "Services/Master/RollRows",
+            "Services/Master/AssignmentCandidates",
+            "Services/Master/AssignmentTargets",
+            "Services/Master/DebugRaidGrid",
+            "Services/Master/AwardMessages",
+            "Services/Master/LootSpam",
+        },
+        registryFromFeature = true,
+        events = "-- events: none",
+        note = "-- notes: Master service facade for focused domain/model helpers",
+    },
+}
+
 local moduleTocPaths = {
     ["Modules/C"] = "Modules\\C.lua",
     ["Modules/Timer"] = "Modules\\Timer.lua",
@@ -726,6 +857,17 @@ local moduleTocPaths = {
     ["Services/Reserves/Chat"] = "Services\\Reserves\\Chat.lua",
     ["Widgets/ReservesUI"] = "Widgets\\ReservesUI.lua",
     ["Services/Debug"] = "Services\\Debug.lua",
+    ["Services/Master/SoftRes"] = "Services\\Master\\SoftRes.lua",
+    ["Services/Master/SessionWinners"] = "Services\\Master\\SessionWinners.lua",
+    ["Services/Master/FlowState"] = "Services\\Master\\FlowState.lua",
+    ["Services/Master/ButtonState"] = "Services\\Master\\ButtonState.lua",
+    ["Services/Master/RollRows"] = "Services\\Master\\RollRows.lua",
+    ["Services/Master/AssignmentCandidates"] = "Services\\Master\\AssignmentCandidates.lua",
+    ["Services/Master/AssignmentTargets"] = "Services\\Master\\AssignmentTargets.lua",
+    ["Services/Master/DebugRaidGrid"] = "Services\\Master\\DebugRaidGrid.lua",
+    ["Services/Master/AwardMessages"] = "Services\\Master\\AwardMessages.lua",
+    ["Services/Master/LootSpam"] = "Services\\Master\\LootSpam.lua",
+    ["Services/Master/Service"] = "Services\\Master\\Service.lua",
 }
 
 local toc = read("!KRT/!KRT.toc")
@@ -772,6 +914,9 @@ for i = 1, #expectedReservesServices do
 end
 for i = 1, #expectedDebugServices do
     assertBefore(toc, "Modules\\ModuleRegistry.lua", moduleTocPaths[expectedDebugServices[i].name])
+end
+for i = 1, #expectedMasterServices do
+    assertBefore(toc, "Modules\\ModuleRegistry.lua", moduleTocPaths[expectedMasterServices[i].name])
 end
 
 local namespaceOptionFiles = {
@@ -1031,6 +1176,20 @@ assertBefore(toc, "Services\\Reserves.lua", "Services\\Reserves\\Chat.lua")
 assertBefore(toc, "Services\\Reserves.lua", "Widgets\\ReservesUI.lua")
 assertBefore(toc, "Services\\Rolls\\Service.lua", "Services\\Debug.lua")
 assertBefore(toc, "Services\\Raid\\Session.lua", "Services\\Debug.lua")
+assertBefore(toc, "Services\\Master\\SoftRes.lua", "Services\\Master\\FlowState.lua")
+assertBefore(toc, "Services\\Master\\SessionWinners.lua", "Services\\Master\\FlowState.lua")
+assertBefore(toc, "Services\\Master\\SoftRes.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\SessionWinners.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\FlowState.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\ButtonState.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\RollRows.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\AssignmentCandidates.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\AssignmentTargets.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\DebugRaidGrid.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\AwardMessages.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\LootSpam.lua", "Services\\Master\\Service.lua")
+assertBefore(toc, "Services\\Master\\Service.lua", "Widgets\\RaidGrid.lua")
+assertBefore(toc, "Services\\Master\\Service.lua", "Controllers\\Master.lua")
 
 for i = 1, #expectedLootServices do
     local expected = expectedLootServices[i]
@@ -1078,6 +1237,17 @@ end
 
 for i = 1, #expectedDebugServices do
     local expected = expectedDebugServices[i]
+    local expectedTocPath = moduleTocPaths[expected.name]
+    for j = 1, #expected.deps do
+        local depTocPath = moduleTocPaths[expected.deps[j]]
+        if depTocPath then
+            assertBefore(toc, depTocPath, expectedTocPath)
+        end
+    end
+end
+
+for i = 1, #expectedMasterServices do
+    local expected = expectedMasterServices[i]
     local expectedTocPath = moduleTocPaths[expected.name]
     for j = 1, #expected.deps do
         local depTocPath = moduleTocPaths[expected.deps[j]]
@@ -1276,6 +1446,10 @@ for i = 1, #expectedDebugServices do
     assertServiceRegistryContract(expectedDebugServices[i])
 end
 
+for i = 1, #expectedMasterServices do
+    assertServiceRegistryContract(expectedMasterServices[i])
+end
+
 local pending = {}
 for i = 1, #preRegistryCoreModules do
     local expected = preRegistryCoreModules[i]
@@ -1358,6 +1532,11 @@ for i = 1, #expectedLoggerServices do
     registry.AddModule(expected.name, { deps = expected.deps })
     registry.SetLoaded(expected.name)
 end
+for i = 1, #expectedMasterServices do
+    local expected = expectedMasterServices[i]
+    registry.AddModule(expected.name, { deps = expected.deps })
+    registry.SetLoaded(expected.name)
+end
 
 local ok, issues = registry.GetLoadOrderStatus()
 if not ok then
@@ -1407,6 +1586,12 @@ for i = 1, #expectedLoggerServices do
     local loggerStatus = registry.GetStatus(expected.name)
     assert(loggerStatus and loggerStatus.Loaded == true, expected.name .. " must be loaded in registry")
     assertDeps(loggerStatus.Deps, expected.deps, expected.name)
+end
+for i = 1, #expectedMasterServices do
+    local expected = expectedMasterServices[i]
+    local masterStatus = registry.GetStatus(expected.name)
+    assert(masterStatus and masterStatus.Loaded == true, expected.name .. " must be loaded in registry")
+    assertDeps(masterStatus.Deps, expected.deps, expected.name)
 end
 
 local negativeAddon = {
@@ -1514,6 +1699,7 @@ local function findExpectedSpec(name)
         expectedLoggerServices,
         expectedReservesServices,
         expectedDebugServices,
+        expectedMasterServices,
     }
 
     for i = 1, #expectedLists do

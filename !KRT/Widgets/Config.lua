@@ -183,13 +183,17 @@ do
         return namespace and Options and Options.Get and Options.Get(namespace) or nil
     end
 
-    local function getOption(key)
-        local cfg = getOptionConfig(key)
-        if cfg and cfg.Get then
-            return cfg:Get(key)
+    local GetOptionByKey = Options.GetByKey
+        or function(key, defaultValue)
+            local cfg = getOptionConfig(key)
+            if cfg and cfg.Get then
+                local value = cfg:Get(key)
+                if value ~= nil then
+                    return value
+                end
+            end
+            return defaultValue
         end
-        return nil
-    end
 
     local function setOption(key, value)
         local cfg = getOptionConfig(key)
@@ -307,15 +311,16 @@ do
         return floor((seconds * 100) + 0.5) / 100
     end
 
-    local function normalizeLoggerLootQualityThreshold(value)
-        local threshold = tonumber(value) or 4
-        for i = 1, #loggerLootQualityOptions do
-            if loggerLootQualityOptions[i].value == threshold then
-                return threshold
+    local normalizeLoggerLootQualityThreshold = Options.NormalizeLoggerLootQualityThreshold
+        or function(value)
+            local threshold = tonumber(value) or 4
+            for i = 1, #loggerLootQualityOptions do
+                if loggerLootQualityOptions[i].value == threshold then
+                    return threshold
+                end
             end
+            return 4
         end
-        return 4
-    end
 
     local function getLoggerLootQualityLabel(value)
         local threshold = normalizeLoggerLootQualityThreshold(value)
@@ -362,11 +367,11 @@ do
     end
 
     local function refreshAutoSpamSoftResDependency(frameName)
-        local autoLootEnabled = getOption("autoSpamLootOnLootOpened") == true
-        if not autoLootEnabled and getOption("autoSpamSoftResOnLootOpened") == true then
+        local autoLootEnabled = GetOptionByKey("autoSpamLootOnLootOpened") == true
+        if not autoLootEnabled and GetOptionByKey("autoSpamSoftResOnLootOpened") == true then
             setOption("autoSpamSoftResOnLootOpened", false)
         end
-        setChecked(frameName, "autoSpamSoftResOnLootOpened", autoLootEnabled and getOption("autoSpamSoftResOnLootOpened") == true)
+        setChecked(frameName, "autoSpamSoftResOnLootOpened", autoLootEnabled and GetOptionByKey("autoSpamSoftResOnLootOpened") == true)
         setOptionControlEnabled(frameName, "autoSpamSoftResOnLootOpened", autoLootEnabled)
     end
 
@@ -649,14 +654,14 @@ do
         if not frameName then
             return
         end
-        local channel = (getOption("useRaidWarning") == true) and (RAID_WARNING or "Raid Warning") or "RAID"
-        local countdownMode = (getOption("countdownSimpleRaidMsg") == true) and L.StrConfigMasterLootPreviewSimple or L.StrConfigMasterLootPreviewDetailed
-        local countdownDuration = tostring(getOption("countdownDuration") or 5)
+        local channel = (GetOptionByKey("useRaidWarning") == true) and (RAID_WARNING or "Raid Warning") or "RAID"
+        local countdownMode = (GetOptionByKey("countdownSimpleRaidMsg") == true) and L.StrConfigMasterLootPreviewSimple or L.StrConfigMasterLootPreviewDetailed
+        local countdownDuration = tostring(GetOptionByKey("countdownDuration") or 5)
         local lines = {
             format(L.StrConfigMasterLootPreviewWin or "Winner announce: %s", channel),
-            format(L.StrConfigMasterLootPreviewHold or "Hold announce: %s", getOption("announceOnHold") and "on" or "off"),
-            format(L.StrConfigMasterLootPreviewBank or "Bank announce: %s", getOption("announceOnBank") and "on" or "off"),
-            format(L.StrConfigMasterLootPreviewDisenchant or "Disenchant announce: %s", getOption("announceOnDisenchant") and "on" or "off"),
+            format(L.StrConfigMasterLootPreviewHold or "Hold announce: %s", GetOptionByKey("announceOnHold") and "on" or "off"),
+            format(L.StrConfigMasterLootPreviewBank or "Bank announce: %s", GetOptionByKey("announceOnBank") and "on" or "off"),
+            format(L.StrConfigMasterLootPreviewDisenchant or "Disenchant announce: %s", GetOptionByKey("announceOnDisenchant") and "on" or "off"),
             format(L.StrConfigMasterLootPreviewCountdown or "Countdown: %s sec, %s", countdownDuration, countdownMode),
         }
         setText(frameName, "AnnouncementPreviewBody", table.concat(lines, "\n"))
@@ -699,7 +704,7 @@ do
             saveAutoMasterLootNoticeSeconds(self)
         end)
         Frames.SetScriptSafely(editBox, "OnEscapePressed", function(self)
-            self:SetText(tostring(normalizeAutoMasterLootNoticeSeconds(getOption("autoMasterLootNoticeSeconds"))))
+            self:SetText(tostring(normalizeAutoMasterLootNoticeSeconds(GetOptionByKey("autoMasterLootNoticeSeconds"))))
             self:ClearFocus()
         end)
     end
@@ -922,32 +927,32 @@ do
             return
         end
 
-        setChecked(frameName, "sortAscending", getOption("sortAscending") == true)
-        setChecked(frameName, "useRaidWarning", getOption("useRaidWarning") == true)
-        setChecked(frameName, "announceOnWin", getOption("announceOnWin") == true)
-        setChecked(frameName, "announceOnHold", getOption("announceOnHold") == true)
-        setChecked(frameName, "announceOnBank", getOption("announceOnBank") == true)
-        setChecked(frameName, "announceOnDisenchant", getOption("announceOnDisenchant") == true)
-        setChecked(frameName, "lootWhispers", getOption("lootWhispers") == true)
-        setChecked(frameName, "softResWhisperReplies", getOption("softResWhisperReplies") == true)
-        setChecked(frameName, "countdownRollsBlock", getOption("countdownRollsBlock") == true)
-        setChecked(frameName, "screenReminder", getOption("screenReminder") == true)
-        setChecked(frameName, "ignoreStacks", getOption("ignoreStacks") == true)
-        setChecked(frameName, "showTooltips", getOption("showTooltips") == true)
-        setChecked(frameName, "showLootCounterDuringMSRoll", getOption("showLootCounterDuringMSRoll") == true)
-        setChecked(frameName, "minimapButton", getOption("minimapButton") == true)
-        setChecked(frameName, "countdownSimpleRaidMsg", getOption("countdownSimpleRaidMsg") == true)
-        setChecked(frameName, "autoSpamLootOnLootOpened", getOption("autoSpamLootOnLootOpened") == true)
+        setChecked(frameName, "sortAscending", GetOptionByKey("sortAscending") == true)
+        setChecked(frameName, "useRaidWarning", GetOptionByKey("useRaidWarning") == true)
+        setChecked(frameName, "announceOnWin", GetOptionByKey("announceOnWin") == true)
+        setChecked(frameName, "announceOnHold", GetOptionByKey("announceOnHold") == true)
+        setChecked(frameName, "announceOnBank", GetOptionByKey("announceOnBank") == true)
+        setChecked(frameName, "announceOnDisenchant", GetOptionByKey("announceOnDisenchant") == true)
+        setChecked(frameName, "lootWhispers", GetOptionByKey("lootWhispers") == true)
+        setChecked(frameName, "softResWhisperReplies", GetOptionByKey("softResWhisperReplies") == true)
+        setChecked(frameName, "countdownRollsBlock", GetOptionByKey("countdownRollsBlock") == true)
+        setChecked(frameName, "screenReminder", GetOptionByKey("screenReminder") == true)
+        setChecked(frameName, "ignoreStacks", GetOptionByKey("ignoreStacks") == true)
+        setChecked(frameName, "showTooltips", GetOptionByKey("showTooltips") == true)
+        setChecked(frameName, "showLootCounterDuringMSRoll", GetOptionByKey("showLootCounterDuringMSRoll") == true)
+        setChecked(frameName, "minimapButton", GetOptionByKey("minimapButton") == true)
+        setChecked(frameName, "countdownSimpleRaidMsg", GetOptionByKey("countdownSimpleRaidMsg") == true)
+        setChecked(frameName, "autoSpamLootOnLootOpened", GetOptionByKey("autoSpamLootOnLootOpened") == true)
         for i = 1, #optionSuffixes do
             local suffix = optionSuffixes[i]
-            setChecked(frameName, suffix, getOption(suffix) == true)
+            setChecked(frameName, suffix, GetOptionByKey(suffix) == true)
         end
 
-        setEditBoxText(frameName, "autoMasterLootNoticeSecondsEditBox", tostring(normalizeAutoMasterLootNoticeSeconds(getOption("autoMasterLootNoticeSeconds"))))
-        setCountdownDurationDisplay(frameName, getOption("countdownDuration"))
+        setEditBoxText(frameName, "autoMasterLootNoticeSecondsEditBox", tostring(normalizeAutoMasterLootNoticeSeconds(GetOptionByKey("autoMasterLootNoticeSeconds"))))
+        setCountdownDurationDisplay(frameName, GetOptionByKey("countdownDuration"))
         refreshAutoSpamSoftResDependency(frameName)
 
-        local useRaidWarning = getOption("useRaidWarning") == true
+        local useRaidWarning = GetOptionByKey("useRaidWarning") == true
         local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
         local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
@@ -1144,13 +1149,13 @@ do
     end
 
     local function refreshLootHistorySyncControls()
-        local thresholdOverride = getOption("ignoreSelectionThreshold") == true
-        setChecked(lootHistoryContentFrameName, "PersistentSyncCheck", getOption("persistentSync") == true)
-        setChecked(lootHistoryContentFrameName, "IgnoreGroupLootCheck", getOption("ignoreGroupLoot") == true)
+        local thresholdOverride = GetOptionByKey("ignoreSelectionThreshold") == true
+        setChecked(lootHistoryContentFrameName, "PersistentSyncCheck", GetOptionByKey("persistentSync") == true)
+        setChecked(lootHistoryContentFrameName, "IgnoreGroupLootCheck", GetOptionByKey("ignoreGroupLoot") == true)
         setChecked(lootHistoryContentFrameName, "IgnoreSelectionThresholdCheck", thresholdOverride)
-        setEditBoxText(lootHistoryContentFrameName, "RequireDatabaseEditBox", getOption("syncRequirePlayer") or "")
-        setEditBoxText(lootHistoryContentFrameName, "PushDatabaseEditBox", getOption("syncPushPlayer") or "")
-        setLoggerLootQualityDropDown(Frames.GetRef(lootHistoryContentFrameName, "LoggerLootQualityDropDown"), getOption("loggerLootQualityThreshold"), thresholdOverride)
+        setEditBoxText(lootHistoryContentFrameName, "RequireDatabaseEditBox", GetOptionByKey("syncRequirePlayer") or "")
+        setEditBoxText(lootHistoryContentFrameName, "PushDatabaseEditBox", GetOptionByKey("syncPushPlayer") or "")
+        setLoggerLootQualityDropDown(Frames.GetRef(lootHistoryContentFrameName, "LoggerLootQualityDropDown"), GetOptionByKey("loggerLootQualityThreshold"), thresholdOverride)
     end
 
     local function refreshLootHistoryPanel()
@@ -1181,9 +1186,9 @@ do
 
         local currentRaid = Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
         if actionName == "require" and syncer.RequestLoggerReq then
-            return syncer:RequestLoggerReq(currentRaid, getOption("syncRequirePlayer"))
+            return syncer:RequestLoggerReq(currentRaid, GetOptionByKey("syncRequirePlayer"))
         elseif actionName == "push" and syncer.BroadcastLoggerPush then
-            return syncer:BroadcastLoggerPush(currentRaid, getOption("syncPushPlayer"))
+            return syncer:BroadcastLoggerPush(currentRaid, GetOptionByKey("syncPushPlayer"))
         elseif actionName == "sync" and syncer.RequestLoggerSync then
             return syncer:RequestLoggerSync()
         end
@@ -1326,7 +1331,7 @@ do
         local threshold = normalizeLoggerLootQualityThreshold(value)
         saveLootHistoryOption("loggerLootQualityThreshold", threshold)
         if owner then
-            setLoggerLootQualityDropDown(owner, threshold, getOption("ignoreSelectionThreshold") == true)
+            setLoggerLootQualityDropDown(owner, threshold, GetOptionByKey("ignoreSelectionThreshold") == true)
         end
         if CloseDropDownMenus then
             CloseDropDownMenus()
@@ -1365,7 +1370,7 @@ do
             })
         end)
         Frames.SetScriptSafely(editBox, "OnEscapePressed", function(self)
-            self:SetText(getOption(optionKey) or "")
+            self:SetText(GetOptionByKey(optionKey) or "")
             self:ClearFocus()
         end)
     end

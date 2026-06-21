@@ -23,18 +23,21 @@ local Receipts = module._Receipts
 -- ----- Internal state ----- --
 
 -- ----- Private helpers ----- --
-local function resolveItemKey(itemLink, itemString)
-    if itemString and itemString ~= "" then
-        return itemString
-    end
-    if Item and Item.GetItemStringFromLink then
-        local key = Item.GetItemStringFromLink(itemLink)
-        if key and key ~= "" then
-            return key
+local resolveItemKey = Item.GetItemKey
+    or function(itemKeyOrLink, itemLink)
+        local itemKey = Item.GetItemStringFromLink and Item.GetItemStringFromLink(itemKeyOrLink) or nil
+        if itemKey and itemKey ~= "" then
+            return itemKey
         end
+        itemKey = Item.GetItemStringFromLink and Item.GetItemStringFromLink(itemLink) or nil
+        if itemKey and itemKey ~= "" then
+            return itemKey
+        end
+        if itemKeyOrLink and itemKeyOrLink ~= "" then
+            return itemKeyOrLink
+        end
+        return itemLink
     end
-    return itemLink
-end
 
 local function resolveKind(args)
     if not args.itemLink then
@@ -76,7 +79,7 @@ function Receipts.FromParsedLoot(args)
         playerName = args.playerName,
         itemLink = args.itemLink,
         itemString = args.itemString,
-        itemKey = resolveItemKey(args.itemLink, args.itemString),
+        itemKey = resolveItemKey(args.itemString, args.itemLink),
         itemCount = tonumber(args.itemCount) or 1,
         itemId = tonumber(args.itemId) or nil,
         itemName = args.itemName,

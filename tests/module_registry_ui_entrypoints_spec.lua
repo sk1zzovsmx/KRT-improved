@@ -184,6 +184,33 @@ local expectedControllers = {
 
 local expectedWidgets = {
     {
+        name = "Widgets/RaidGrid",
+        path = "!KRT/Widgets/RaidGrid.lua",
+        gate = 'UIWidgets.IsEnabled("RaidGrid")',
+        registryFromFeature = true,
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Colors",
+            "Modules/UI/Facade",
+        },
+        forbiddenPrefixes = { "Controllers/", "EntryPoints/", "Services/" },
+    },
+    {
+        name = "Widgets/LootHints",
+        path = "!KRT/Widgets/LootHints.lua",
+        gate = 'UIWidgets.IsEnabled("LootHints")',
+        registryFromFeature = true,
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Item",
+            "Modules/UI/Facade",
+            "Modules/UI/Frames",
+        },
+        forbiddenPrefixes = { "Controllers/", "EntryPoints/", "Services/Rolls/", "Services/Loot/" },
+    },
+    {
         name = "Widgets/LootCounter",
         path = "!KRT/Widgets/LootCounter.lua",
         gate = 'UIWidgets.IsEnabled("LootCounter")',
@@ -660,6 +687,8 @@ local moduleTocPaths = {
     ["Controllers/Logger"] = "Controllers\\Logger.lua",
     ["Controllers/Warnings"] = "Controllers\\Warnings.lua",
     ["Controllers/Spammer"] = "Controllers\\Spammer.lua",
+    ["Widgets/RaidGrid"] = "Widgets\\RaidGrid.lua",
+    ["Widgets/LootHints"] = "Widgets\\LootHints.lua",
     ["Widgets/LootCounter"] = "Widgets\\LootCounter.lua",
     ["Widgets/ReservesUI"] = "Widgets\\ReservesUI.lua",
     ["Widgets/Config"] = "Widgets\\Config.lua",
@@ -794,6 +823,8 @@ local localLimitControllerNamespacePaths = {
 local widgetPaths = {
     Config = "!KRT/Widgets/Config.lua",
     LootCounter = "!KRT/Widgets/LootCounter.lua",
+    RaidGrid = "!KRT/Widgets/RaidGrid.lua",
+    LootHints = "!KRT/Widgets/LootHints.lua",
     Reserves = "!KRT/Widgets/ReservesUI.lua",
 }
 
@@ -812,8 +843,9 @@ end
 
 local function assertWidgetMethod(source, methodName, context)
     local pattern = methodName .. "%s*=%s*function%s*%("
+    local modulePattern = "function%s+module%." .. methodName .. "%s*%("
     local message = context .. " must expose " .. methodName .. " = function"
-    assert(source:find(pattern), message)
+    assert(source:find(pattern) or source:find(modulePattern), message)
 end
 
 local function assertControllerDispatchPair(controllerName, methodName, sourcePath)
@@ -865,7 +897,12 @@ local function assertWidgetDispatchPair(widgetId, methodName, sourcePath)
 
     if standardWidgetMethods[methodName] then
         local message = context .. " must be backed by UI.Scaffold.CreateWidgetApi"
-        assertContains(widgetSource, "Scaffold.CreateWidgetApi(module,", message)
+        assert(
+            widgetSource:find("Scaffold.CreateWidgetApi(module,", 1, true)
+                or widgetSource:find(methodName .. "%s*=%s*function%s*%(")
+                or widgetSource:find("function%s+module%." .. methodName .. "%s*%("),
+            message
+        )
     else
         assertWidgetMethod(widgetSource, methodName, context)
     end

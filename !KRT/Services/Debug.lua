@@ -34,26 +34,28 @@ do
         { name = "KRTDbgRog", class = "ROGUE", subgroup = 2 },
     }
     local syntheticByName = {}
-
-    -- ----- Private helpers ----- --
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
+    local GetOption = Options.GetValue
+        or function(namespace, key, defaultValue)
+            local cfg = Options and Options.Get and Options.Get(namespace) or nil
+            if cfg and cfg.Get then
+                local value = cfg:Get(key)
+                if value ~= nil then
+                    return value
+                end
+            end
+            return defaultValue
+        end
+    local IsDebugEnabled = Options.IsDebugEnabled or function()
+        return false
     end
 
+    -- ----- Private helpers ----- --
     local function getRaidService()
         return Services.Raid
     end
 
     local function getRollsService()
         return Services.Rolls
-    end
-
-    local function getOption(namespace, key)
-        local cfg = Options and Options.Get and Options.Get(namespace)
-        if cfg and cfg.Get then
-            return cfg:Get(key)
-        end
-        return nil
     end
 
     local function normalizeSyntheticName(name)
@@ -246,7 +248,7 @@ do
         end
 
         ok, reason = rolls:SubmitDebugRoll(profile.name, roll)
-        if isDebugEnabled() then
+        if IsDebugEnabled() then
             addon:debug(Diag.D.LogDebugRaidRoll:format(tostring(raidId), profile.name, roll, tostring(ok), tostring(reason)))
         end
 
@@ -267,7 +269,7 @@ do
         local tiedIndexes = {}
         local tieCount = 0
         local tieRoll = 0
-        local wantLow = getOption("Master", "sortAscending") == true
+        local wantLow = GetOption("Master", "sortAscending") == true
 
         if tieMode and total > 1 then
             tieCount = random(2, 3)
@@ -353,7 +355,7 @@ do
             end
 
             raidService:AddPlayer(player, raidId)
-            if isDebugEnabled() then
+            if IsDebugEnabled() then
                 addon:debug(Diag.D.LogDebugRaidSeed:format(tostring(raidId), player.name, player.class))
             end
 
@@ -404,14 +406,14 @@ do
                 local playerNid = tonumber(player.playerNid) or 0
                 if playerNid > 0 and protectedNids[playerNid] then
                     blocked = blocked + 1
-                    if isDebugEnabled() then
+                    if IsDebugEnabled() then
                         addon:debug(Diag.D.LogDebugRaidClearBlocked:format(tostring(raidId), player.name, tostring(playerNid)))
                     end
                 else
                     removed = removed + 1
                     tinsert(delta.left, buildRosterDeltaEntry(player))
                     tremove(raid.players, i)
-                    if isDebugEnabled() then
+                    if IsDebugEnabled() then
                         addon:debug(Diag.D.LogDebugRaidClearRemoved:format(tostring(raidId), player.name, tostring(playerNid)))
                     end
                 end

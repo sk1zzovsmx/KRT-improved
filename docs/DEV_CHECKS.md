@@ -160,12 +160,21 @@ Use this manual checklist for Controller, Widget, XML, and shared UI changes:
 - Controller/Widget frame lifecycle uses `UI.Scaffold.DefineModule(cfg)` or documents an exception.
 - `addon.UI.ModuleState` keeps the canonical `Loaded`, `Bound`, `Localized`, `Dirty`, `Reason`, `FrameName`.
 - Repeated scroll lists or tables use `addon.UI.Lists` unless static or explicitly exempt.
+- Indexed row names use `addon.UI.Lists.MakeIndexedRowName("Suffix")` when they match
+  `frameName .. "Suffix" .. index`.
 - Standard list widgets use `FrameNameScrollFrame` and `FrameNameScrollFrameScrollChild`.
 - Selectable row selected/focused state uses `addon.UI.Rows`.
 - Editbox behavior uses `EditBoxes.BindHandlers`, `EditBoxes.Reset`, or `EditBoxes.SetValue`.
 - Reusable border, spacing, row visual, glow, and primitive behavior stays under `Modules/UI/*`.
 - Services do not reference frames, widgets, Controllers, `UI.Scaffold`, or shared UI helper modules.
 - XML remains layout-only with no `<Scripts>` or `<On...>` handlers.
+
+## 4.2 Vendored Library Decision
+
+`!KRT/Libs/**` is third-party package content and is excluded from KRT-owned
+normalization. Nested compatibility copies stay in place even when they look
+duplicated. Delete or normalize them only after the release-packaging policy is
+changed explicitly.
 
 ## 5) Release-Path Checks
 

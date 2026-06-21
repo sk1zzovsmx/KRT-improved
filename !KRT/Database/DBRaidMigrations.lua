@@ -9,8 +9,119 @@ local feature = addon.Database.GetFeatureShared()
 local DB = feature.DB
 local Database = feature.Database
 local Strings = feature.Strings
+local LootSourceCandidates = feature.LootSourceCandidates
 
 local isBossFightRecord = Database._IsBossFightRecord
+local tconcat = table.concat
+local SHARED_SOURCE_LABEL_FALLBACK = "Shared"
+local SHARED_SOURCE_PREFIX_FALLBACK = "Shared:"
+
+local function normalizeSourceKeyText(value)
+    if value == nil then
+        return nil
+    end
+    local text = tostring(value):gsub("^%s*(.-)%s*$", "%1")
+    if text == "" then
+        return nil
+    end
+    return string.lower(text)
+end
+
+local function buildCandidateSourceKey(candidate, name)
+    local raidKey = normalizeSourceKeyText(candidate and candidate.raid) or "unknown"
+    local kind = normalizeSourceKeyText(candidate and candidate.kind) or "boss"
+    local npcId = tonumber(candidate and (candidate.npcId or candidate.sourceNpcId)) or 0
+    local sourceName = normalizeSourceKeyText(name or (candidate and (candidate.npcName or candidate.name))) or "unknown"
+    return tconcat({ raidKey, kind, tostring(npcId), sourceName, "any" }, "|")
+end
+
+if type(LootSourceCandidates) ~= "table" then
+    LootSourceCandidates = {}
+
+    function LootSourceCandidates.GetSharedLabel()
+        return SHARED_SOURCE_LABEL_FALLBACK
+    end
+
+    function LootSourceCandidates.IsSharedSourceName(value)
+        if type(value) ~= "string" then
+            return false
+        end
+        return value == SHARED_SOURCE_LABEL_FALLBACK or string.sub(value, 1, string.len(SHARED_SOURCE_PREFIX_FALLBACK)) == SHARED_SOURCE_PREFIX_FALLBACK
+    end
+
+    local function appendCandidate(out, seen, rawName)
+        if type(rawName) ~= "string" then
+            return
+        end
+        local name
+        if Strings and Strings.NormalizeText then
+            name = Strings.NormalizeText(rawName, true)
+        else
+            name = tostring(rawName):gsub("^%s*(.-)%s*$", "%1")
+            if name == "" then
+                name = nil
+            end
+        end
+        if not name or name == "" then
+            return
+        end
+        local key = Strings and Strings.NormalizeLower and Strings.NormalizeLower(name, true) or name
+        if seen[key] then
+            return
+        end
+        seen[key] = true
+        local candidate = {
+            name = name,
+            kind = "boss",
+        }
+        out[#out + 1] = candidate
+        return candidate
+    end
+
+    local function parseSharedText(value)
+        if type(value) ~= "string" then
+            return nil
+        end
+        local text = value
+        if string.sub(text, 1, string.len(SHARED_SOURCE_PREFIX_FALLBACK)) == SHARED_SOURCE_PREFIX_FALLBACK then
+            text = string.sub(text, string.len(SHARED_SOURCE_PREFIX_FALLBACK) + 1)
+        end
+        text = tostring(text):gsub("^%s*(.-)%s*$", "%1")
+        if text == "" or text == SHARED_SOURCE_LABEL_FALLBACK then
+            return nil
+        end
+        local out = {}
+        local seen = {}
+        for name in string.gmatch(text, "[^/]+") do
+            appendCandidate(out, seen, name)
+        end
+        return (#out > 0) and out or nil
+    end
+
+    function LootSourceCandidates.Copy(candidates, fallbackText)
+        local copied = {}
+        local seen = {}
+        if type(candidates) ~= "table" then
+            local parsed = parseSharedText(fallbackText)
+            return parsed
+        end
+        for i = 1, #candidates do
+            local candidate = candidates[i]
+            if type(candidate) == "table" and (candidate.name or candidate.npcName) then
+                local copy = appendCandidate(copied, seen, candidate.name or candidate.npcName)
+                if copy then
+                    copy.kind = candidate.kind or copy.kind
+                    copy.npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or nil
+                    copy.sourceKey = candidate.sourceKey or buildCandidateSourceKey(candidate, copy.name)
+                end
+            end
+        end
+        if #copied == 0 then
+            return parseSharedText(fallbackText)
+        end
+        return copied
+    end
+end
 
 -- Current-schema raid persistence helpers.
 do
@@ -19,12 +130,21 @@ do
 
     -- ----- Internal state ----- --
     local EMPTY_MIGRATIONS = {}
-    local SHARED_SOURCE_LABEL = "Shared"
-    local SHARED_SOURCE_PREFIX = "Shared:"
+    local SHARED_SOURCE_LABEL = LootSourceCandidates.GetSharedLabel()
 
     -- ----- Private helpers ----- --
     local normalizeNameLower = function(value)
-        return Strings.NormalizeLower(value, true)
+        if Strings and Strings.NormalizeLower then
+            return Strings.NormalizeLower(value, true)
+        end
+        if value == nil then
+            return nil
+        end
+        local text = tostring(value):gsub("^%s*(.-)%s*$", "%1")
+        if text == "" then
+            return nil
+        end
+        return string.lower(text)
     end
 
     local function ensureTableField(raid, key, emptyAsMap)
@@ -39,35 +159,27 @@ do
         end
     end
 
-    local function normalizeName(name)
-        if Strings and Strings.NormalizeName then
-            return Strings.NormalizeName(name, true)
+    local normalizeName = Strings.NormalizeName
+        or function(value, allowNil)
+            if value == nil then
+                return allowNil and nil or ""
+            end
+            local text = tostring(value):gsub("^%s*(.-)%s*$", "%1")
+            if allowNil and text == "" then
+                return nil
+            end
+            return text
         end
-        if name == nil then
-            return nil
+    local normalizeTextOrNil = Strings.NilIfEmpty
+        or function(value)
+            if value == nil then
+                return nil
+            end
+            local text = tostring(value):gsub("^%s*(.-)%s*$", "%1")
+            return (text ~= "") and text or nil
         end
-        local text = tostring(name)
-        if text == "" then
-            return nil
-        end
-        return text
-    end
-
-    local function normalizeTextOrNil(value)
-        if value == nil then
-            return nil
-        end
-        local text = nil
-        if Strings and Strings.TrimText then
-            text = Strings.TrimText(value, true)
-        else
-            text = tostring(value)
-        end
-        if type(text) ~= "string" or text == "" then
-            return nil
-        end
-        return text
-    end
+    local isSharedSourceName = LootSourceCandidates.IsSharedSourceName
+    local compactSharedCandidates = LootSourceCandidates.Copy
 
     local function normalizePositiveNumberOrNil(value)
         local num = tonumber(value)
@@ -77,88 +189,19 @@ do
         return num
     end
 
-    local function isLegacySharedText(value)
-        return type(value) == "string" and string.sub(value, 1, string.len(SHARED_SOURCE_PREFIX)) == SHARED_SOURCE_PREFIX
-    end
-
-    local function isSharedSourceName(value)
-        local text = normalizeTextOrNil(value)
-        return text == SHARED_SOURCE_LABEL or isLegacySharedText(text)
-    end
-
-    local function appendSharedCandidate(out, seen, rawName, rawNpcId, rawKind, rawSourceKey)
-        local name = normalizeTextOrNil(rawName)
-        if not name then
-            return
-        end
-
-        local key = normalizeNameLower(name) or name
-        if seen[key] then
-            return
-        end
-        seen[key] = true
-
-        local candidate = {
-            name = name,
-            kind = normalizeTextOrNil(rawKind) or "boss",
-        }
-        local sourceKey = normalizeTextOrNil(rawSourceKey)
-        if sourceKey then
-            candidate.sourceKey = sourceKey
-        end
-
-        local npcId = tonumber(rawNpcId)
-        if npcId and npcId > 0 then
-            candidate.npcId = npcId
-        end
-
-        out[#out + 1] = candidate
-    end
-
-    local function parseSharedCandidatesFromText(value)
-        local text = normalizeTextOrNil(value)
-        if not text then
+    local function buildSharedSourceKeyFromCandidates(candidates)
+        if type(candidates) ~= "table" then
             return nil
         end
-
-        if isLegacySharedText(text) then
-            text = normalizeTextOrNil(string.sub(text, string.len(SHARED_SOURCE_PREFIX) + 1))
-        end
-        if not text or text == SHARED_SOURCE_LABEL then
-            return nil
-        end
-
-        local out = {}
-        local seen = {}
-        for name in string.gmatch(text, "[^/]+") do
-            appendSharedCandidate(out, seen, name, nil, "boss")
-        end
-
-        return (#out > 0) and out or nil
-    end
-
-    local function compactSharedCandidates(candidates, fallbackText)
-        local out = {}
-        local seen = {}
-        if type(candidates) == "table" then
-            for i = 1, #candidates do
-                local candidate = candidates[i]
-                if type(candidate) == "table" then
-                    appendSharedCandidate(out, seen, candidate.name or candidate.npcName, candidate.npcId or candidate.sourceNpcId, candidate.kind, candidate.sourceKey)
-                end
+        local keys = {}
+        for i = 1, #candidates do
+            local candidate = candidates[i]
+            local sourceKey = normalizeTextOrNil(candidate and candidate.sourceKey) or buildCandidateSourceKey(candidate, candidate and candidate.name)
+            if sourceKey then
+                keys[#keys + 1] = sourceKey
             end
         end
-
-        if #out == 0 then
-            local parsed = parseSharedCandidatesFromText(fallbackText)
-            if type(parsed) == "table" then
-                for i = 1, #parsed do
-                    appendSharedCandidate(out, seen, parsed[i].name, parsed[i].npcId, parsed[i].kind, parsed[i].sourceKey)
-                end
-            end
-        end
-
-        return (#out > 0) and out or nil
+        return (#keys > 0) and ("shared|" .. tconcat(keys, ";")) or nil
     end
 
     local function getLootSourceResolver()
@@ -197,7 +240,7 @@ do
             return nil, nil
         end
 
-        return candidates, normalizeTextOrNil(source.sourceKey)
+        return candidates, normalizeTextOrNil(source.sourceKey) or buildSharedSourceKeyFromCandidates(candidates)
     end
 
     local function migrateSharedLootSources(raid)
@@ -248,6 +291,9 @@ do
                     lootSource.sourceName = SHARED_SOURCE_LABEL
                     lootSource.sourceKey = resolvedSourceKey or normalizeTextOrNil(lootSource.sourceKey)
                     lootSource.candidates = resolvedCandidates or compactSharedCandidates(lootSource.candidates, sourceName) or bossCandidates
+                    if not lootSource.sourceKey then
+                        lootSource.sourceKey = buildSharedSourceKeyFromCandidates(lootSource.candidates)
+                    end
                     loot.lootSource = lootSource
                 end
             end

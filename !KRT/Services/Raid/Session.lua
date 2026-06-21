@@ -26,8 +26,8 @@ do
     local RAID_INSTANCE_CHECK_DELAYS = { 0.3, 0.8, 1.5, 2.5, 3.5 }
 
     -- ----- Private helpers ----- --
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
+    local isDebugEnabled = feature.Options.IsDebugEnabled or function()
+        return false
     end
 
     local function cancelRaidInstanceChecks()

@@ -46,31 +46,7 @@ do
         return map
     end
 
-    local function isBossFightRecord(boss)
-        if type(Database._IsBossFightRecord) == "function" then
-            return Database._IsBossFightRecord(boss)
-        end
-
-        if type(boss) ~= "table" then
-            return false
-        end
-
-        local sourceKind = boss.sourceKind
-        if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
-            return false
-        end
-
-        if boss.source == "LootSources" then
-            return false
-        end
-
-        local name = boss.name or boss.boss
-        if type(name) == "string" and string.sub(name, 1, 7) == "Shared:" then
-            return false
-        end
-
-        return true
-    end
+    local isBossFightRecord = Database.IsBossFightRecord
 
     local function createNidAllocator(initialNext)
         local usedNids = {}

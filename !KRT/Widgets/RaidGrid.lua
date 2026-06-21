@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
--- exports: addon.Widgets.MasterLootGrid
+-- exports: addon.Widgets.RaidGrid
 -- events: none
 
 local addon = select(2, ...)
@@ -10,6 +10,7 @@ local feature = addon.Database.GetFeatureShared()
 local Widgets = feature.Widgets
 local UI = feature.UI
 local UIWidgets = UI.Widgets
+local Primitives = UI.Primitives
 local Colors = feature.Colors
 local L = feature.L
 
@@ -21,25 +22,26 @@ local ceil, min, max = math.ceil, math.min, math.max
 
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
-    registry.AddModule("Widgets/MasterLootGrid", {
+    registry.AddModule("Widgets/RaidGrid", {
         deps = {
             "Init",
             "Modules/ModuleRegistry",
             "Modules/Colors",
             "Modules/UI/Facade",
+            "Modules/UI/Visuals",
         },
     })
-    registry.SetLoaded("Widgets/MasterLootGrid")
+    registry.SetLoaded("Widgets/RaidGrid")
 end
 
 do
-    if UIWidgets and UIWidgets.IsEnabled and not UIWidgets.IsEnabled("MasterLootGrid") then
+    if UIWidgets and UIWidgets.IsEnabled and not UIWidgets.IsEnabled("RaidGrid") then
         return
     end
 
-    Widgets.MasterLootGrid = Widgets.MasterLootGrid or {}
-    local module = Widgets.MasterLootGrid
-    addon.Widgets.MasterLootGrid = module
+    Widgets.RaidGrid = Widgets.RaidGrid or {}
+    local module = Widgets.RaidGrid
+    addon.Widgets.RaidGrid = module
 
     -- ----- Internal state ----- --
     local CFG = {
@@ -56,7 +58,6 @@ do
         buttonHoverAlpha = 0.85,
     }
 
-    local SOLID_TEX = "Interface\\Buttons\\WHITE8x8"
     local frame
     local activeConfig
     local entries = {}
@@ -104,19 +105,12 @@ do
         end
     end
 
-    local function setTextureColor(texture, r, g, b, a)
-        if not texture then
-            return
+    local setTextureColor = Primitives.SetTextureColor
+        or function(texture, r, g, b, a)
+            if texture and texture.SetTexture then
+                texture:SetTexture(r, g, b, a)
+            end
         end
-        if texture.SetTexture then
-            texture:SetTexture(SOLID_TEX)
-        end
-        if texture.SetVertexColor then
-            texture:SetVertexColor(r, g, b, a or 1)
-        elseif texture.SetTexture then
-            texture:SetTexture(r, g, b, a or 1)
-        end
-    end
 
     local function createTexture(parent, layer)
         if parent and parent.CreateTexture then
@@ -165,12 +159,12 @@ do
 
     local function getTooltipLine()
         if activeConfig and activeConfig.mode == "target" then
-            return L.TipMasterLootGridClickTarget
+            return L.TipRaidGridClickTarget
         end
         if activeConfig and activeConfig.mode == "debug" then
-            return L.TipMasterLootGridClickDebug
+            return L.TipRaidGridClickDebug
         end
-        return L.TipMasterLootGridClickAward
+        return L.TipRaidGridClickAward
     end
 
     local function updateButtonColor(button, hovered)
@@ -200,7 +194,7 @@ do
     end
 
     local function createButton(index)
-        local buttonName = "KRTMasterLootGridButton" .. tostring(index)
+        local buttonName = "KRTRaidGridButton" .. tostring(index)
         local button = _G.CreateFrame("Button", buttonName, frame)
         setSize(button, CFG.buttonWidth, CFG.buttonHeight)
         safeCall(button, "RegisterForClicks", "LeftButtonUp")
@@ -263,7 +257,7 @@ do
             return frame
         end
 
-        frame = _G.CreateFrame("Frame", "KRTMasterLootGridFrame", _G.UIParent, "KRTDialogTemplate")
+        frame = _G.CreateFrame("Frame", "KRTRaidGridFrame", _G.UIParent, "KRTDialogTemplate")
         frame.buttons = buttons
         safeCall(frame, "Hide")
         safeCall(frame, "SetFrameStrata", "FULLSCREEN_DIALOG")
@@ -329,14 +323,14 @@ do
         end
 
         if type(_G.UISpecialFrames) == "table" then
-            tinsert(_G.UISpecialFrames, "KRTMasterLootGridFrame")
+            tinsert(_G.UISpecialFrames, "KRTRaidGridFrame")
         end
 
         return frame
     end
 
     local function updateHeader(width)
-        local title = activeConfig and activeConfig.title or L.StrMasterLootGridTitle
+        local title = activeConfig and activeConfig.title or L.StrRaidGridTitle
         local texture = activeConfig and activeConfig.texture or nil
         local count = activeConfig and tonumber(activeConfig.count) or nil
 
@@ -353,7 +347,7 @@ do
             safeCall(frame.title, "SetWidth", max(100, width - 70))
         end
 
-        safeCall(frame.title, "SetText", title or L.StrMasterLootGridTitle)
+        safeCall(frame.title, "SetText", title or L.StrRaidGridTitle)
         if count and count > 1 then
             safeCall(frame.count, "SetText", "x" .. tostring(count))
             safeCall(frame.count, "Show")
@@ -422,7 +416,7 @@ do
         activeButtonCount = count
 
         if count <= 0 then
-            safeCall(frame.empty, "SetText", (activeConfig and activeConfig.emptyText) or L.StrMasterLootGridEmpty)
+            safeCall(frame.empty, "SetText", (activeConfig and activeConfig.emptyText) or L.StrRaidGridEmpty)
             safeCall(frame.empty, "Show")
         else
             safeCall(frame.empty, "Hide")
@@ -484,6 +478,6 @@ do
     end
 
     if UIWidgets and UIWidgets.Register then
-        UIWidgets.Register("MasterLootGrid", module)
+        UIWidgets.Register("RaidGrid", module)
     end
 end

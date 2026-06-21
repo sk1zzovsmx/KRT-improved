@@ -25,7 +25,10 @@ local module = Reserves
 module._Sync = module._Sync or {}
 
 local Sync = module._Sync
-local Payload = Comms and Comms._Payload or nil
+local Payload = Comms and Comms.Payload or nil
+local sendAddonWhisper = Comms and Comms.SendAddonWhisper or function(prefix, target, msg)
+    SendAddonMessage(prefix, tostring(msg or ""), "WHISPER", target)
+end
 
 local PREFIX = "KRTResSync"
 local FIELD_SEP = "|"
@@ -41,15 +44,16 @@ Sync._incoming = Sync._incoming or {}
 Sync._nextRequestId = Sync._nextRequestId or 0
 
 -- ----- Private helpers ----- --
-local function getPayload()
-    Payload = Payload or (Comms and Comms._Payload)
-    return assert(Payload, "Comms payload helpers are not initialized")
-end
+local normalizeSender = Comms and Comms.NormalizeSender
+    or function(sender)
+        local name = tostring(sender or "")
+        local normalized = Strings and Strings.NormalizeName and Strings.NormalizeName(name, true) or name
+        return normalized or name
+    end
 
-local function normalizeSender(sender)
-    local name = tostring(sender or "")
-    local normalized = Strings and Strings.NormalizeName and Strings.NormalizeName(name, true) or name
-    return normalized or name
+local function requirePayload()
+    Payload = Payload or (Comms and Comms.Payload)
+    return assert(Payload, "Comms payload helpers are not initialized")
 end
 
 local function getReservesService()
@@ -77,18 +81,9 @@ local function canProvideReserves()
     return role.isMasterLooter == true or role.isLeader == true or role.isAssistant == true
 end
 
-local function nextRequestId()
-    Sync._nextRequestId = (tonumber(Sync._nextRequestId) or 0) + 1
-    return tostring(Sync._nextRequestId)
-end
-
-local function sendWhisper(target, msg)
-    SendAddonMessage(PREFIX, msg, "WHISPER", target)
-end
-
 local function sendError(target, reason)
-    local payload = getPayload()
-    sendWhisper(target, payload._PackFields(FIELD_SEP, MSG_DATA_ERR, tostring(reason or "unknown")))
+    local payload = requirePayload()
+    sendAddonWhisper(PREFIX, target, payload.PackFields(FIELD_SEP, MSG_DATA_ERR, tostring(reason or "unknown")))
 end
 
 local function shouldRequestRemoteData(remoteChecksum)
@@ -110,8 +105,8 @@ local function requestDataFrom(target, requestId, checksum)
     if target == "" then
         return false
     end
-    local payload = getPayload()
-    sendWhisper(target, payload._PackFields(FIELD_SEP, MSG_DATA_REQ, requestId, checksum or ""))
+    local payload = requirePayload()
+    sendAddonWhisper(PREFIX, target, payload.PackFields(FIELD_SEP, MSG_DATA_REQ, requestId, checksum or ""))
     addon:info(L.MsgReservesSyncDataRequested)
     return true
 end
@@ -126,8 +121,8 @@ local function sortedPlayerKeys(data)
 end
 
 local function buildPayload(data, mode)
-    local payload = getPayload()
-    local lines = { payload._PackFields(FIELD_SEP, "H", mode or "multi") }
+    local payload = requirePayload()
+    local lines = { payload.PackFields(FIELD_SEP, "H", mode or "multi") }
     local keys = sortedPlayerKeys(data)
 
     for i = 1, #keys do
@@ -138,17 +133,17 @@ local function buildPayload(data, mode)
             for j = 1, #player.reserves do
                 local row = player.reserves[j]
                 if type(row) == "table" and row.rawID then
-                    lines[#lines + 1] = payload._PackFields(
+                    lines[#lines + 1] = payload.PackFields(
                         FIELD_SEP,
                         "R",
-                        payload._EncodeText(playerName),
+                        payload.EncodeText(playerName),
                         tonumber(row.rawID) or 0,
                         tonumber(row.quantity) or 1,
                         tonumber(row.plus) or 0,
-                        payload._EncodeText(row.class),
-                        payload._EncodeText(row.spec),
-                        payload._EncodeText(row.note),
-                        payload._EncodeText(row.source)
+                        payload.EncodeText(row.class),
+                        payload.EncodeText(row.spec),
+                        payload.EncodeText(row.note),
+                        payload.EncodeText(row.source)
                     )
                 end
             end
@@ -159,17 +154,17 @@ local function buildPayload(data, mode)
 end
 
 local function parsePayload(payload)
-    local payloadCodec = getPayload()
+    local payloadCodec = requirePayload()
     local reserves = {}
     local mode = "multi"
     local fields = {}
 
     for line in tostring(payload or ""):gmatch("[^\n]+") do
-        payloadCodec._SplitFields(line, FIELD_SEP, fields)
+        payloadCodec.SplitFields(line, FIELD_SEP, fields)
         if fields[1] == "H" then
             mode = (fields[2] == "plus") and "plus" or "multi"
         elseif fields[1] == "R" then
-            local playerName = payloadCodec._DecodeText(fields[2])
+            local playerName = payloadCodec.DecodeText(fields[2])
             local itemId = tonumber(fields[3])
             if playerName and playerName ~= "" and itemId and itemId > 0 then
                 local playerKey = Strings and Strings.NormalizeLower and Strings.NormalizeLower(playerName, true) or playerName
@@ -185,10 +180,10 @@ local function parsePayload(payload)
                     rawID = itemId,
                     quantity = tonumber(fields[4]) or 1,
                     plus = tonumber(fields[5]) or 0,
-                    class = payloadCodec._DecodeText(fields[6]),
-                    spec = payloadCodec._DecodeText(fields[7]),
-                    note = payloadCodec._DecodeText(fields[8]),
-                    source = payloadCodec._DecodeText(fields[9]),
+                    class = payloadCodec.DecodeText(fields[6]),
+                    spec = payloadCodec.DecodeText(fields[7]),
+                    note = payloadCodec.DecodeText(fields[8]),
+                    source = payloadCodec.DecodeText(fields[9]),
                 }
             end
         end
@@ -204,17 +199,17 @@ local function getLocalPayload()
 end
 
 local function sendMetadata(target, requestId)
+    local payload = requirePayload()
     if not canProvideReserves() then
-        local payload = getPayload()
-        sendWhisper(target, payload._PackFields(FIELD_SEP, MSG_DATA_ERR, requestId, "no_data"))
+        sendAddonWhisper(PREFIX, target, payload.PackFields(FIELD_SEP, MSG_DATA_ERR, requestId, "no_data"))
         return false
     end
 
     local _, meta = getLocalPayload()
-    local payload = getPayload()
-    sendWhisper(
+    sendAddonWhisper(
+        PREFIX,
         target,
-        payload._PackFields(
+        payload.PackFields(
             FIELD_SEP,
             MSG_META_ACK,
             requestId,
@@ -229,14 +224,14 @@ local function sendMetadata(target, requestId)
 end
 
 local function sendData(target, requestId)
+    local payloadCodec = requirePayload()
     if not canProvideReserves() then
         sendError(target, "no_data")
         return false
     end
 
     local payload, meta = getLocalPayload()
-    local payloadCodec = getPayload()
-    local encoded = payloadCodec._EncodeText(payload)
+    local encoded = payloadCodec.EncodeText(payload)
     local payloadLen = #encoded
     local totalChunks = floor((payloadLen + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE)
     if totalChunks < 1 then
@@ -247,10 +242,10 @@ local function sendData(target, requestId)
         local fromPos = ((idx - 1) * MAX_CHUNK_SIZE) + 1
         local toPos = fromPos + MAX_CHUNK_SIZE - 1
         local chunk = encoded:sub(fromPos, toPos)
-        sendWhisper(target, payloadCodec._PackFields(FIELD_SEP, MSG_DATA_CHUNK, requestId, idx, totalChunks, chunk))
+        sendAddonWhisper(PREFIX, target, payloadCodec.PackFields(FIELD_SEP, MSG_DATA_CHUNK, requestId, idx, totalChunks, chunk))
     end
 
-    sendWhisper(target, payloadCodec._PackFields(FIELD_SEP, MSG_DATA_DONE, requestId, meta and meta.checksum or ""))
+    sendAddonWhisper(PREFIX, target, payloadCodec.PackFields(FIELD_SEP, MSG_DATA_DONE, requestId, meta and meta.checksum or ""))
     return true
 end
 
@@ -269,8 +264,7 @@ local function applyIncoming(sender, requestId, checksum)
         parts[i] = pending.chunks[i]
     end
 
-    local payloadCodec = getPayload()
-    local decodedPayload = payloadCodec._DecodeText(tconcat(parts, ""))
+    local decodedPayload = requirePayload().DecodeText(tconcat(parts, ""))
     if not decodedPayload then
         return false, "decode_failed"
     end
@@ -289,9 +283,9 @@ end
 
 function Sync:RequestMetadata()
     ensurePrefix()
-    local requestId = nextRequestId()
-    local payload = getPayload()
-    local ok = Comms and Comms.Sync and Comms.Sync(PREFIX, payload._PackFields(FIELD_SEP, MSG_META_REQ, requestId))
+    local requestId = Comms.NextRequestId(Sync, "_nextRequestId")
+    local payload = requirePayload()
+    local ok = Comms and Comms.Sync and Comms.Sync(PREFIX, payload.PackFields(FIELD_SEP, MSG_META_REQ, requestId))
     if ok == false then
         addon:warn(L.MsgReservesSyncNotInGroup)
         return false
@@ -306,7 +300,7 @@ function Sync:HandleMessage(prefix, msg, channel, sender)
     end
 
     local fields = {}
-    getPayload()._SplitFields(msg, FIELD_SEP, fields)
+    requirePayload().SplitFields(msg, FIELD_SEP, fields)
     local kind = fields[1]
     local requestId = fields[2]
     local source = normalizeSender(sender)

@@ -14,12 +14,12 @@ local Bus = feature.Bus
 local Comms = feature.Comms
 local Item = feature.Item
 local Services = feature.Services
+local Strings = feature.Strings
+local Payload = Comms.Payload
 
 local _G = _G
 local type, tostring, tonumber = type, tostring, tonumber
-local select = select
 local tinsert, tsort, tconcat = table.insert, table.sort, table.concat
-local strfind, strsub = string.find, string.sub
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
@@ -77,100 +77,27 @@ local function ensurePrefix()
     end
 end
 
-local function getPayload()
-    return Comms and Comms._Payload or nil
-end
+local encodeText = Payload.EncodeText
 
-local function encodeText(value)
-    local payload = getPayload()
-    if payload and type(payload._EncodeText) == "function" then
-        return payload._EncodeText(value)
-    end
-    return tostring(value or "")
-end
-
-local function decodeText(value)
-    local payload = getPayload()
-    if payload and type(payload._DecodeText) == "function" then
-        local decoded = payload._DecodeText(value)
-        if decoded ~= nil then
-            return decoded
-        end
+local decodeText = function(value)
+    local decoded = Payload.DecodeText(value)
+    if decoded ~= nil then
+        return decoded
     end
     return tostring(value or "")
 end
 
 local function packFields(...)
-    local payload = getPayload()
-    if payload and type(payload._PackFields) == "function" then
-        return payload._PackFields(SEP, ...)
-    end
-
-    local n = select("#", ...)
-    local out = {}
-    for i = 1, n do
-        out[i] = tostring(select(i, ...) or "")
-    end
-    return tconcat(out, SEP)
+    return Payload.PackFields(SEP, ...)
 end
 
 local function splitText(text, sep, out)
-    local input = tostring(text or "")
-    local delimiter = tostring(sep or "")
-    local fields = out or {}
-    local startPos = 1
-    local n = 0
-
-    if delimiter == "" then
-        fields[1] = input
-        for i = 2, #fields do
-            fields[i] = nil
-        end
-        return fields, 1
-    end
-
-    while true do
-        local fromPos, toPos = strfind(input, delimiter, startPos, true)
-        if not fromPos then
-            n = n + 1
-            fields[n] = strsub(input, startPos)
-            break
-        end
-        n = n + 1
-        fields[n] = strsub(input, startPos, fromPos - 1)
-        startPos = toPos + 1
-    end
-    for i = n + 1, #fields do
-        fields[i] = nil
-    end
-    return fields, n
+    return Payload.SplitFields(text, sep, out)
 end
 
 local splitScratch = {}
 local function splitFields(text)
-    local payload = getPayload()
-    if payload and type(payload._SplitFields) == "function" then
-        return payload._SplitFields(text, SEP, splitScratch)
-    end
-
-    local input = tostring(text or "")
-    local startPos = 1
-    local n = 0
-    while true do
-        local fromPos, toPos = strfind(input, SEP, startPos, true)
-        if not fromPos then
-            n = n + 1
-            splitScratch[n] = strsub(input, startPos)
-            break
-        end
-        n = n + 1
-        splitScratch[n] = strsub(input, startPos, fromPos - 1)
-        startPos = toPos + 1
-    end
-    for i = n + 1, #splitScratch do
-        splitScratch[i] = nil
-    end
-    return splitScratch, n
+    return Payload.SplitFields(text, SEP, splitScratch)
 end
 
 local snapshotRowsScratch = {}
@@ -184,29 +111,23 @@ local function normalizeNumber(value)
     return nil
 end
 
-local function normalizeText(value)
-    if value == nil then
-        return nil
-    end
-    value = tostring(value)
-    if value == "" then
-        return nil
-    end
-    return value
-end
+local normalizeText = Strings.NormalizeText
 
-local function resolveItemKey(itemKeyOrLink, itemLink)
-    local key = normalizeText(itemKeyOrLink)
-    local link = normalizeText(itemLink)
-
-    if link and Item and type(Item.GetItemStringFromLink) == "function" then
-        key = Item.GetItemStringFromLink(link) or key
-    elseif key and strfind(key, "|Hitem:", 1, true) and Item and type(Item.GetItemStringFromLink) == "function" then
-        key = Item.GetItemStringFromLink(key) or key
+local resolveItemKey = Item.GetItemKey
+    or function(itemKeyOrLink, itemLink)
+        local itemKey = Item.GetItemStringFromLink and Item.GetItemStringFromLink(itemKeyOrLink) or nil
+        if itemKey and itemKey ~= "" then
+            return itemKey
+        end
+        itemKey = Item.GetItemStringFromLink and Item.GetItemStringFromLink(itemLink) or nil
+        if itemKey and itemKey ~= "" then
+            return itemKey
+        end
+        if itemKeyOrLink and itemKeyOrLink ~= "" then
+            return itemKeyOrLink
+        end
+        return itemLink
     end
-
-    return normalizeText(key or link)
-end
 
 local function buildSessionId()
     local playerName = Database and Database.GetPlayerName and Database.GetPlayerName() or "player"
@@ -226,7 +147,7 @@ local function ensureSessionId()
 end
 
 local function setSessionId(sessionId)
-    sessionId = normalizeText(sessionId)
+    sessionId = normalizeText(sessionId, true)
     if sessionId then
         state.sessionId = sessionId
     else
@@ -256,7 +177,7 @@ local function triggerChanged(reason, row)
 end
 
 local function getOrCreateRow(itemKey)
-    itemKey = normalizeText(itemKey)
+    itemKey = normalizeText(itemKey, true)
     if not itemKey then
         return nil
     end
@@ -317,14 +238,14 @@ local function upsertRow(data, reason)
     local row = getOrCreateRow(itemKey)
     row.itemKey = itemKey
     row.sessionId = data.sessionId or row.sessionId or state.sessionId
-    row.itemLink = normalizeText(data.itemLink) or row.itemLink
-    row.itemName = normalizeText(data.itemName or data.name) or row.itemName
-    row.itemTexture = normalizeText(data.itemTexture or data.texture) or row.itemTexture
-    row.itemColor = normalizeText(data.itemColor or data.color) or row.itemColor
+    row.itemLink = normalizeText(data.itemLink, true) or row.itemLink
+    row.itemName = normalizeText(data.itemName or data.name, true) or row.itemName
+    row.itemTexture = normalizeText(data.itemTexture or data.texture, true) or row.itemTexture
+    row.itemColor = normalizeText(data.itemColor or data.color, true) or row.itemColor
     row.quality = normalizeNumber(data.quality or data.itemRarity or data.rarity) or row.quality
     row.count = normalizeNumber(data.count or data.itemCount) or row.count or 1
     row.slot = normalizeNumber(data.slot or data.index) or row.slot
-    row.sender = normalizeText(data.sender) or row.sender
+    row.sender = normalizeText(data.sender, true) or row.sender
     row.protocolVersion = normalizeNumber(data.protocolVersion) or row.protocolVersion or PROTOCOL_VERSION
 
     if data.rollType ~= nil then
@@ -334,19 +255,19 @@ local function upsertRow(data, reason)
         row.duration = normalizeNumber(data.duration)
     end
     if data.winnerName ~= nil then
-        row.winnerName = normalizeText(data.winnerName)
+        row.winnerName = normalizeText(data.winnerName, true)
     end
     if data.rollValue ~= nil then
         row.rollValue = normalizeNumber(data.rollValue)
     end
     if data.reason ~= nil then
-        row.reason = normalizeText(data.reason)
+        row.reason = normalizeText(data.reason, true)
     end
     if data.remaining ~= nil then
         row.remaining = normalizeNumber(data.remaining)
     end
     if data.tieNamesText ~= nil then
-        row.tieNamesText = normalizeText(data.tieNamesText)
+        row.tieNamesText = normalizeText(data.tieNamesText, true)
     end
 
     if data.state then
@@ -361,7 +282,7 @@ local function upsertRow(data, reason)
 end
 
 local function clearState(sessionId)
-    state.sessionId = normalizeText(sessionId) or buildSessionId()
+    state.sessionId = normalizeText(sessionId, true) or buildSessionId()
     state.order = {}
     state.itemsByKey = {}
     triggerChanged("clear", nil)
@@ -515,7 +436,7 @@ local function handleRollEndMessage(fields, sender)
         winnerName = winnerName,
         rollValue = fields[6],
         reason = decodeText(fields[7]),
-        state = normalizeText(winnerName) and STATE_WINNER or STATE_ACTIVE,
+        state = normalizeText(winnerName, true) and STATE_WINNER or STATE_ACTIVE,
         sender = sender,
     }, "roll_end")
     return row ~= nil
@@ -590,7 +511,7 @@ local function handleSnapshotMessage(fields, sender)
         return true
     end
 
-    local sessionId = normalizeText(fields[4]) or buildSessionId()
+    local sessionId = normalizeText(fields[4], true) or buildSessionId()
     local snapshotText = decodeText(fields[5])
     local rows, rowCount = splitText(snapshotText, SNAP_ROW_SEP, snapshotRowsScratch)
     local applied = 0
@@ -610,7 +531,7 @@ local function handleSnapshotMessage(fields, sender)
                 itemName = decodeText(rowFields[5]),
                 itemTexture = decodeText(rowFields[6]),
                 slot = rowFields[7],
-                state = normalizeText(rowFields[8]) or STATE_ACTIVE,
+                state = normalizeText(rowFields[8], true) or STATE_ACTIVE,
                 rollType = rowFields[9],
                 duration = rowFields[10],
                 winnerName = decodeText(rowFields[11]),

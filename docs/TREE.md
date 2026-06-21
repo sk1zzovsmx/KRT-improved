@@ -84,6 +84,7 @@
 |   |   |-- Features.lua
 |   |   |-- Item.lua
 |   |   |-- Json.lua
+|   |   |-- LootSourceCandidates.lua
 |   |   |-- LootSources.lua
 |   |   |-- ModuleRegistry.lua
 |   |   |-- Sort.lua
@@ -111,6 +112,18 @@
 |   |   |   |-- State.lua
 |   |   |   |-- Tracking.lua
 |   |   |   \\-- Workflow.lua
+|   |   |-- Master
+|   |   |   |-- AssignmentCandidates.lua
+|   |   |   |-- AssignmentTargets.lua
+|   |   |   |-- AwardMessages.lua
+|   |   |   |-- ButtonState.lua
+|   |   |   |-- DebugRaidGrid.lua
+|   |   |   |-- FlowState.lua
+|   |   |   |-- LootSpam.lua
+|   |   |   |-- RollRows.lua
+|   |   |   |-- Service.lua
+|   |   |   |-- SessionWinners.lua
+|   |   |   \\-- SoftRes.lua
 |   |   |-- Raid
 |   |   |   |-- Attendance.lua
 |   |   |   |-- Capabilities.lua
@@ -154,7 +167,8 @@
 |   |-- Widgets
 |   |   |-- Config.lua
 |   |   |-- LootCounter.lua
-|   |   |-- MasterLootGrid.lua
+|   |   |-- LootHints.lua
+|   |   |-- RaidGrid.lua
 |   |   |-- README.md
 |   |   \\-- ReservesUI.lua
 |   |-- !KRT.toc
@@ -204,7 +218,9 @@
 |   |-- superpowers
 |   |   |-- plans
 |   |   |   |-- 2026-06-04-atlasloot-raid-dataset.md
-|   |   |   \\-- 2026-06-05-master-loot-grid.md
+|   |   |   |-- 2026-06-05-master-loot-grid.md
+|   |   |   |-- 2026-06-07-master-service-split.md
+|   |   |   \\-- 2026-06-07-runtime-cleanup-followup.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       \\-- 2026-06-05-master-loot-grid-design.md
@@ -238,7 +254,11 @@
 |   |       \\-- canonical-minimal-01.lua
 |   |-- config_interface_options_spec.lua
 |   |-- controllers_cleanup_spec.lua
+|   |-- controller_chunk_budget_spec.lua
 |   |-- logger_visual_refresh_spec.lua
+|   |-- master_assignment_service_spec.lua
+|   |-- master_model_services_spec.lua
+|   |-- master_service_split_spec.lua
 |   |-- module_registry_database_spec.lua
 |   |-- module_registry_modules_spec.lua
 |   |-- module_registry_services_spec.lua

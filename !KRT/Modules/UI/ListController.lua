@@ -8,6 +8,7 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
+local Options = feature.Options
 local UI = feature.UI or {}
 local Frames = UI.Frames
 local Rows = UI.Rows
@@ -41,8 +42,8 @@ local function getListDiag(bucketName, keyName)
     return bucket[keyName]
 end
 
-local function isDebugEnabled()
-    return addon.hasDebug ~= nil
+local isDebugEnabled = Options.IsDebugEnabled or function()
+    return false
 end
 
 -- ----- Public methods ----- --
@@ -54,6 +55,13 @@ function Lists.CreateRowRenderer(fn)
         end
         fn(row, it, ...)
         return rowHeight
+    end
+end
+
+function Lists.MakeIndexedRowName(suffix)
+    suffix = tostring(suffix or "")
+    return function(frameName, _, index)
+        return tostring(frameName or "") .. suffix .. tostring(index or "")
     end
 end
 

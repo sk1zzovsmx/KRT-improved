@@ -24,7 +24,22 @@ do
     -- ----- Internal state ----- --
 
     -- ----- Private helpers ----- --
-    local findRaidPlayerByNid = assert(module._FindRaidPlayerByNid, "Missing Raid._FindRaidPlayerByNid")
+    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
+
+    local function getRaidQueries()
+        if not RaidQueries and Database.GetRaidQueries then
+            RaidQueries = Database.GetRaidQueries()
+        end
+        return RaidQueries
+    end
+
+    local function resolveLootLooterName(raid, entry)
+        local queries = getRaidQueries()
+        if queries and queries.ResolveLootLooterName then
+            return queries:ResolveLootLooterName(raid, entry)
+        end
+        return nil
+    end
 
     local function buildHeldLootItemQuery(itemLink)
         if not itemLink then
@@ -55,20 +70,6 @@ do
             return true
         end
         return false
-    end
-
-    local function resolveLootLooterName(raid, loot)
-        if type(loot) ~= "table" then
-            return nil
-        end
-        local looterNid = tonumber(loot.looterNid)
-        if looterNid and looterNid > 0 then
-            local player = findRaidPlayerByNid(raid, looterNid)
-            if player and player.name then
-                return player.name
-            end
-        end
-        return nil
     end
 
     -- ----- Public methods ----- --
@@ -158,7 +159,9 @@ do
             local entry = loot[i]
             if entry and tonumber(entry.rollType) == rollTypes.HOLD then
                 local winnerName = resolveLootLooterName(raid, entry)
-                if (not holderName or holderName == "" or winnerName == holderName) and (queryBossNid <= 0 or tonumber(entry.bossNid) == queryBossNid) then
+                local holderMatches = not holderName or holderName == "" or winnerName == holderName
+                local bossMatches = queryBossNid <= 0 or tonumber(entry.bossNid) == queryBossNid
+                if holderMatches and bossMatches then
                     if matchesHeldLootItem(entry, query, true) then
                         return tonumber(entry.lootNid) or 0
                     end
@@ -189,7 +192,9 @@ do
             local entry = loot[i]
             if entry and tostring(entry.rollSessionId or "") == sessionId then
                 local winnerName = resolveLootLooterName(raid, entry)
-                if (not holderName or holderName == "" or winnerName == holderName) and (queryBossNid <= 0 or tonumber(entry.bossNid) == queryBossNid) then
+                local holderMatches = not holderName or holderName == "" or winnerName == holderName
+                local bossMatches = queryBossNid <= 0 or tonumber(entry.bossNid) == queryBossNid
+                if holderMatches and bossMatches then
                     return tonumber(entry.lootNid) or 0
                 end
             end
@@ -207,6 +212,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/C",
             "Modules/Item",
             "Modules/Strings",
+            "Database/DBRaidQueries",
             "Services/Raid/Counts",
         },
     })

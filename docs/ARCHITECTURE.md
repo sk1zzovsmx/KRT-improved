@@ -9,6 +9,9 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 
 1. `Libs/*`
    Third-party runtime libraries loaded first.
+   Vendored subtrees under `!KRT/Libs/**`, including nested compatibility dependencies,
+   are third-party package content; do not edit or remove them as cleanup unless release
+   packaging policy explicitly changes.
 2. `Init.lua` + `Database/{DB,DBOptions,DBSchema,DBManager}.lua`
    Unified bootstrap, shared namespaces, controller dispatch, DB/options bootstrap.
 3. `Localization/*`
@@ -58,6 +61,9 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   internal import parsing, SoftRes name alias policy, grouped-display/player-format, runtime-only sync, and
   whisper-response helpers in `!KRT/Services/Reserves/{Import,Aliases,Display,Sync,Chat}.lua`
   (`addon.Services.Reserves._Import`, `_Aliases`, `_Display`, `_Sync`, `_Chat`).
+  External call sites use the parent facade for sync operations (`RequestSyncMetadata`,
+  `HandleSyncMessage`, `GetSyncPayload`, `SetSyncedData`, and cache APIs); `_Sync`
+  remains package-internal.
   `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
   `Services/Chat.lua` owns announce/warn output contracts.
 - `!KRT/Database/DB.lua`
@@ -70,7 +76,9 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   Owns schema-version state while exposing the canonical public accessor on
   `addon.Database.GetRaidSchemaVersion`; `addon.DBSchema` is not a second parallel getter facade.
 - `!KRT/Widgets/*.lua`
-  Own child UI controllers under `addon.Widgets.*`.
+  Own child UI controllers under `addon.Widgets.*`. Controllers and entrypoints should
+  dispatch optional widget behavior through `addon.UI.Widgets.Call(...)`; widget files
+  register there while keeping owner exports available for widget-local ownership and tests.
 - `!KRT/EntryPoints/*.lua`
   Own slash/minimap entrypoints.
 - `!KRT/Modules/*.lua`

@@ -12,6 +12,37 @@ Release-Version: 0.8.0-beta.1
   actions now use a separate inventory-trade permission, so raid leaders,
   assistants, and the active Master Looter can trade already-held items while
   the raid uses Group Loot without unlocking protected loot-window awards.
+- **Raid Grid naming** - Renamed the native assignment grid widget and debug
+  copy from Master Loot Grid to Raid Grid, with `/krt debug raidgrid` as the
+  canonical debug command while keeping the existing aliases available.
+- **Loot Master service split** - Moved pure Loot Master workflow, SoftRes,
+  session-winner, button state, roll row, assignment target, award-message,
+  loot-spam, and debug Raid Grid row models into focused
+  `Services/Master/*` helpers while keeping UI ownership in the Loot Master
+  controller.
+- **Runtime helper consolidation** - Centralized option reads, debug guards,
+  string nil/trim helpers, loot-source candidates, loot-method lookup,
+  loot looter resolution, boss lookup, item-key resolution, Comms payload
+  helpers, Reserves sync facade calls, and UI texture color helpers so
+  Database, Raid, Logger, Loot, Master, and widget code share the same runtime
+  contracts.
+- **Runtime cleanup follow-up** - Promoted `Comms.Payload` encode/decode/split
+  helpers to the public payload contract, made `Database.IsBossFightRecord` the
+  canonical boss-record predicate with the underscore alias kept for
+  compatibility, replaced targeted string fallback clones with `Strings`
+  helpers, centralized indexed list row names in `UI.Lists`, and documented the
+  decision to keep nested vendored copies untouched unless release packaging
+  policy changes.
+- **Raid query ownership** - Removed fallback boss and looter lookup copies from
+  Logger, Raid, and sync services so raid-domain reads delegate to the shared
+  raid query facade instead of maintaining parallel lookup logic.
+- **Controller/service boundaries** - Removed Logger action controller binding,
+  moved Loot Master roll-session enrichment into the Rolls service, and routed
+  LootHints interactions through the widget facade instead of private
+  controller pass-through wrappers.
+- **Public API cleanup** - Removed retired bootstrap UI helper exports, exposed
+  Reserves sync payload/cache imports through the parent service facade, and
+  documented widget-facade dispatch plus vendored-library cleanup boundaries.
 
 ## [0.8.0-beta.1] - 2026-06-05
 
@@ -19,7 +50,7 @@ Release-Version: 0.8.0-beta.1
 
 - **Debug command reference** - Added `debug/README.md` under the addon root
   with all debug and related diagnostic slash commands plus copy-ready snippets
-  for timer stats, synthetic raid rolls, Master Loot grid previews, SoftRes
+  for timer stats, synthetic raid rolls, Raid Grid previews, SoftRes
   readiness, support reports, and performance spike capture.
 
 ### Fixes
@@ -74,12 +105,12 @@ Release-Version: 0.8.0-beta.1
 
 ### Enhancements
 
-- **Master Loot assignment grid** - Replaced the manual Master Loot candidate
+- **Raid Grid assignment** - Replaced the manual Master Loot candidate
   dropdown flow with a native Blizzard-style KRT grid that expands to the
   current candidate count without scrolling, confirms above-threshold awards
   through a standard StaticPopup, and uses the same grid for Hold, Bank, and
   DE target selection without awarding loot.
-- **Master Loot grid debug view** - Added `/krt debug mlgrid [1-40]` to open
+- **Raid Grid debug view** - Added `/krt debug raidgrid [1-40]` to open
   the native grid with a configurable fake player count for layout testing,
   and to let the item-click popup use real roster names plus fake fillers when
   no live Blizzard Master Loot candidates are available. Debug rows never award

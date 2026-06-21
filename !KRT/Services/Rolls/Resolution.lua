@@ -10,6 +10,7 @@ local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
+local Options = feature.Options
 local Services = feature.Services
 
 local tconcat = table.concat
@@ -26,8 +27,8 @@ local Resolution = module._Resolution
 local Strategies = assert(module._Strategies, "Rolls strategy helpers are not initialized")
 
 -- ----- Private helpers ----- --
-local function isDebugEnabled()
-    return addon.hasDebug ~= nil
+local isDebugEnabled = Options.IsDebugEnabled or function()
+    return false
 end
 
 local function assertContext(ctx)

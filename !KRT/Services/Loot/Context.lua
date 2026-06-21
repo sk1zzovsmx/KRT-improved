@@ -9,6 +9,8 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 local Database = feature.Database
 local Services = feature.Services
+local Strings = feature.Strings
+local LootSourceCandidates = feature.LootSourceCandidates
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
@@ -19,47 +21,17 @@ module._Context = module._Context or {}
 local LootContext = module._Context
 
 -- ----- Private helpers ----- --
-local function normalizeTextOrNil(value)
-    if value == nil then
-        return nil
-    end
-    local text = tostring(value)
-    if text == "" then
-        return nil
-    end
-    return text
-end
-
-local function copySourceCandidates(candidates)
-    if type(candidates) ~= "table" then
-        return nil
-    end
-
-    local copied = {}
-    for i = 1, #candidates do
-        local candidate = candidates[i]
-        if type(candidate) == "table" then
-            local name = normalizeTextOrNil(candidate.name or candidate.npcName)
-            if name then
-                local out = {
-                    name = name,
-                    kind = normalizeTextOrNil(candidate.kind) or "boss",
-                }
-                local sourceKey = normalizeTextOrNil(candidate.sourceKey)
-                if sourceKey then
-                    out.sourceKey = sourceKey
-                end
-                local npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or 0
-                if npcId > 0 then
-                    out.npcId = npcId
-                end
-                copied[#copied + 1] = out
-            end
+local NormalizeText = Strings.NormalizeText
+    or function(value, allowNil)
+        if value == nil then
+            return allowNil and nil or ""
         end
+        local text = tostring(value):gsub("^%s*(.-)%s*$", "%1")
+        if allowNil and text == "" then
+            return nil
+        end
+        return text
     end
-
-    return (#copied > 0) and copied or nil
-end
 
 local function isValidLootSourceKind(kind)
     return kind == "boss" or kind == "trash" or kind == "shared" or kind == "object"
@@ -159,11 +131,11 @@ function LootContext.NormalizeLootSourceState(state)
     state.bossNid = tonumber(state.bossNid) or 0
     state.sourceNpcId = tonumber(state.sourceNpcId) or 0
     state.sourceName = state.sourceName or nil
-    state.sourceKey = normalizeTextOrNil(state.sourceKey)
+    state.sourceKey = NormalizeText(state.sourceKey, true)
     state.openedAt = tonumber(state.openedAt) or 0
     state.snapshotId = tonumber(state.snapshotId) or nil
     state.expiresAt = tonumber(state.expiresAt) or 0
-    state.candidates = (state.kind == "shared") and copySourceCandidates(state.candidates) or nil
+    state.candidates = (state.kind == "shared") and LootSourceCandidates.Copy(state.candidates) or nil
     if state.raidNum <= 0 or not state.kind then
         return nil
     end
@@ -182,12 +154,12 @@ function LootContext.NormalizeActiveLootContext(context)
     context.sourceUnit = context.sourceUnit or nil
     context.sourceNpcId = tonumber(context.sourceNpcId) or 0
     context.sourceName = context.sourceName or nil
-    context.sourceKey = normalizeTextOrNil(context.sourceKey)
+    context.sourceKey = NormalizeText(context.sourceKey, true)
     context.snapshotId = tonumber(context.snapshotId) or nil
     context.openedAt = tonumber(context.openedAt) or 0
     context.expiresAt = tonumber(context.expiresAt) or 0
     context.windowExpiresAt = tonumber(context.windowExpiresAt) or 0
-    context.candidates = (context.kind == "shared") and copySourceCandidates(context.candidates) or nil
+    context.candidates = (context.kind == "shared") and LootSourceCandidates.Copy(context.candidates) or nil
     if context.raidNum <= 0 then
         return nil
     end
@@ -326,7 +298,7 @@ function LootContext.CopyLootSource(context, bossNidOverride)
         snapshotId = tonumber(source.snapshotId) or nil,
     }
     if source.kind == "shared" then
-        copied.candidates = copySourceCandidates(source.candidates)
+        copied.candidates = LootSourceCandidates.Copy(source.candidates)
     end
     return copied
 end
@@ -337,6 +309,8 @@ if registry and type(registry.AddModule) == "function" and type(registry.SetLoad
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Modules/Strings",
+            "Modules/LootSourceCandidates",
         },
     })
     registry.SetLoaded("Services/Loot/Context")

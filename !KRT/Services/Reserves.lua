@@ -78,8 +78,8 @@ do
 
     -- ----- Private helpers ----- --
 
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
+    local isDebugEnabled = Options.IsDebugEnabled or function()
+        return false
     end
 
     local function normalizeImportMode(mode)
@@ -1018,6 +1018,10 @@ do
         return persistedReservesData, getActiveSyncMetadata()
     end
 
+    function Service:GetSyncPayload()
+        return Sync:GetPayload()
+    end
+
     function Sync:SetSyncedData(sourceData, meta)
         if Service:IsLocalDataAvailable() then
             return false, "local_data_present"
@@ -1039,6 +1043,10 @@ do
         syncedCacheActive = true
         rebuildReserveIndexes("sync", nil, mode, players)
         return true
+    end
+
+    function Service:SetSyncedData(sourceData, meta)
+        return Sync:SetSyncedData(sourceData, meta)
     end
 
     function Service:DeleteSyncedReservesCache()
@@ -1071,6 +1079,20 @@ do
         return nextState
     end
 
+    function Service:RequestSyncMetadata()
+        if not (Sync and Sync.RequestMetadata) then
+            return false
+        end
+        return Sync:RequestMetadata()
+    end
+
+    function Service:HandleSyncMessage(prefix, msg, channel, sender)
+        if not (Sync and Sync.HandleMessage) then
+            return false
+        end
+        return Sync:HandleMessage(prefix, msg, channel, sender)
+    end
+
     hasPendingItem = function(itemId)
         if not itemId then
             return false
@@ -1078,7 +1100,9 @@ do
         return pendingItemInfo[itemId] ~= nil
     end
 
-    Service._HasPendingItem = hasPendingItem
+    function Service:HasPendingItem(itemId)
+        return hasPendingItem(itemId)
+    end
 end
 
 local registry = feature.ModuleRegistry

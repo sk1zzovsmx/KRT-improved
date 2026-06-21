@@ -8,19 +8,21 @@ local addonName = ...
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
-local type, tostring = type, tostring
+local type, tostring, tonumber = type, tostring, tonumber
 local pcall = pcall
 local select = select
-local strfind, strsub = string.find, string.sub
+local strfind, strmatch, strsub = string.find, string.match, string.sub
 local tconcat = table.concat
 local _G = _G
 
 local Comms = feature.Comms or {}
 addon.Comms = Comms
-Comms._Payload = Comms._Payload or {}
-local Payload = Comms._Payload
+Comms.Payload = Comms.Payload or Comms._Payload or {}
+Comms._Payload = Comms.Payload
+local Payload = Comms.Payload
 local L = feature.L
 local Database = feature.Database
+local Strings = feature.Strings
 
 -- ----- Internal state ----- --
 
@@ -195,6 +197,22 @@ end
 
 -- ----- Public methods ----- --
 
+function Payload.EncodeText(value)
+    return Payload._EncodeText(value)
+end
+
+function Payload.DecodeText(value)
+    return Payload._DecodeText(value)
+end
+
+function Payload.SplitFields(text, sep, out)
+    return Payload._SplitFields(text, sep, out)
+end
+
+function Payload.PackFields(sep, ...)
+    return Payload._PackFields(sep, ...)
+end
+
 function Comms.Sync(prefix, msg)
     return sendGroupMessage(prefix, msg)
 end
@@ -211,6 +229,34 @@ function Comms.SendWhisper(target, msg)
         SendChatMessage(msg, "WHISPER", nil, target)
         return true
     end
+end
+
+function Comms.SendAddonWhisper(prefix, target, msg)
+    if type(prefix) == "string" and type(target) == "string" and msg then
+        SendAddonMessage(prefix, tostring(msg), "WHISPER", target)
+        return true
+    end
+    return false
+end
+
+function Comms.NormalizeSender(sender)
+    if type(sender) ~= "string" then
+        return nil
+    end
+    local short = strmatch(sender, "^([^%-]+)") or sender
+    if Strings and type(Strings.NormalizeName) == "function" then
+        return Strings.NormalizeName(short, true) or short
+    end
+    return short
+end
+
+function Comms.NextRequestId(owner, fieldName)
+    if type(owner) ~= "table" then
+        return nil
+    end
+    local key = fieldName or "_nextRequestId"
+    owner[key] = (tonumber(owner[key]) or 0) + 1
+    return tostring(owner[key])
 end
 
 function Comms:EnsureVersionPrefix()

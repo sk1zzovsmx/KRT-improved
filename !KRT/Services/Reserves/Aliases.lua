@@ -23,31 +23,8 @@ module._Aliases = module._Aliases or {}
 local Aliases = module._Aliases
 
 -- ----- Private helpers ----- --
-local function trimText(value)
-    if value == nil then
-        return nil
-    end
-    if Strings and type(Strings.TrimText) == "function" then
-        return Strings.TrimText(value, true)
-    end
-    local out = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
-    return out ~= "" and out or nil
-end
-
-local function normalizeName(value)
-    if Strings and type(Strings.NormalizeName) == "function" then
-        return Strings.NormalizeName(value, true)
-    end
-    return trimText(value)
-end
-
-local function normalizeKey(value)
-    if Strings and type(Strings.NormalizeLower) == "function" then
-        return Strings.NormalizeLower(value, true)
-    end
-    local normalized = normalizeName(value)
-    return normalized and string.lower(normalized) or nil
-end
+local normalizeName = Strings.NormalizeName
+local normalizeKey = Strings.NormalizeLower
 
 Aliases._NormalizeKey = normalizeKey
 

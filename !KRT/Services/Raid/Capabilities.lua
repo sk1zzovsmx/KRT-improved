@@ -18,7 +18,7 @@ local type = type
 local getLootMethod = GetLootMethod
 local unitIsUnit = UnitIsUnit
 
-local function getLootMethodName()
+local function readLootMethodName()
     if type(getLootMethod) ~= "function" then
         return nil
     end
@@ -30,7 +30,7 @@ local function getLootMethodName()
 end
 
 local function isPassiveGroupLootMethod(method)
-    local resolvedMethod = method or getLootMethodName()
+    local resolvedMethod = method or readLootMethodName()
     return resolvedMethod == "group" or resolvedMethod == "needbeforegreed"
 end
 
@@ -47,6 +47,10 @@ do
     end
 
     -- ----- Public methods ----- --
+
+    function module:GetLootMethodName()
+        return readLootMethodName()
+    end
 
     function module:IsMasterLooter()
         local method, partyMaster, raidMaster = getLootMethod()
@@ -150,7 +154,7 @@ do
     end
 
     function module:CanObservePassiveLoot()
-        local method = getLootMethodName()
+        local method = readLootMethodName()
         if method == "master" then
             return module:CanUseCapability("loot")
         end

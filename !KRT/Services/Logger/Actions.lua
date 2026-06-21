@@ -12,6 +12,7 @@ local Strings = feature.Strings
 local Base64 = feature.Base64
 local Database = feature.Database
 local Services = feature.Services
+local LootSourceCandidates = feature.LootSourceCandidates
 
 local tinsert = table.insert
 local tremove = table.remove
@@ -23,6 +24,7 @@ local lower = string.lower
 local abs = math.abs
 local time = time
 local EPIC_ITEM_RARITY = 4
+local RAW_QUERY_OPTS = { raw = true }
 local ITEM_LINK_RARITIES = {
     ff9d9d9d = 0,
     ffffffff = 1,
@@ -42,9 +44,6 @@ local Store = Logger.Store
 local Helpers = Logger.Helpers
 local LootSources = feature.LootSources
 
--- Controller binding (injected by Controllers/Logger.lua at setup time).
-local _controller = nil
-local _triggerSelectionEvent = nil
 local commitRaidSelections
 local resolveLoggerLootEntry
 local applyLoggerLootMutation
@@ -70,40 +69,6 @@ trimText = function(value)
         return Strings.TrimText(value or "")
     end
     return Strings.NormalizeName(value) or ""
-end
-
-local function copySourceCandidates(candidates)
-    if type(candidates) ~= "table" then
-        return nil
-    end
-
-    local copied = {}
-    for i = 1, #candidates do
-        local candidate = candidates[i]
-        if type(candidate) == "table" then
-            local name = trimText(candidate.name or candidate.npcName)
-            if name ~= "" then
-                local out = {
-                    name = name,
-                    kind = trimText(candidate.kind),
-                }
-                if out.kind == "" then
-                    out.kind = "boss"
-                end
-                local sourceKey = trimText(candidate.sourceKey)
-                if sourceKey ~= "" then
-                    out.sourceKey = sourceKey
-                end
-                local npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or 0
-                if npcId > 0 then
-                    out.npcId = npcId
-                end
-                copied[#copied + 1] = out
-            end
-        end
-    end
-
-    return (#copied > 0) and copied or nil
 end
 
 local function removeFromList(list, value)
@@ -252,63 +217,43 @@ restoreCurrentRaidIndex = function(raidStore, currentRaidNid)
     end
 end
 
-findBossByNid = function(raid, bossNid)
-    local queryNid = tonumber(bossNid)
-    if not (raid and queryNid and queryNid > 0) then
-        return nil
+local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
+
+local function getRaidQueries()
+    if not RaidQueries and Database.GetRaidQueries then
+        RaidQueries = Database.GetRaidQueries()
     end
-    local bosses = raid.bossKills or {}
-    for i = 1, #bosses do
-        local boss = bosses[i]
-        if boss and tonumber(boss.bossNid) == queryNid then
-            return boss
-        end
+    return RaidQueries
+end
+
+findBossByNid = function(raid, bossNid, opts)
+    local queries = getRaidQueries()
+    if queries and queries.FindBossByNid then
+        return queries:FindBossByNid(raid, bossNid, opts)
     end
     return nil
 end
 
-findBossByName = function(raid, bossName)
-    local queryName = trimText(bossName)
-    if queryName == "" then
-        return nil
-    end
-    local bosses = raid and raid.bossKills or {}
-    for i = 1, #bosses do
-        local boss = bosses[i]
-        local name = boss and trimText(boss.name or boss.boss)
-        if name == queryName then
-            return boss
-        end
+findBossByName = function(raid, bossName, opts)
+    local queries = getRaidQueries()
+    if queries and queries.FindBossByName then
+        return queries:FindBossByName(raid, bossName, opts)
     end
     return nil
 end
 
-findBossBySourceNpcId = function(raid, sourceNpcId)
-    local queryNpcId = tonumber(sourceNpcId) or 0
-    if queryNpcId <= 0 then
-        return nil
-    end
-    local bosses = raid and raid.bossKills or {}
-    for i = 1, #bosses do
-        local boss = bosses[i]
-        if boss and (tonumber(boss.sourceNpcId) or 0) == queryNpcId then
-            return boss
-        end
+findBossBySourceNpcId = function(raid, sourceNpcId, opts)
+    local queries = getRaidQueries()
+    if queries and queries.FindBossBySourceNpcId then
+        return queries:FindBossBySourceNpcId(raid, sourceNpcId, opts)
     end
     return nil
 end
 
-local function findBossBySourceKey(raid, sourceKey)
-    local queryKey = trimText(sourceKey)
-    if queryKey == "" then
-        return nil
-    end
-    local bosses = raid and raid.bossKills or {}
-    for i = 1, #bosses do
-        local boss = bosses[i]
-        if boss and trimText(boss.sourceKey) == queryKey then
-            return boss
-        end
+local function findBossBySourceKey(raid, sourceKey, opts)
+    local queries = getRaidQueries()
+    if queries and queries.FindBossBySourceKey then
+        return queries:FindBossBySourceKey(raid, sourceKey, opts)
     end
     return nil
 end
@@ -408,7 +353,7 @@ applyStaticLootSource = function(loot, source, bossNid)
     }
     if source.kind == "shared" then
         loot.lootSource.sourceName = "Shared"
-        loot.lootSource.candidates = copySourceCandidates(source.candidates)
+        loot.lootSource.candidates = LootSourceCandidates.Copy(source.candidates)
     end
 end
 
@@ -475,7 +420,7 @@ local function scanRaidLoot(raid, result)
             local bossNid = tonumber(loot.bossNid) or 0
             if bossNid <= 0 then
                 result.missingSources = result.missingSources + 1
-            elseif not findBossByNid(raid, bossNid) then
+            elseif not findBossByNid(raid, bossNid, RAW_QUERY_OPTS) then
                 result.invalidSources = result.invalidSources + 1
             end
 
@@ -567,13 +512,6 @@ end
 
 -- ----- Public methods ----- --
 
---- Bind the owning controller and its triggerSelectionEvent helper.
---- Called once from Controllers/Logger.lua after all files are loaded.
-function Actions:BindController(ctrl, triggerFn)
-    _controller = ctrl
-    _triggerSelectionEvent = triggerFn
-end
-
 commitRaidSelections = function(raid, opts)
     if not raid then
         return
@@ -587,7 +525,7 @@ commitRaidSelections = function(raid, opts)
         Store._InvalidateIndexes(raid)
     end
 
-    local log = _controller
+    local log = type(opts.selectionState) == "table" and opts.selectionState or nil
     if not log then
         return
     end
@@ -657,18 +595,19 @@ commitRaidSelections = function(raid, opts)
         end
     end
 
-    if _triggerSelectionEvent then
+    local triggerSelectionEvent = opts.triggerSelectionEvent
+    if type(triggerSelectionEvent) == "function" then
         if changedBoss then
-            _triggerSelectionEvent(log, "selectedBoss")
+            triggerSelectionEvent(log, "selectedBoss")
         end
         if changedPlayer then
-            _triggerSelectionEvent(log, "selectedPlayer")
+            triggerSelectionEvent(log, "selectedPlayer")
         end
         if changedBossPlayer then
-            _triggerSelectionEvent(log, "selectedBossPlayer")
+            triggerSelectionEvent(log, "selectedBossPlayer")
         end
         if changedItem then
-            _triggerSelectionEvent(log, "selectedItem")
+            triggerSelectionEvent(log, "selectedItem")
         end
     end
 end
@@ -829,7 +768,7 @@ function Actions:ResolveLootEditWinner(raidID, lootNid, rawText)
     return winner
 end
 
-function Actions:DeleteBoss(rID, bossNid)
+function Actions:DeleteBoss(rID, bossNid, opts)
     local raid = Store:GetRaid(rID)
     if not (raid and bossNid) then
         return 0
@@ -850,7 +789,7 @@ function Actions:DeleteBoss(rID, bossNid)
     end
 
     tremove(raid.bossKills, bossIndex)
-    commitRaidSelections(raid)
+    commitRaidSelections(raid, opts)
 
     if Database.GetCurrentRaid() == rID and tonumber(Database.GetLastBoss()) == tonumber(bossNid) then
         Database.SetLastBoss(nil)
@@ -861,7 +800,7 @@ end
 
 -- Bulk delete: removes multiple loot entries (by nid) with a single Commit()
 -- Returns: number of removed entries
-function Actions:DeleteLootMany(rID, lootNids)
+function Actions:DeleteLootMany(rID, lootNids, opts)
     local raid = Store:GetRaid(rID)
     if not (raid and lootNids and raid.loot) then
         return 0
@@ -887,7 +826,7 @@ function Actions:DeleteLootMany(rID, lootNids)
     end
 
     if removed > 0 then
-        commitRaidSelections(raid)
+        commitRaidSelections(raid, opts)
     end
     return removed
 end
@@ -911,7 +850,7 @@ end
 
 -- Bulk delete: removes multiple raid attendees (by playerNid) with a single Commit()
 -- Returns: number of removed attendees
-function Actions:DeleteRaidAttendeeMany(rID, playerNids)
+function Actions:DeleteRaidAttendeeMany(rID, playerNids, opts)
     local raid = Store:GetRaid(rID)
     if not (raid and raid.players and playerNids and #playerNids > 0) then
         return 0
@@ -977,7 +916,9 @@ function Actions:DeleteRaidAttendeeMany(rID, playerNids)
         end
     end
 
-    commitRaidSelections(raid, { clearPlayers = true })
+    opts = opts or {}
+    opts.clearPlayers = true
+    commitRaidSelections(raid, opts)
     return removed
 end
 
@@ -1237,7 +1178,7 @@ end
 
 -- Upsert boss kill (edit if bossNid provided, otherwise append new boss kill).
 -- Returns bossNid on success, nil on failure.
-function Actions:UpsertBossKill(rID, bossNid, name, ts, mode)
+function Actions:UpsertBossKill(rID, bossNid, name, ts, mode, opts)
     local raid = Store:GetRaid(rID)
     if not raid then
         return nil
@@ -1257,7 +1198,9 @@ function Actions:UpsertBossKill(rID, bossNid, name, ts, mode)
         bossKill.time = ts
         bossKill.mode = (mode == "h") and "h" or "n"
         -- keep existing players/hash; hash is stable per nid
-        commitRaidSelections(raid, { invalidate = false })
+        opts = opts or {}
+        opts.invalidate = false
+        commitRaidSelections(raid, opts)
         return bossKill.bossNid
     end
 
@@ -1273,13 +1216,13 @@ function Actions:UpsertBossKill(rID, bossNid, name, ts, mode)
         hash = Base64.Encode(rID .. "|" .. name .. "|" .. newNid),
     })
 
-    commitRaidSelections(raid)
+    commitRaidSelections(raid, opts)
     return newNid
 end
 
 -- Add existing raid player to the selected boss attendees list.
 -- nameRaw is matched (case-insensitive) against raid.players[].name.
-function Actions:AddBossAttendee(rID, bossNid, nameRaw)
+function Actions:AddBossAttendee(rID, bossNid, nameRaw, opts)
     local name = Strings.TrimText(nameRaw or "")
     local normalizedName = Strings.NormalizeLower(name)
     if normalizedName == "" then
@@ -1316,7 +1259,9 @@ function Actions:AddBossAttendee(rID, bossNid, nameRaw)
 
     tinsert(bossKill.players, playerNid)
     addon:info(L.StrAttendeesAddSuccess)
-    commitRaidSelections(raid, { invalidate = false })
+    opts = opts or {}
+    opts.invalidate = false
+    commitRaidSelections(raid, opts)
     return true
 end
 
@@ -1328,6 +1273,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/ModuleRegistry",
             "Modules/Strings",
             "Modules/Base64",
+            "Database/DBRaidQueries",
             "Services/Logger/Store",
             "Services/Logger/Helpers",
         },

@@ -6,7 +6,7 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
-local type, pairs, tostring = type, pairs, tostring
+local type, pairs, tostring, tonumber = type, pairs, tostring, tonumber
 local format = string.format
 
 local Options = feature.Options or {}
@@ -23,6 +23,14 @@ Events.OptionsReset = Events.OptionsReset or "OptionsReset"
 Events.OptionsLoaded = Events.OptionsLoaded or "OptionsLoaded"
 
 local SCHEMA_VERSION = 2
+local DEFAULT_LOGGER_LOOT_QUALITY_THRESHOLD = 4
+local LOGGER_LOOT_QUALITY_THRESHOLDS = {
+    [0] = true,
+    [2] = true,
+    [3] = true,
+    [4] = true,
+    [5] = true,
+}
 
 -- ----- Internal state ----- --
 local namespaces = {}
@@ -191,6 +199,36 @@ end
 
 function Options.Get(name)
     return namespaces[name]
+end
+
+function Options.GetValue(name, key, defaultValue)
+    local ns = namespaces[name]
+    if ns and ns.Get then
+        local value = ns:Get(key)
+        if value ~= nil then
+            return value
+        end
+    end
+    return defaultValue
+end
+
+function Options.GetByKey(key, defaultValue)
+    local ns = keyToNamespace[key]
+    if ns and ns.Get then
+        local value = ns:Get(key)
+        if value ~= nil then
+            return value
+        end
+    end
+    return defaultValue
+end
+
+function Options.NormalizeLoggerLootQualityThreshold(value)
+    local threshold = tonumber(value)
+    if threshold and LOGGER_LOOT_QUALITY_THRESHOLDS[threshold] then
+        return threshold
+    end
+    return DEFAULT_LOGGER_LOOT_QUALITY_THRESHOLD
 end
 
 function Options.EnsureLoaded()

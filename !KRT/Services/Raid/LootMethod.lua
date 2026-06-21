@@ -16,7 +16,6 @@ local Services = feature.Services
 local tostring, tonumber, type = tostring, tonumber, type
 
 local GetTime = GetTime
-local GetLootMethod = GetLootMethod
 local SetLootMethod = SetLootMethod
 local UnitExists = UnitExists
 local UnitGUID = UnitGUID
@@ -49,27 +48,20 @@ local state = {
 }
 
 -- ----- Private helpers ----- --
-local function getOption(key)
-    local cfg = Options and Options.Get and Options.Get("Master")
-    if cfg and cfg.Get then
-        return cfg:Get(key)
+local GetOption = Options.GetValue
+    or function(namespace, key, defaultValue)
+        local cfg = Options and Options.Get and Options.Get(namespace) or nil
+        if cfg and cfg.Get then
+            local value = cfg:Get(key)
+            if value ~= nil then
+                return value
+            end
+        end
+        return defaultValue
     end
-    return nil
-end
-
-local function getLootMethodName()
-    if type(GetLootMethod) ~= "function" then
-        return nil
-    end
-    local method = GetLootMethod()
-    if type(method) ~= "string" or method == "" then
-        return nil
-    end
-    return method
-end
 
 local function getAutoMasterLootNoticeSeconds()
-    local seconds = tonumber(getOption("autoMasterLootNoticeSeconds")) or DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS
+    local seconds = tonumber(GetOption("Master", "autoMasterLootNoticeSeconds")) or DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS
     if seconds < MIN_AUTO_MASTER_LOOT_NOTICE_SECONDS then
         return MIN_AUTO_MASTER_LOOT_NOTICE_SECONDS
     end
@@ -151,13 +143,13 @@ end
 -- ----- Public methods ----- --
 function module:HandleAutoMasterLootTargetChanged()
     -- PLAYER_TARGET_CHANGED
-    if getOption("autoMasterLootOnBossTarget") ~= true then
+    if GetOption("Master", "autoMasterLootOnBossTarget") ~= true then
         return false
     end
     if not hasRaidLeaderAuthority() then
         return false
     end
-    if getLootMethodName() == "master" then
+    if module:GetLootMethodName() == "master" then
         return false
     end
     if type(SetLootMethod) ~= "function" then
@@ -189,25 +181,25 @@ end
 
 function module:NotifyLootWindowOpened()
     clearLootWindowPromptState()
-    if getOption("askGroupLootAfterBossLoot") ~= true then
+    if GetOption("Master", "askGroupLootAfterBossLoot") ~= true then
         return false
     end
     if not hasRaidLeaderAuthority() then
         return false
     end
-    state.lootWindowWasMasterLoot = getLootMethodName() == "master"
+    state.lootWindowWasMasterLoot = module:GetLootMethodName() == "master"
     state.lootWindowWasBoss = getTargetBossInfo(true) ~= nil
     return state.lootWindowWasMasterLoot and state.lootWindowWasBoss
 end
 
 function module:NotifyLootWindowCleared()
-    if getOption("askGroupLootAfterBossLoot") ~= true then
+    if GetOption("Master", "askGroupLootAfterBossLoot") ~= true then
         return false
     end
     if state.lootWindowPromptShown or not state.lootWindowWasMasterLoot or not state.lootWindowWasBoss then
         return false
     end
-    if not hasRaidLeaderAuthority() or getLootMethodName() ~= "master" then
+    if not hasRaidLeaderAuthority() or module:GetLootMethodName() ~= "master" then
         clearLootWindowPromptState()
         return false
     end
@@ -223,7 +215,7 @@ function module:RestoreGroupLoot(source)
     if not hasRaidLeaderAuthority() or type(SetLootMethod) ~= "function" then
         return false
     end
-    if getLootMethodName() ~= "master" then
+    if module:GetLootMethodName() ~= "master" then
         clearLootWindowPromptState()
         return false
     end

@@ -44,6 +44,17 @@ do
     local DEFAULT_SPAM_OUTPUT = "LFM"
     local MAX_SPAM_RUNTIME_SECONDS = 1800
     local MAX_SPAM_MESSAGES_PER_RUN = 30
+    local GetOption = Options.GetValue
+        or function(namespace, key, defaultValue)
+            local cfg = Options and Options.Get and Options.Get(namespace) or nil
+            if cfg and cfg.Get then
+                local value = cfg:Get(key)
+                if value ~= nil then
+                    return value
+                end
+            end
+            return defaultValue
+        end
 
     local spamRuntime = {
         ticking = false,
@@ -73,14 +84,6 @@ do
         end
 
         return (UnitIsGroupLeader and UnitIsGroupLeader("player")) or (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) or false
-    end
-
-    local function getOption(namespace, key)
-        local cfg = Options and Options.Get and Options.Get(namespace)
-        if cfg and cfg.Get then
-            return cfg:Get(key)
-        end
-        return nil
     end
 
     local function resolveGroupType()
@@ -121,10 +124,10 @@ do
 
         local groupType = resolveGroupType()
         if groupType == "raid" then
-            if isCountdownMessage(text) and getOption("Rolls", "countdownSimpleRaidMsg") == true then
+            if isCountdownMessage(text) and GetOption("Rolls", "countdownSimpleRaidMsg") == true then
                 return "RAID"
             end
-            if getOption("Master", "useRaidWarning") == true and canUseRaidWarning() then
+            if GetOption("Master", "useRaidWarning") == true and canUseRaidWarning() then
                 return "RAID_WARNING"
             end
             return "RAID"
@@ -296,7 +299,7 @@ do
             return false, "empty"
         end
 
-        if addon.IsInRaid and addon.IsInRaid() and getOption("Master", "useRaidWarning") == true then
+        if addon.IsInRaid and addon.IsInRaid() and GetOption("Master", "useRaidWarning") == true then
             local raidService = Services.Raid
             if raidService and type(raidService.CanUseCapability) == "function" and not raidService:CanUseCapability("raid_warning") then
                 addon:warn(L.WarnRaidWarningFallback)

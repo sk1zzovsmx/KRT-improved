@@ -46,6 +46,22 @@ function Strings.TrimText(value, allowNil)
     return trimRaw(value)
 end
 
+function Strings.NilIfEmpty(value)
+    local text = Strings.TrimText(value, true)
+    if text == nil or text == "" then
+        return nil
+    end
+    return text
+end
+
+function Strings.NormalizeText(value, allowNil)
+    local text = Strings.TrimText(value, allowNil)
+    if allowNil and text == "" then
+        return nil
+    end
+    return text
+end
+
 function Strings.NormalizeName(value, allowNil)
     local text = Strings.TrimText(value, allowNil)
     if text == nil then

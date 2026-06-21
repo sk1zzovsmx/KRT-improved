@@ -19,6 +19,7 @@ local Services = feature.Services
 local Base64 = feature.Base64
 local IgnoredMobs = feature.IgnoredMobs or {}
 local LootSources = feature.LootSources
+local LootSourceCandidates = feature.LootSourceCandidates
 
 local InternalEvents = Events.Internal
 
@@ -55,46 +56,7 @@ do
     local UNKNOWN_OBJECT = _G.UNKNOWNOBJECT
     local UNKNOWN_BEING = _G.UNKNOWNBEING or _G.UKNOWNBEING
 
-    local function trimText(value, allowNil)
-        if Strings and type(Strings.TrimText) == "function" then
-            return Strings.TrimText(value, allowNil)
-        end
-        if value == nil then
-            return allowNil and nil or ""
-        end
-        return tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
-    end
-
-    local function copySourceCandidates(candidates)
-        if type(candidates) ~= "table" then
-            return nil
-        end
-
-        local copied = {}
-        for i = 1, #candidates do
-            local candidate = candidates[i]
-            if type(candidate) == "table" then
-                local name = trimText(candidate.name or candidate.npcName, true)
-                if name then
-                    local out = {
-                        name = name,
-                        kind = trimText(candidate.kind, true) or "boss",
-                    }
-                    local sourceKey = trimText(candidate.sourceKey, true)
-                    if sourceKey then
-                        out.sourceKey = sourceKey
-                    end
-                    local npcId = tonumber(candidate.npcId or candidate.sourceNpcId) or 0
-                    if npcId > 0 then
-                        out.npcId = npcId
-                    end
-                    copied[#copied + 1] = out
-                end
-            end
-        end
-
-        return (#copied > 0) and copied or nil
-    end
+    local trimText = Strings.TrimText
 
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
@@ -113,8 +75,8 @@ do
     local recentTrashDeathContextActivityAt = 0
 
     -- ----- Private helpers ----- --
-    local function isDebugEnabled()
-        return addon.hasDebug ~= nil
+    local isDebugEnabled = feature.Options.IsDebugEnabled or function()
+        return false
     end
 
     local function isTraceEnabled()
@@ -178,74 +140,44 @@ do
         return LootContextState.SyncActive(raidState)
     end
 
+    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
+
+    local function getRaidQueries()
+        if not RaidQueries and Database.GetRaidQueries then
+            RaidQueries = Database.GetRaidQueries()
+        end
+        return RaidQueries
+    end
+
     local function findBossByNid(raid, bossNid)
-        local resolvedBossNid = tonumber(bossNid) or 0
-        if resolvedBossNid <= 0 then
-            return nil
+        local queries = getRaidQueries()
+        if queries and queries.FindBossByNid then
+            return queries:FindBossByNid(raid, bossNid)
         end
-
-        local bosses = raid and raid.bossKills or {}
-        for i = 1, #bosses do
-            local boss = bosses[i]
-            if boss and tonumber(boss.bossNid) == resolvedBossNid then
-                return boss
-            end
-        end
-
         return nil
     end
 
     local function findBossByName(raid, bossName)
-        local resolvedBossName = Strings.NormalizeLower(bossName, true)
-        if not resolvedBossName or resolvedBossName == "" then
-            return nil
+        local queries = getRaidQueries()
+        if queries and queries.FindBossByName then
+            return queries:FindBossByName(raid, bossName)
         end
-
-        local bosses = raid and raid.bossKills or {}
-        for i = #bosses, 1, -1 do
-            local boss = bosses[i]
-            if boss then
-                local candidateName = Strings.NormalizeLower(boss.name, true)
-                if candidateName == resolvedBossName then
-                    return boss
-                end
-            end
-        end
-
         return nil
     end
 
     local function findBossBySourceNpcId(raid, sourceNpcId)
-        local resolvedNpcId = tonumber(sourceNpcId) or 0
-        if resolvedNpcId <= 0 then
-            return nil
+        local queries = getRaidQueries()
+        if queries and queries.FindBossBySourceNpcId then
+            return queries:FindBossBySourceNpcId(raid, sourceNpcId)
         end
-
-        local bosses = raid and raid.bossKills or {}
-        for i = #bosses, 1, -1 do
-            local boss = bosses[i]
-            if boss and (tonumber(boss.sourceNpcId) or 0) == resolvedNpcId then
-                return boss
-            end
-        end
-
         return nil
     end
 
     local function findBossBySourceKey(raid, sourceKey)
-        local queryKey = trimText(sourceKey, true)
-        if not queryKey then
-            return nil
+        local queries = getRaidQueries()
+        if queries and queries.FindBossBySourceKey then
+            return queries:FindBossBySourceKey(raid, sourceKey)
         end
-
-        local bosses = raid and raid.bossKills or {}
-        for i = #bosses, 1, -1 do
-            local boss = bosses[i]
-            if boss and trimText(boss.sourceKey, true) == queryKey then
-                return boss
-            end
-        end
-
         return nil
     end
 
@@ -617,7 +549,7 @@ do
         activeLoot.sourceNpcId = tonumber(sourceMeta and sourceMeta.npcId) or tonumber(sourceMeta and sourceMeta.sourceNpcId) or 0
         activeLoot.sourceName = sourceName
         activeLoot.sourceKey = trimText(sourceMeta and sourceMeta.sourceKey, true)
-        activeLoot.candidates = (resolvedKind == "shared") and copySourceCandidates(sourceMeta and sourceMeta.candidates) or nil
+        activeLoot.candidates = (resolvedKind == "shared") and LootSourceCandidates.Copy(sourceMeta and sourceMeta.candidates) or nil
         activeLoot.snapshotId = tonumber(snapshotId) or nil
         activeLoot.openedAt = resolvedNow
         activeLoot.expiresAt = expiresAt
@@ -1799,6 +1731,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/Base64",
             "Modules/Dataset/IgnoredMobs",
             "Modules/LootSources",
+            "Database/DBRaidQueries",
             "Services/Loot/Context",
             "Services/Loot/State",
             "Services/Loot/Snapshots",

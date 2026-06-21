@@ -374,6 +374,12 @@ local function rollsApi(tbl)
         end
     end
 
+    if type(tbl.EnsureLootRollSession) ~= "function" then
+        function tbl:EnsureLootRollSession(itemLink, rollType, source, _opts)
+            return self:EnsureRollSession(itemLink, rollType, source)
+        end
+    end
+
     if type(tbl.SyncSessionState) ~= "function" then
         function tbl:SyncSessionState(_session)
             return nil
@@ -627,31 +633,40 @@ local function newHarness()
 
     local Bus = makeBus()
     local Strings = {}
-    function Strings.NormalizeName(name)
-        if type(name) ~= "string" then
-            return nil
-        end
-        local out = name:gsub("^%s+", ""):gsub("%s+$", "")
-        if out == "" then
-            return nil
-        end
-        return out
-    end
-
-    function Strings.NormalizeLower(name)
-        local out = Strings.NormalizeName(name)
-        return out and string.lower(out) or nil
-    end
-
-    function Strings.TrimText(value, nilIfEmpty)
+    function Strings.TrimText(value, allowNil)
         if value == nil then
-            return nil
+            return allowNil and nil or ""
         end
-        local out = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
-        if nilIfEmpty and out == "" then
+        return tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+
+    function Strings.NilIfEmpty(value)
+        local out = Strings.TrimText(value, true)
+        if out == nil or out == "" then
             return nil
         end
         return out
+    end
+
+    function Strings.NormalizeText(value, allowNil)
+        local out = Strings.TrimText(value, allowNil)
+        if allowNil and out == "" then
+            return nil
+        end
+        return out
+    end
+
+    function Strings.NormalizeName(name, allowNil)
+        local out = Strings.TrimText(name, allowNil)
+        if out == nil then
+            return nil
+        end
+        return out
+    end
+
+    function Strings.NormalizeLower(name, allowNil)
+        local out = Strings.NormalizeName(name, allowNil)
+        return out and string.lower(out) or nil
     end
 
     function Strings.GetNormalizedNameLower(value)
@@ -662,6 +677,59 @@ local function newHarness()
         value = tostring(value or "")
         local first, rest = value:match("^%s*(%S+)%s*(.-)%s*$")
         return first or "", rest or ""
+    end
+
+    local function splitPayloadFields(text, sep, out)
+        local fields = out or {}
+        local delimiter = tostring(sep or "|")
+        local input = tostring(text or "")
+        local n = 0
+        local startPos = 1
+
+        while true do
+            local fromPos, toPos = input:find(delimiter, startPos, true)
+            if not fromPos then
+                n = n + 1
+                fields[n] = input:sub(startPos)
+                break
+            end
+            n = n + 1
+            fields[n] = input:sub(startPos, fromPos - 1)
+            startPos = toPos + 1
+        end
+
+        for i = n + 1, #fields do
+            fields[i] = nil
+        end
+
+        return fields, n
+    end
+
+    local function packPayloadFields(sep, ...)
+        local n = select("#", ...)
+        local out = {}
+        for i = 1, n do
+            out[i] = tostring(select(i, ...) or "")
+        end
+        return table.concat(out, tostring(sep or "|"))
+    end
+
+    local function isBossFightRecord(boss)
+        if type(boss) ~= "table" then
+            return false
+        end
+        local sourceKind = boss.sourceKind
+        if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
+            return false
+        end
+        if boss.source == "LootSources" then
+            return false
+        end
+        local name = boss.name or boss.boss
+        if type(name) == "string" and name:sub(1, 7) == "Shared:" then
+            return false
+        end
+        return true
     end
 
     local Sort = {
@@ -1186,9 +1254,16 @@ local function newHarness()
     }
 
     addon.Comms = {
+        Payload = {
+            EncodeText = addon.Base64.Encode,
+            DecodeText = addon.Base64.Decode,
+            SplitFields = splitPayloadFields,
+            PackFields = packPayloadFields,
+        },
         Sync = function() end,
         Whisper = function() end,
     }
+    addon.Comms._Payload = addon.Comms.Payload
 
     addon.Item = {
         GetItemIdFromLink = function(value)
@@ -1476,6 +1551,12 @@ local function newHarness()
                 return fn(row, it)
             end
         end,
+        MakeIndexedRowName = function(suffix)
+            suffix = tostring(suffix or "")
+            return function(frameName, _, index)
+                return tostring(frameName or "") .. suffix .. tostring(index or "")
+            end
+        end,
         CreateController = function(cfg)
             local controller = { cfg = cfg, dirtyCount = 0 }
             function controller:Dirty()
@@ -1532,6 +1613,12 @@ local function newHarness()
     }
 
     local Database = {}
+
+    function Database.IsBossFightRecord(boss)
+        return isBossFightRecord(boss)
+    end
+
+    Database._IsBossFightRecord = Database.IsBossFightRecord
 
     local function ensureNamespace(root, ...)
         assert(type(root) == "table", "ensureNamespace requires a root table")
@@ -2014,6 +2101,12 @@ local function newHarness()
         end
     end
 
+    if type(services.Rolls.EnsureLootRollSession) ~= "function" then
+        function services.Rolls:EnsureLootRollSession(itemLink, rollType, source, _opts)
+            return self:EnsureRollSession(itemLink, rollType, source)
+        end
+    end
+
     local function parseItemId(value)
         if type(value) == "number" then
             return value
@@ -2253,6 +2346,7 @@ local function newHarness()
             local lootSourceFiles = {
                 "!KRT/Modules/Dataset/IgnoredMobs.lua",
                 "!KRT/Modules/Dataset/LootSourcesData.lua",
+                "!KRT/Modules/LootSourceCandidates.lua",
                 "!KRT/Modules/LootSources.lua",
             }
             local raidServiceFiles = {
@@ -2276,15 +2370,33 @@ local function newHarness()
                 end
             end
 
+            local function ensureRaidQueries()
+                if not addon.LootSourceCandidates then
+                    loadFiles({ "!KRT/Modules/LootSourceCandidates.lua" })
+                end
+                if not (addon.DB and addon.DB.RaidQueries) then
+                    loadFiles({ "!KRT/Database/DBRaidQueries.lua" })
+                end
+                Database.GetRaidQueries = function()
+                    return addon.DB and addon.DB.RaidQueries or nil
+                end
+            end
+
             if path == "!KRT/Modules/LootSources.lua" then
                 loadFiles(lootSourceFiles)
                 feature.LootSources = addon.LootSources
                 return addon.LootSources
             end
 
+            if path == "!KRT/Database/DBRaidQueries.lua" then
+                ensureRaidQueries()
+                return addon.DB and addon.DB.RaidQueries or nil
+            end
+
             if path == "!KRT/Services/Loot.lua" then
                 loadFiles(lootSourceFiles)
                 feature.LootSources = addon.LootSources
+                ensureRaidQueries()
                 loadFiles(lootServiceFiles)
                 return addon.Services.Loot
             end
@@ -2292,6 +2404,7 @@ local function newHarness()
             if path == "!KRT/Services/Raid.lua" then
                 loadFiles(lootSourceFiles)
                 feature.LootSources = addon.LootSources
+                ensureRaidQueries()
                 loadFiles(lootServiceFiles)
                 loadFiles(raidServiceFiles)
                 local raid = addon.Services.Raid
@@ -2338,6 +2451,10 @@ local function newHarness()
 
             if path == "!KRT/Controllers/Logger.lua" or path == "!KRT/Database/DBRaidValidator.lua" then
                 loadFiles({ "!KRT/Modules/Dataset/IgnoredMobs.lua" })
+            end
+
+            if path == "!KRT/Database/DBSyncer.lua" or path == "!KRT/Services/Logger/Store.lua" or path == "!KRT/Services/Logger/Actions.lua" then
+                ensureRaidQueries()
             end
 
             local chunk, err = loadfile(path)
@@ -2449,6 +2566,14 @@ local function readText(path)
     return text
 end
 
+local function countTextPattern(text, pattern)
+    local count = 0
+    for _ in tostring(text or ""):gmatch(pattern) do
+        count = count + 1
+    end
+    return count
+end
+
 local function setHarnessOption(h, namespace, key, value, defaults)
     local cfg = h.addon.Options.AddNamespace(namespace, defaults or {})
     cfg:Set(key, value)
@@ -2476,11 +2601,23 @@ local function setupLoggerExportHarness(seedRaids)
 end
 
 local function loadMasterController(h)
+    h:load("!KRT/Services/Master/SoftRes.lua")
+    h:load("!KRT/Services/Master/SessionWinners.lua")
+    h:load("!KRT/Services/Master/FlowState.lua")
+    h:load("!KRT/Services/Master/ButtonState.lua")
+    h:load("!KRT/Services/Master/RollRows.lua")
+    h:load("!KRT/Services/Master/AssignmentCandidates.lua")
+    h:load("!KRT/Services/Master/AssignmentTargets.lua")
+    h:load("!KRT/Services/Master/DebugRaidGrid.lua")
+    h:load("!KRT/Services/Master/AwardMessages.lua")
+    h:load("!KRT/Services/Master/LootSpam.lua")
+    h:load("!KRT/Services/Master/Service.lua")
+    h:load("!KRT/Widgets/LootHints.lua")
     h:load("!KRT/Controllers/Master.lua")
 end
 
-local function loadMasterLootGridWidget(h)
-    h:load("!KRT/Widgets/MasterLootGrid.lua")
+local function loadRaidGridWidget(h)
+    h:load("!KRT/Widgets/RaidGrid.lua")
 end
 
 local function loadMasterFrameForTest(Master, frame)
@@ -9848,30 +9985,30 @@ test("raid service owns master loot candidate cache resolution", function()
     assertEqual(Raid:FindMasterLootCandidateIndex(itemLink, "Cara"), 1, "expected raid candidate cache invalidation to force a rebuild")
 end)
 
-test("master native loot grid opens for master loot candidates", function()
+test("master native raid grid opens for master loot candidates", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice", "Bob", "Cara" },
         selectedLootQuality = 3,
     })
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
     ctx.Master:OPEN_MASTER_LOOT_LIST()
 
-    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    local grid = ctx.h.addon.Widgets.RaidGrid
     assertTrue(grid:IsShown(), "expected native grid to show for master loot candidates")
     assertEqual(grid:GetButtonCount(), 3, "expected one grid button per candidate")
 end)
 
-test("master debug loot grid opens with fake N-player roster without awarding", function()
+test("master debug raid grid opens with fake N-player roster without awarding", function()
     local ctx = setupMasterAwardHarness({
         candidates = {},
         selectedLootQuality = 3,
     })
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
-    local shownCount = ctx.Master:ShowDebugMasterLootGrid(25)
+    local shownCount = ctx.Master:ShowDebugRaidGrid(25)
 
-    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    local grid = ctx.h.addon.Widgets.RaidGrid
     assertEqual(shownCount, 25, "expected debug grid to clamp and return the shown fake player count")
     assertTrue(grid:IsShown(), "expected debug grid to show fake players")
     assertEqual(grid:GetMode(), "debug", "expected debug grid mode to avoid live award behavior")
@@ -9882,13 +10019,13 @@ test("master debug loot grid opens with fake N-player roster without awarding", 
     assertEqual(#ctx.queuedAwards, 0, "expected debug grid not to queue KRT awards")
 end)
 
-test("slash debug mlgrid opens fake Master Loot grid", function()
+test("slash debug raidgrid opens fake Raid Grid", function()
     local ctx = setupMasterAwardHarness({
         candidates = {},
         selectedLootQuality = 3,
     })
     _G.SlashCmdList = {}
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
     ctx.h:load("!KRT/Localization/localization.en.lua")
     ctx.h.Database.RequestControllerMethod = function(name, methodName, ...)
         local controller = ctx.h.addon.Controllers[name]
@@ -9900,13 +10037,13 @@ test("slash debug mlgrid opens fake Master Loot grid", function()
     end
     ctx.h:load("!KRT/EntryPoints/SlashEvents.lua")
 
-    _G.SlashCmdList.KRT("debug mlgrid 12")
+    _G.SlashCmdList.KRT("debug raidgrid 12")
 
-    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    local grid = ctx.h.addon.Widgets.RaidGrid
     assertTrue(grid:IsShown(), "expected slash command to show debug grid")
     assertEqual(grid:GetMode(), "debug", "expected slash command to open debug grid mode")
     assertEqual(grid:GetButtonCount(), 12, "expected slash command count to drive fake player count")
-    assertContains(ctx.h.logs.info, "Master Loot grid debug shown with %d fake players.", "expected slash command to report the debug grid flow")
+    assertContains(ctx.h.logs.info, "Raid Grid Debug shown with %d fake players.", "expected slash command to report the debug grid flow")
 end)
 
 test("master item popup debug fallback uses real roster before fake players", function()
@@ -9916,7 +10053,7 @@ test("master item popup debug fallback uses real roster before fake players", fu
     })
     local rosterNames = { "Alice", "Bob" }
     ctx.h.feature.coreState.debug = {
-        masterLootGridTargetCount = 5,
+        raidGridTargetCount = 5,
     }
     ctx.h.addon.UnitIterator = function()
         local index = 0
@@ -9932,11 +10069,11 @@ test("master item popup debug fallback uses real roster before fake players", fu
         local index = tonumber(string.match(tostring(unit or ""), "^raid(%d+)$"))
         return index and rosterNames[index] or nil
     end
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
     ctx.Master:OPEN_MASTER_LOOT_LIST()
 
-    local grid = ctx.h.addon.Widgets.MasterLootGrid
+    local grid = ctx.h.addon.Widgets.RaidGrid
     assertTrue(grid:IsShown(), "expected item popup to show the debug fallback grid")
     assertEqual(grid:GetMode(), "debug", "expected no-candidate item popup fallback to stay display-only")
     assertEqual(grid:GetButtonCount(), 5, "expected debug fallback to fill real roster up to the target count")
@@ -9948,7 +10085,7 @@ test("master item popup debug fallback uses real roster before fake players", fu
     assertEqual(#ctx.queuedAwards, 0, "expected debug fallback not to queue KRT awards")
 end)
 
-test("master native loot grid hides Blizzard dropdown lists", function()
+test("master native raid grid hides Blizzard dropdown lists", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice", "Bob" },
         selectedLootQuality = 3,
@@ -9957,7 +10094,7 @@ test("master native loot grid hides Blizzard dropdown lists", function()
     local list2 = ctx.h.makeFrame(true, "DropDownList2")
     _G.DropDownList1 = list1
     _G.DropDownList2 = list2
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
     ctx.Master:OPEN_MASTER_LOOT_LIST()
     ctx.h:flushTimers()
@@ -9966,33 +10103,33 @@ test("master native loot grid hides Blizzard dropdown lists", function()
     assertTrue(not list2:IsShown(), "expected native grid to hide DropDownList2")
 end)
 
-test("master native loot grid is layered above loot selection frames", function()
+test("master native raid grid is layered above loot selection frames", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice", "Bob" },
         selectedLootQuality = 3,
     })
     _G.LootButton1:SetFrameLevel(42)
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
     ctx.Master:OPEN_MASTER_LOOT_LIST()
 
-    local gridFrame = _G.KRTMasterLootGridFrame
+    local gridFrame = _G.KRTRaidGridFrame
     assertTrue(gridFrame ~= nil, "expected native grid frame to exist")
     assertEqual(gridFrame:GetFrameStrata(), "FULLSCREEN_DIALOG", "expected native grid to use a strata above loot selection frames")
     assertTrue(gridFrame._toplevel == true, "expected native grid to be a top-level frame")
     assertTrue(gridFrame:GetFrameLevel() > _G.LootButton1:GetFrameLevel(), "expected native grid level to sit above the selected loot button")
 end)
 
-test("master native loot grid opens centered on screen", function()
+test("master native raid grid opens centered on screen", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice", "Bob" },
         selectedLootQuality = 3,
     })
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
     ctx.Master:OPEN_MASTER_LOOT_LIST()
 
-    local gridFrame = _G.KRTMasterLootGridFrame
+    local gridFrame = _G.KRTRaidGridFrame
     local point = gridFrame and gridFrame._points and gridFrame._points[1] or nil
     assertTrue(point ~= nil, "expected native grid to be positioned")
     assertEqual(point.point, "CENTER", "expected native grid to anchor from its center")
@@ -10002,15 +10139,15 @@ test("master native loot grid opens centered on screen", function()
     assertEqual(point.y, 0, "expected native grid vertical offset to be zero")
 end)
 
-test("master native loot grid confirms above-threshold manual awards", function()
+test("master native raid grid confirms above-threshold manual awards", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice", "Bob" },
         selectedLootQuality = 4,
     })
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
     ctx.Master:OPEN_MASTER_LOOT_LIST()
-    ctx.h.addon.Widgets.MasterLootGrid:ClickButtonForTest(2)
+    ctx.h.addon.Widgets.RaidGrid:ClickButtonForTest(2)
 
     assertEqual(#ctx.givenLoot, 0, "expected above-threshold click to wait for confirmation")
     local popup = _G.StaticPopupDialogs.KRT_MASTER_LOOT_GRID_CONFIRM
@@ -10048,10 +10185,10 @@ test("master target grid updates Hold target without awarding", function()
         end
         return nil
     end
-    loadMasterLootGridWidget(ctx.h)
+    loadRaidGridWidget(ctx.h)
 
     ctx.Master._Private.OpenAssignmentTargetGrid("holder")
-    ctx.h.addon.Widgets.MasterLootGrid:ClickButtonForTest(3)
+    ctx.h.addon.Widgets.RaidGrid:ClickButtonForTest(3)
 
     assertEqual(ctx.raid.holder, "Cara", "expected target grid to persist holder")
     assertEqual(ctx.h.feature.lootState.holder, "Cara", "expected target grid to update holder state")
@@ -12980,20 +13117,19 @@ test("master workflow model names rolling and ready states without changing stat
     h.feature.UI = h.addon.UI
     loadMasterController(h)
 
-    local Master = h.addon.Controllers.Master
-    local Private = Master._Private
+    local FlowState = h.addon.Services.Master.FlowState
 
-    local idle = Private.BuildMasterWorkflowState({
+    local idle = FlowState.BuildState({
         currentFlowState = "idle",
         hasItem = false,
         rollModel = {},
     })
-    local ready = Private.BuildMasterWorkflowState({
+    local ready = FlowState.BuildState({
         currentFlowState = "loot",
         hasItem = true,
         rollModel = {},
     })
-    local srReady = Private.BuildMasterWorkflowState({
+    local srReady = FlowState.BuildState({
         currentFlowState = "loot",
         hasItem = true,
         rollModel = {},
@@ -13003,7 +13139,7 @@ test("master workflow model names rolling and ready states without changing stat
             presentReserveCount = 1,
         },
     })
-    local srRolling = Private.BuildMasterWorkflowState({
+    local srRolling = FlowState.BuildState({
         currentFlowState = "rolling",
         hasItem = true,
         rollModel = {
@@ -13016,7 +13152,7 @@ test("master workflow model names rolling and ready states without changing stat
             },
         },
     })
-    local tie = Private.BuildMasterWorkflowState({
+    local tie = FlowState.BuildState({
         currentFlowState = "rolling",
         hasItem = true,
         rollModel = {
@@ -13086,14 +13222,13 @@ test("master workflow model centralizes button capabilities without changing gat
     h.feature.UI = h.addon.UI
     loadMasterController(h)
 
-    local Master = h.addon.Controllers.Master
-    local Private = Master._Private
+    local FlowState = h.addon.Services.Master.FlowState
 
     h.feature.lootState.lootCount = 1
     h.feature.lootState.rollsCount = 0
     h.feature.lootState.fromInventory = false
 
-    local ready = Private.BuildMasterWorkflowState({
+    local ready = FlowState.BuildState({
         canAwardSelection = false,
         canRoll = false,
         countdownRunning = false,
@@ -13106,7 +13241,7 @@ test("master workflow model centralizes button capabilities without changing gat
         rollModel = {},
         rolled = false,
     })
-    local countdown = Private.BuildMasterWorkflowState({
+    local countdown = FlowState.BuildState({
         canAwardSelection = false,
         canRoll = true,
         countdownRunning = true,
@@ -13120,7 +13255,7 @@ test("master workflow model centralizes button capabilities without changing gat
         rolled = false,
     })
     h.feature.lootState.rollsCount = 1
-    local awardReady = Private.BuildMasterWorkflowState({
+    local awardReady = FlowState.BuildState({
         canAwardSelection = true,
         canRoll = false,
         countdownRunning = false,
@@ -13138,7 +13273,7 @@ test("master workflow model centralizes button capabilities without changing gat
         },
         rolled = false,
     })
-    local noAccess = Private.BuildMasterWorkflowState({
+    local noAccess = FlowState.BuildState({
         canAwardSelection = true,
         canRoll = true,
         countdownRunning = false,
@@ -13151,7 +13286,7 @@ test("master workflow model centralizes button capabilities without changing gat
         rollModel = {},
         rolled = false,
     })
-    local noItemNoAccess = Private.BuildMasterWorkflowState({
+    local noItemNoAccess = FlowState.BuildState({
         canAwardSelection = false,
         canRoll = false,
         countdownRunning = false,
@@ -13632,8 +13767,8 @@ test("master workflow model exposes compact session winners", function()
     h.feature.UI = h.addon.UI
     loadMasterController(h)
 
-    local Private = h.addon.Controllers.Master._Private
-    local winners = Private.BuildSessionWinnersModel({
+    local SessionWinners = h.addon.Services.Master.SessionWinners
+    local winners = SessionWinners.BuildModel({
         resolution = {
             autoWinners = {
                 { name = "Alice", roll = 99 },
@@ -13678,8 +13813,7 @@ test("master loot reserve ui state exposes reserved players", function()
 
     loadMasterController(h)
 
-    local Master = h.addon.Controllers.Master
-    local state = Master._Private.BuildLootReserveUiState(link)
+    local state = h.addon.UI.Widgets.Call("LootHints", "BuildLootReserveUiState", link)
 
     assertTrue(state.hasReserves == true, "expected reserved loot state to be marked")
     assertEqual(state.itemId, 9410, "expected reserve state to expose item id")
@@ -16331,16 +16465,58 @@ test("comms payload helpers encode split and pack addon-message fields", functio
     h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/Modules/Base64.lua")
 
-    local payload = h.addon.Comms._Payload
-    local encoded = payload._EncodeText("Alpha|Beta")
-    local packed = payload._PackFields("|", "ROW", encoded, nil, "tail")
-    local fields, n = payload._SplitFields(packed, "|")
+    local payload = h.addon.Comms.Payload
+    local encoded = payload.EncodeText("Alpha|Beta")
+    local packed = payload.PackFields("|", "ROW", encoded, nil, "tail")
+    local fields, n = payload.SplitFields(packed, "|")
 
     assertEqual(n, 4, "expected packed field count")
     assertEqual(fields[1], "ROW", "expected first payload field")
-    assertEqual(payload._DecodeText(fields[2]), "Alpha|Beta", "expected encoded delimiter text to round-trip")
+    assertEqual(payload.DecodeText(fields[2]), "Alpha|Beta", "expected encoded delimiter text to round-trip")
     assertEqual(fields[3], "", "expected nil payload fields to pack as empty strings")
     assertEqual(fields[4], "tail", "expected final payload field")
+end)
+
+test("runtime cleanup consumers use canonical public helper owners", function()
+    local commsSource = readText("!KRT/Modules/Comms.lua")
+    local distributionSource = readText("!KRT/Services/Loot/DistributionSession.lua")
+    local listsSource = readText("!KRT/Modules/UI/ListController.lua")
+    local loggerSource = readText("!KRT/Controllers/Logger.lua")
+    local masterSource = readText("!KRT/Controllers/Master.lua")
+    local warningsSource = readText("!KRT/Controllers/Warnings.lua")
+    local raidStateSource = readText("!KRT/Services/Raid/State.lua")
+    local reservesAliasesSource = readText("!KRT/Services/Reserves/Aliases.lua")
+    local reservesImportSource = readText("!KRT/Services/Reserves/Import.lua")
+    local reservesChatSource = readText("!KRT/Services/Reserves/Chat.lua")
+    local dbSource = readText("!KRT/Database/DB.lua")
+    local dbQueriesSource = readText("!KRT/Database/DBRaidQueries.lua")
+    local dbStoreSource = readText("!KRT/Database/DBRaidStore.lua")
+    local loggerViewSource = readText("!KRT/Services/Logger/View.lua")
+
+    assertTextContains(commsSource, "function Payload.EncodeText", "Comms must expose public payload encode API")
+    assertTextContains(commsSource, "function Payload.DecodeText", "Comms must expose public payload decode API")
+    assertTextNotContains(distributionSource, "Comms._Payload", "Loot distribution must not consume private Comms payload helpers")
+
+    assertTextContains(listsSource, "function Lists.MakeIndexedRowName", "UI.Lists must expose the indexed row-name factory")
+    assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("RaidBtn")', "Logger raid lists should use shared row-name factory")
+    assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("BossBtn")', "Logger boss lists should use shared row-name factory")
+    assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("PlayerBtn")', "Logger player lists should use shared row-name factory")
+    assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("ItemBtn")', "Logger loot lists should use shared row-name factory")
+    assertTextContains(masterSource, 'UI.Lists.MakeIndexedRowName("PlayerBtn")', "Master roll list should use shared row-name factory")
+    assertTextContains(warningsSource, 'Lists.MakeIndexedRowName("WarningBtn")', "Warnings list should use shared row-name factory")
+
+    assertTextNotContains(raidStateSource, "local function trimText", "Raid state should consume Strings.TrimText directly")
+    assertTextNotContains(reservesAliasesSource, "local function trimText", "Reserves aliases should consume Strings helpers directly")
+    assertTextNotContains(reservesAliasesSource, "local function normalizeName", "Reserves aliases should consume Strings.NormalizeName directly")
+    assertTextNotContains(reservesImportSource, "local function trimText", "Reserves import should consume Strings.TrimText directly")
+    assertTextNotContains(reservesChatSource, "local function trimText", "Reserves chat should consume Strings.TrimText directly")
+    assertTextNotContains(distributionSource, "local function normalizeText", "Loot distribution should consume Strings.NormalizeText directly")
+
+    assertTextContains(dbSource, "function Database.IsBossFightRecord", "Database must expose the canonical boss-record predicate")
+    assertEqual(countTextPattern(dbSource, "local function isBossFightRecord"), 1, "Database must own the only boss-record implementation")
+    assertTextNotContains(dbQueriesSource, "local function isBossFightRecord", "DBRaidQueries must consume Database.IsBossFightRecord")
+    assertTextNotContains(dbStoreSource, "local function isBossFightRecord", "DBRaidStore must consume Database.IsBossFightRecord")
+    assertTextNotContains(loggerViewSource, "local function isBossFightRecord", "Logger View must consume Database.IsBossFightRecord")
 end)
 
 test("loot distribution session publishes item roll and done messages", function()
@@ -16608,7 +16784,7 @@ test("reserves synced runtime cache feeds display without persisting", function(
     local Reserves = h.addon.Services.Reserves
     Reserves:Load()
 
-    local ok = Reserves._Sync:SetSyncedData({
+    local ok = Reserves:SetSyncedData({
         Alice = {
             reserves = {
                 { rawID = 1001, quantity = 2, plus = 4, class = "MAGE" },
@@ -16650,7 +16826,7 @@ test("reserves local data wins over synced runtime cache", function()
     local Reserves = h.addon.Services.Reserves
     Reserves:Load()
 
-    local ok, reason = Reserves._Sync:SetSyncedData({
+    local ok, reason = Reserves:SetSyncedData({
         Bob = {
             reserves = {
                 { rawID = 2002, quantity = 1 },
@@ -16843,7 +17019,7 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
     requester:load("!KRT/Services/Reserves.lua")
     requester.addon.Services.Reserves:Load()
 
-    local ok = requester.addon.Services.Reserves._Sync:RequestMetadata()
+    local ok = requester.addon.Services.Reserves:RequestSyncMetadata()
 
     assertTrue(ok == true, "expected metadata request to be sent")
     assertEqual(sent[1].prefix, "KRTResSync", "expected dedicated reserves sync prefix")
@@ -16864,7 +17040,7 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
     provider.addon.Services.Reserves:Load()
     provider:setRaidRoleState({ inRaid = true, isLeader = true, isMasterLooter = true })
 
-    local handled = provider.addon.Services.Reserves._Sync:HandleMessage("KRTResSync", "META_REQ|1", "RAID", "Requester")
+    local handled = provider.addon.Services.Reserves:HandleSyncMessage("KRTResSync", "META_REQ|1", "RAID", "Requester")
 
     assertTrue(handled == true, "expected provider to handle metadata request")
     assertEqual(sent[1].prefix, "KRTResSync", "expected provider metadata prefix")
@@ -16874,7 +17050,7 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
 
     local metaAck = sent[1]
     sent = {}
-    requester.addon.Services.Reserves._Sync:HandleMessage(metaAck.prefix, metaAck.msg, metaAck.channel, "Master")
+    requester.addon.Services.Reserves:HandleSyncMessage(metaAck.prefix, metaAck.msg, metaAck.channel, "Master")
 
     assertEqual(sent[1].prefix, "KRTResSync", "expected requester data request prefix")
     assertEqual(sent[1].channel, "WHISPER", "expected requester to whisper data request")
@@ -16883,13 +17059,13 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
 
     local dataReq = sent[1]
     sent = {}
-    provider.addon.Services.Reserves._Sync:HandleMessage(dataReq.prefix, dataReq.msg, dataReq.channel, "Requester")
+    provider.addon.Services.Reserves:HandleSyncMessage(dataReq.prefix, dataReq.msg, dataReq.channel, "Requester")
 
     assertTrue(#sent >= 2, "expected data chunks and done message after data request")
     assertTrue(sent[#sent].msg:match("^DATA_DONE|") ~= nil, "expected final data done message")
 
     for i = 1, #sent do
-        requester.addon.Services.Reserves._Sync:HandleMessage(sent[i].prefix, sent[i].msg, sent[i].channel, "Master")
+        requester.addon.Services.Reserves:HandleSyncMessage(sent[i].prefix, sent[i].msg, sent[i].channel, "Master")
     end
     assertEqual(requester.addon.Services.Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice", "expected chunked sync payload to populate requester runtime cache")
     requester.addon.Services.Reserves:Save("test")

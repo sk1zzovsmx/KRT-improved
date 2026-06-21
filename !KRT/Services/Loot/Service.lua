@@ -59,14 +59,6 @@ local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD
 local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or 30
 local UNCOMMON_ITEM_RARITY = 2
 local UNCOMMON_ITEM_LINK_COLOR = "ff1eff00"
-local DEFAULT_LOGGER_LOOT_QUALITY_THRESHOLD = 4
-local loggerLootQualityThresholds = {
-    [0] = true,
-    [2] = true,
-    [3] = true,
-    [4] = true,
-    [5] = true,
-}
 
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
@@ -88,6 +80,28 @@ do
     local Rules = assert(module._Rules, "Loot rules helpers are not initialized")
     local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
     local resolveRaidRecord = assert(ContextHelpers.ResolveRaidRecord, "Missing LootContext.ResolveRaidRecord")
+    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
+
+    local function getRaidQueries()
+        if not RaidQueries and Database.GetRaidQueries then
+            RaidQueries = Database.GetRaidQueries()
+        end
+        return RaidQueries
+    end
+
+    local function resolveStoredLootLooterName(raid, raidNum, loot)
+        local queries = getRaidQueries()
+        if queries and queries.ResolveLootLooterName then
+            return queries:ResolveLootLooterName(raid, loot)
+        end
+
+        local looterNid = tonumber(loot and loot.looterNid) or 0
+        local raidService = Services.Raid
+        if looterNid > 0 and raidService and raidService.GetPlayerName then
+            return raidService:GetPlayerName(looterNid, raidNum)
+        end
+        return nil
+    end
     local isIgnoredItem = assert(Rules._IsIgnoredItem, "Missing LootRules._IsIgnoredItem")
 
     -- ----- Internal state ----- --
@@ -114,13 +128,17 @@ do
         return false
     end
 
-    local function getOption(namespace, key)
-        local cfg = Options and Options.Get and Options.Get(namespace)
-        if cfg and cfg.Get then
-            return cfg:Get(key)
+    local GetOption = Options.GetValue
+        or function(namespace, key, defaultValue)
+            local cfg = Options and Options.Get and Options.Get(namespace) or nil
+            if cfg and cfg.Get then
+                local value = cfg:Get(key)
+                if value ~= nil then
+                    return value
+                end
+            end
+            return defaultValue
         end
-        return nil
-    end
 
     local function buildEmptyDistributionModel()
         return {
@@ -387,23 +405,6 @@ do
         return PassiveGroupLoot.GetPassiveLootRollItemKey(loot.itemLink)
     end
 
-    local function resolveLootLooterName(raidNum, loot)
-        if type(loot) ~= "table" then
-            return nil
-        end
-
-        local looterNid = tonumber(loot.looterNid)
-        if not looterNid or looterNid <= 0 then
-            return nil
-        end
-
-        local raidService = Services.Raid
-        if raidService then
-            return raidService:GetPlayerName(looterNid, raidNum)
-        end
-        return nil
-    end
-
     local function findUpgradeablePassiveLootEntry(raid, raidNum, itemLink, looter, rollSessionId)
         if type(raid) ~= "table" or not itemLink or not looter then
             return nil
@@ -425,7 +426,7 @@ do
             end
 
             if loot and getLootItemKey(loot) == targetItemKey then
-                local lootLooter = resolveLootLooterName(raidNum, loot)
+                local lootLooter = resolveStoredLootLooterName(raid, raidNum, loot)
                 if lootLooter == targetLooter and (tonumber(loot.rollValue) or 0) <= 0 then
                     local lootSessionId = loot.rollSessionId and tostring(loot.rollSessionId) or nil
                     if targetSessionId and targetSessionId ~= "" then
@@ -1036,13 +1037,14 @@ do
         return itemString, itemName, itemRarity, itemTexture, tonumber(itemId), itemType
     end
 
-    local function normalizeLoggerLootQualityThreshold(value)
-        local threshold = tonumber(value)
-        if threshold and loggerLootQualityThresholds[threshold] then
-            return threshold
+    local normalizeLoggerLootQualityThreshold = Options.NormalizeLoggerLootQualityThreshold
+        or function(value)
+            local threshold = tonumber(value)
+            if threshold == 0 or threshold == 2 or threshold == 3 or threshold == 4 or threshold == 5 then
+                return threshold
+            end
+            return 4
         end
-        return DEFAULT_LOGGER_LOOT_QUALITY_THRESHOLD
-    end
 
     local function getRaidLootThreshold()
         if type(GetLootThreshold) == "function" then
@@ -1052,8 +1054,8 @@ do
     end
 
     local function getEffectiveLoggerLootThreshold()
-        if getOption("Logger", "ignoreSelectionThreshold") == true then
-            return normalizeLoggerLootQualityThreshold(getOption("Logger", "loggerLootQualityThreshold"))
+        if GetOption("Logger", "ignoreSelectionThreshold") == true then
+            return normalizeLoggerLootQualityThreshold(GetOption("Logger", "loggerLootQualityThreshold"))
         end
         return getRaidLootThreshold()
     end
@@ -1650,7 +1652,7 @@ do
     end
 
     local function shouldIgnoreGroupLoot()
-        return getOption("Logger", "ignoreGroupLoot") == true
+        return GetOption("Logger", "ignoreGroupLoot") == true
     end
 
     function module:ObservePassiveLootMessage(msg, winnerOnly)
@@ -2055,6 +2057,7 @@ if registry and type(registry.AddModule) == "function" and type(registry.SetLoad
             "Modules/Item",
             "Modules/Strings",
             "Modules/Time",
+            "Database/DBRaidQueries",
             "Services/Loot/Context",
             "Services/Loot/PendingAwards",
             "Services/Loot/PassiveGroupLoot",
