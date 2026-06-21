@@ -590,6 +590,90 @@ local function formatPerfThreshold(value)
     return format("%.1f", n)
 end
 
+local function printPerfReport()
+    local getter = addon._PerfGetStats
+    local rows = type(getter) == "function" and getter(addon) or nil
+    local count = rows and #rows or 0
+    if count <= 0 then
+        addon:info(L.MsgPerfReportEmpty)
+        return
+    end
+
+    addon:info(L.MsgPerfReportTitle:format(count))
+    for i = 1, count do
+        local row = rows[i] or {}
+        addon:info(
+            L.MsgPerfReportRow:format(
+                i,
+                tostring(row.label or L.StrUnknown),
+                tonumber(row.count) or 0,
+                formatPerfThreshold(row.totalMs),
+                formatPerfThreshold(row.avgMs),
+                formatPerfThreshold(row.maxMs)
+            )
+        )
+    end
+end
+
+local function printPerfSyncReport()
+    local syncer = getDatabaseService("GetSyncer")
+    local getter = syncer and syncer.GetSyncMetrics
+    local metrics = type(getter) == "function" and getter(syncer) or nil
+    local totalMessages = (tonumber(metrics and metrics.outgoingMessages) or 0) + (tonumber(metrics and metrics.incomingMessages) or 0)
+    if totalMessages <= 0 then
+        addon:info(L.MsgPerfSyncReportEmpty)
+        return
+    end
+
+    addon:info(
+        L.MsgPerfSyncReportTitle:format(
+            tonumber(metrics.outgoingMessages) or 0,
+            tonumber(metrics.outgoingChunks) or 0,
+            tonumber(metrics.outgoingBytes) or 0,
+            tonumber(metrics.outgoingRequests) or 0,
+            tonumber(metrics.outgoingSnapshots) or 0,
+            tonumber(metrics.incomingMessages) or 0,
+            tonumber(metrics.incomingChunks) or 0,
+            tonumber(metrics.incomingBytes) or 0,
+            tonumber(metrics.incomingRequests) or 0,
+            tonumber(metrics.incomingSnapshots) or 0
+        )
+    )
+
+    local modes = metrics.modes or {}
+    for i = 1, #modes do
+        local row = modes[i] or {}
+        addon:info(
+            L.MsgPerfSyncReportRow:format(
+                tostring(row.mode or L.StrUnknown),
+                tonumber(row.outgoingMessages) or 0,
+                tonumber(row.outgoingChunks) or 0,
+                tonumber(row.outgoingBytes) or 0,
+                tonumber(row.outgoingRequests) or 0,
+                tonumber(row.outgoingSnapshots) or 0,
+                tonumber(row.incomingMessages) or 0,
+                tonumber(row.incomingChunks) or 0,
+                tonumber(row.incomingBytes) or 0,
+                tonumber(row.incomingRequests) or 0,
+                tonumber(row.incomingSnapshots) or 0
+            )
+        )
+    end
+end
+
+local function resetPerfReport()
+    local resetter = addon._PerfResetStats
+    if type(resetter) == "function" then
+        resetter(addon)
+    end
+    local syncer = getDatabaseService("GetSyncer")
+    local resetSyncMetrics = syncer and syncer.ResetSyncMetrics
+    if type(resetSyncMetrics) == "function" then
+        resetSyncMetrics(syncer)
+    end
+    addon:info(L.MsgPerfReportReset)
+end
+
 local function getPerfThreshold()
     local threshold = tonumber(coreState and coreState.perfThresholdMs) or 5
     if threshold < 0 then
@@ -645,6 +729,21 @@ local function handlePerfCommand(rest)
         return
     end
 
+    if subCmd == "report" or subCmd == "stats" or subCmd == "top" then
+        printPerfReport()
+        return
+    end
+
+    if subCmd == "sync" or subCmd == "payload" or subCmd == "payloads" then
+        printPerfSyncReport()
+        return
+    end
+
+    if subCmd == "reset" or subCmd == "clear" then
+        resetPerfReport()
+        return
+    end
+
     if subCmd == "status" then
         local status = isPerfEnabled() and L.StrEnabled or L.StrDisabled
         addon:info(L.MsgPerfStatus:format(status, formatPerfThreshold(getPerfThreshold())))
@@ -655,6 +754,9 @@ local function handlePerfCommand(rest)
     printHelp("on", L.StrCmdPerfOn)
     printHelp("off", L.StrCmdPerfOff)
     printHelp("threshold <ms>", L.StrCmdPerfThreshold)
+    printHelp("report", L.StrCmdPerfReport)
+    printHelp("sync", L.StrCmdPerfSync)
+    printHelp("reset", L.StrCmdPerfReset)
 end
 
 local function handleMinimapCommand(rest)

@@ -65,6 +65,36 @@ local function getRaidQueries()
     return nil
 end
 
+local function startPerf()
+    if addon.hasPerf and addon._PerfStart then
+        return addon:_PerfStart()
+    end
+    return nil
+end
+
+local function getOutputCount(out)
+    if type(out) ~= "table" then
+        return 0
+    end
+    return #out
+end
+
+local function getRaidPerfId(raid)
+    return tostring((raid and raid.raidNid) or "?")
+end
+
+local function finishPerf(label, startedAt, raid, out, extraDetails)
+    if not (startedAt and addon._PerfFinish) then
+        return
+    end
+
+    local details = "raid=" .. getRaidPerfId(raid) .. " rows=" .. tostring(getOutputCount(out))
+    if extraDetails and extraDetails ~= "" then
+        details = details .. " " .. tostring(extraDetails)
+    end
+    addon:_PerfFinish(label, startedAt, details)
+end
+
 local function getLootSourceModel(loot, boss)
     local lootSource = type(loot and loot.lootSource) == "table" and loot.lootSource or nil
     local sourceKind = (lootSource and lootSource.kind) or (boss and boss.sourceKind) or nil
@@ -130,9 +160,12 @@ buildRows = function(out, list, pred, map)
 end
 
 function View:FillBossList(out, raid)
+    local perfStart = startPerf()
     local queries = getRaidQueries()
     if queries and queries.GetBossKills then
-        return queries:GetBossKills(raid, out)
+        local result = queries:GetBossKills(raid, out)
+        finishPerf("Logger.View.FillBossList", perfStart, raid, out)
+        return result
     end
     buildRows(out, raid and raid.bossKills, nil, function(boss, i)
         local it = {}
@@ -144,12 +177,16 @@ function View:FillBossList(out, raid)
         it.mode = self:GetBossModeLabel(boss)
         return it
     end)
+    finishPerf("Logger.View.FillBossList", perfStart, raid, out)
 end
 
 function View:FillRaidAttendeesList(out, raid)
+    local perfStart = startPerf()
     local queries = getRaidQueries()
     if queries and queries.GetRaidAttendance then
-        return queries:GetRaidAttendance(raid, out)
+        local result = queries:GetRaidAttendance(raid, out)
+        finishPerf("Logger.View.FillRaidAttendeesList", perfStart, raid, out)
+        return result
     end
     buildRows(out, raid and raid.players, nil, function(p)
         local it = {}
@@ -162,22 +199,29 @@ function View:FillRaidAttendeesList(out, raid)
         it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
         return it
     end)
+    finishPerf("Logger.View.FillRaidAttendeesList", perfStart, raid, out)
 end
 
 function View:FillBossAttendeesList(out, raid, bossNid)
+    local perfStart = startPerf()
     local queries = getRaidQueries()
     if queries and queries.GetBossAttendance then
-        return queries:GetBossAttendance(raid, bossNid, out)
+        local result = queries:GetBossAttendance(raid, bossNid, out)
+        finishPerf("Logger.View.FillBossAttendeesList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?"))
+        return result
     end
     if not out then
+        finishPerf("Logger.View.FillBossAttendeesList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?"))
         return
     end
     twipe(out)
     if not (raid and bossNid) then
+        finishPerf("Logger.View.FillBossAttendeesList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?"))
         return
     end
     local bossKill = Store:GetBoss(raid, bossNid)
     if not (bossKill and isBossFightRecord(bossKill) and bossKill.players and raid.players) then
+        finishPerf("Logger.View.FillBossAttendeesList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?"))
         return
     end
 
@@ -202,15 +246,19 @@ function View:FillBossAttendeesList(out, raid, bossNid)
             out[n] = it
         end
     end
+    finishPerf("Logger.View.FillBossAttendeesList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?"))
 end
 
 function View:GetPlayerBossParticipationList(out, raid, playerNid)
+    local perfStart = startPerf()
     if not out then
+        finishPerf("Logger.View.GetPlayerBossParticipationList", perfStart, raid, out, "player=" .. tostring(playerNid or "?"))
         return
     end
     twipe(out)
     local selectedPlayerNid = tonumber(playerNid)
     if not (raid and selectedPlayerNid) then
+        finishPerf("Logger.View.GetPlayerBossParticipationList", perfStart, raid, out, "player=" .. tostring(playerNid or "?"))
         return
     end
 
@@ -237,12 +285,16 @@ function View:GetPlayerBossParticipationList(out, raid, playerNid)
             end
         end
     end
+    finishPerf("Logger.View.GetPlayerBossParticipationList", perfStart, raid, out, "player=" .. tostring(playerNid or "?"))
 end
 
 function View:FillLootList(out, raid, bossNid, playerName)
+    local perfStart = startPerf()
     local queries = getRaidQueries()
     if queries and queries.GetLoot then
-        return queries:GetLoot(raid, bossNid, playerName, out)
+        local result = queries:GetLoot(raid, bossNid, playerName, out)
+        finishPerf("Logger.View.FillLootList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?") .. " player=" .. tostring(playerName or ""))
+        return result
     end
     local bossFilter = tonumber(bossNid) or bossNid
     local playerFilterNid = Store._ResolveLootLooterNid(raid, playerName)
@@ -280,6 +332,7 @@ function View:FillLootList(out, raid, bossNid, playerName)
         it.timeFmt = date("%H:%M", it.time)
         return it
     end)
+    finishPerf("Logger.View.FillLootList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?") .. " player=" .. tostring(playerName or ""))
 end
 
 local registry = feature.ModuleRegistry

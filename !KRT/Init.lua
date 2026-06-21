@@ -36,6 +36,7 @@ local _G = _G
 local pairs, select, type = pairs, select, type
 local setmetatable = setmetatable
 local tostring, tonumber = tostring, tonumber
+local tsort = table.sort
 local GetRealmName = _G.GetRealmName
 local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
 local UnitIsGroupLeader = _G.UnitIsGroupLeader
@@ -111,6 +112,50 @@ local function getPerfThresholdMs()
     return threshold
 end
 
+local function ensurePerfStats()
+    addon.State.perfStats = addon.State.perfStats or {}
+    return addon.State.perfStats
+end
+
+local function clearArray(out)
+    for i = 1, #out do
+        out[i] = nil
+    end
+end
+
+local function recordPerfStat(label, elapsedMs)
+    local key = tostring(label or "?")
+    local stats = ensurePerfStats()
+    local row = stats[key]
+    if not row then
+        row = {
+            label = key,
+            count = 0,
+            totalMs = 0,
+            maxMs = 0,
+        }
+        stats[key] = row
+    end
+
+    row.count = row.count + 1
+    row.totalMs = row.totalMs + elapsedMs
+    if elapsedMs > row.maxMs then
+        row.maxMs = elapsedMs
+    end
+    row.avgMs = row.totalMs / row.count
+    return row
+end
+
+local function sortPerfSnapshot(a, b)
+    if a.totalMs ~= b.totalMs then
+        return a.totalMs > b.totalMs
+    end
+    if a.maxMs ~= b.maxMs then
+        return a.maxMs > b.maxMs
+    end
+    return tostring(a.label or "") < tostring(b.label or "")
+end
+
 -- ----- Public methods ----- --
 function Database.EnsureBootstrapEvents()
     return seedBootstrapEvents()
@@ -139,6 +184,7 @@ addon._PerfFinish = function(self, label, startedAt, details)
     end
 
     local elapsedMs = (getTime() - startedAt) * 1000
+    recordPerfStat(label, elapsedMs)
     if elapsedMs < getPerfThresholdMs() then
         return elapsedMs
     end
@@ -152,6 +198,42 @@ addon._PerfFinish = function(self, label, startedAt, details)
         self:info(template:format(tostring(label or "?"), elapsedMs, suffix))
     end
     return elapsedMs
+end
+
+addon._PerfGetStats = function(self, out)
+    out = out or {}
+    clearArray(out)
+
+    local state = self and self.State or addon.State
+    local stats = state and state.perfStats or nil
+    if not stats then
+        return out
+    end
+
+    local n = 0
+    for _, row in pairs(stats) do
+        n = n + 1
+        local count = tonumber(row.count) or 0
+        local totalMs = tonumber(row.totalMs) or 0
+        out[n] = {
+            label = tostring(row.label or "?"),
+            count = count,
+            totalMs = totalMs,
+            maxMs = tonumber(row.maxMs) or 0,
+            avgMs = count > 0 and (totalMs / count) or 0,
+        }
+    end
+
+    tsort(out, sortPerfSnapshot)
+    return out
+end
+
+addon._PerfResetStats = function(self)
+    local state = self and self.State or addon.State
+    if state then
+        state.perfStats = {}
+    end
+    return true
 end
 
 local function getController(name)

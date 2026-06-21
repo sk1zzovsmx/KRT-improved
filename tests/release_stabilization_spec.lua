@@ -4643,6 +4643,116 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     assertTrue(syncTarget.addon.DB.Syncer._pendingRequests[syncRequestId] == nil, "expected successful sync merge to complete the pending request")
 end)
 
+test("db syncer records sync payload byte chunk metrics", function()
+    local source = newHarness()
+    source.addon.State.perfEnabled = true
+    source.addon.hasPerf = true
+    local itemLink = source.registerItem(9001, "Sync Blade")
+    local itemString = source.addon.Item.GetItemStringFromLink(itemLink)
+    source:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 77,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 2, class = "MAGE", join = 1000, countMS = 3 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", mode = "n", difficulty = 4, time = 1010, hash = "patchwerk-1010", players = { 1 } },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    itemId = 9001,
+                    itemName = "Sync Blade",
+                    itemString = itemString,
+                    itemLink = itemLink,
+                    itemRarity = 4,
+                    itemTexture = "Icon9001",
+                    itemCount = 1,
+                    looterNid = 1,
+                    rollType = source.rollTypes.MAINSPEC,
+                    rollValue = 98,
+                    bossNid = 10,
+                    time = 1015,
+                },
+            },
+            nextPlayerNid = 2,
+            nextBossNid = 11,
+            nextLootNid = 102,
+        },
+    })
+
+    local snapshotMessages = {}
+    source.addon.IsInGroup = function()
+        return true
+    end
+    source.addon.IsInRaid = function()
+        return false
+    end
+    source.addon.Strings.TrimText = function(value)
+        return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    _G.SendAddonMessage = function(prefix, payload, channel, target)
+        snapshotMessages[#snapshotMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+            channel = channel,
+            target = target,
+        }
+    end
+
+    source:load("!KRT/Modules/Comms.lua")
+    source:load("!KRT/Modules/Base64.lua")
+    source:load("!KRT/Database/DBSyncer.lua")
+
+    assertTrue(source.addon.DB.Syncer:BroadcastLoggerPush(77, "Bob") == true, "expected source push snapshot to send")
+    assertTrue(#snapshotMessages > 1, "expected source snapshot to be chunked")
+
+    local outgoing = source.addon.DB.Syncer:GetSyncMetrics()
+    assertEqual(outgoing.outgoingSnapshots, 1, "expected one outgoing snapshot metric")
+    assertEqual(outgoing.outgoingMessages, #snapshotMessages, "expected outgoing message frequency to match sent chunks")
+    assertEqual(outgoing.outgoingChunks, #snapshotMessages, "expected outgoing chunk metric to match sent chunks")
+    assertTrue(outgoing.outgoingBytes > 0, "expected outgoing byte metric")
+    assertEqual(#outgoing.modes, 1, "expected one per-mode metrics row")
+    assertEqual(outgoing.modes[1].mode, "PUSH", "expected outgoing metrics to be grouped by mode")
+    assertEqual(outgoing.modes[1].outgoingChunks, #snapshotMessages, "expected per-mode outgoing chunks")
+
+    local target = newHarness()
+    target.addon.State.perfEnabled = true
+    target.addon.hasPerf = true
+    target:installRaidStore({})
+    target.addon.IsInGroup = function()
+        return true
+    end
+    target.addon.IsInRaid = function()
+        return false
+    end
+    target:load("!KRT/Modules/Comms.lua")
+    target:load("!KRT/Modules/Base64.lua")
+    target:load("!KRT/Database/DBSyncer.lua")
+
+    for i = 1, #snapshotMessages do
+        local msg = snapshotMessages[i]
+        target.addon.DB.Syncer:OnAddonMessage(msg.prefix, msg.payload, msg.channel, "Alice")
+    end
+
+    local incoming = target.addon.DB.Syncer:GetSyncMetrics()
+    assertEqual(incoming.incomingSnapshots, 1, "expected one completed incoming snapshot metric")
+    assertEqual(incoming.incomingMessages, #snapshotMessages, "expected incoming message frequency to match received chunks")
+    assertEqual(incoming.incomingChunks, #snapshotMessages, "expected incoming chunk metric to match received chunks")
+    assertTrue(incoming.incomingBytes > 0, "expected incoming byte metric")
+
+    target.addon.DB.Syncer:ResetSyncMetrics()
+    local reset = target.addon.DB.Syncer:GetSyncMetrics()
+    assertEqual(reset.incomingMessages, 0, "expected reset to clear incoming metrics")
+    assertEqual(#reset.modes, 0, "expected reset to clear per-mode metrics")
+end)
+
 test("logger export escapes loot CSV fields and filters by boss and player", function()
     local h, raid, Export = setupLoggerExportHarness({
         {
@@ -4934,6 +5044,89 @@ test("logger view lists only bosses attended by selected raid player", function(
     assertTextNotContains(rows[2].name, "Shared:", "expected shared loot source records to stay out of boss participation")
 end)
 
+test("logger view and export hot paths record perf measurements", function()
+    local h, raid, Export = setupLoggerExportHarness({
+        {
+            schemaVersion = 1,
+            raidNid = 49,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            startTime = 1700006000,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE", join = 1700006000, leave = 1700006120 },
+                { playerNid = 2, name = "Bob", class = "WARRIOR", join = 1700006000, leave = 1700006120 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", time = 1700006060, mode = "n", players = { 1, 2 } },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    bossNid = 10,
+                    itemId = 9101,
+                    itemName = "Measured Blade",
+                    looterNid = 1,
+                    rollType = 1,
+                    rollValue = 88,
+                    time = 1700006070,
+                },
+            },
+            nextPlayerNid = 3,
+            nextBossNid = 11,
+            nextLootNid = 102,
+        },
+    })
+    h:load("!KRT/Services/Logger/View.lua")
+
+    local perfRows = {}
+    h.addon.hasPerf = true
+    h.addon._PerfStart = function()
+        return #perfRows + 1
+    end
+    h.addon._PerfFinish = function(_, label, startedAt, details)
+        perfRows[#perfRows + 1] = {
+            label = label,
+            startedAt = startedAt,
+            details = details,
+        }
+    end
+
+    local View = h.addon.Services.Logger.View
+    local rows = {}
+    View:FillLootList(rows, raid, 10, "Alice")
+    View:FillBossList(rows, raid)
+    View:FillRaidAttendeesList(rows, raid)
+    View:FillBossAttendeesList(rows, raid, 10)
+    View:GetPlayerBossParticipationList(rows, raid, 1)
+    Export:GetLootCSV(raid, { selectedBossNid = 10, selectedPlayerNid = 1 })
+    Export:GetRaidAttendanceCSV(raid)
+
+    local function findPerf(label)
+        for i = 1, #perfRows do
+            if perfRows[i].label == label then
+                return perfRows[i]
+            end
+        end
+        return nil
+    end
+
+    local function assertPerf(label, detail)
+        local row = findPerf(label)
+        assertTrue(row ~= nil, "expected " .. label .. " perf measurement")
+        assertTextContains(row.details, "raid=49", "expected raid context for " .. label)
+        assertTextContains(row.details, detail, "expected row context for " .. label)
+    end
+
+    assertPerf("Logger.View.FillLootList", "rows=1")
+    assertPerf("Logger.View.FillBossList", "rows=1")
+    assertPerf("Logger.View.FillRaidAttendeesList", "rows=2")
+    assertPerf("Logger.View.FillBossAttendeesList", "rows=2")
+    assertPerf("Logger.View.GetPlayerBossParticipationList", "rows=1")
+    assertPerf("Logger.Export.GetLootCSV", "rows=1")
+    assertPerf("Logger.Export.GetRaidAttendanceCSV", "rows=2")
+end)
+
 test("logger updates duplicate item entries by lootNid only", function()
     local h = newHarness()
     local link = h.registerItem(9001, "Twinblade")
@@ -5017,6 +5210,56 @@ test("logger updates duplicate item entries by lootNid only", function()
     local bad = request.ok
     assertTrue(bad == false, "expected raw itemId logger update to fail")
     assertContains(h.logs.error, "expected lootNid but got raw itemId", "expected explicit raw itemId guard-rail log")
+end)
+
+test("logger loot refresh coalesces duplicate raid update bursts", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+    h:load("!KRT/Controllers/Logger.lua")
+
+    local Logger = h.addon.Controllers.Logger
+    Logger._SetSelectedRaid(1)
+    Logger._lootUiHandle = nil
+
+    local scheduledCount = 0
+    local cancelledCount = 0
+    local oldScheduleTimer = Logger.ScheduleTimer
+    local oldCancelTimer = Logger.CancelTimer
+    Logger.ScheduleTimer = function(self, callback, delay, ...)
+        scheduledCount = scheduledCount + 1
+        return oldScheduleTimer(self, callback, delay, ...)
+    end
+    Logger.CancelTimer = function(self, handle)
+        cancelledCount = cancelledCount + 1
+        return oldCancelTimer(self, handle)
+    end
+
+    h.Bus.TriggerEvent(h.addon.Events.Internal.RaidLootUpdate, 2)
+    assertEqual(scheduledCount, 0, "expected unrelated raid loot updates to skip logger loot refresh")
+
+    h.Bus.TriggerEvent(h.addon.Events.Internal.RaidLootUpdate, 1)
+    h.Bus.TriggerEvent(h.addon.Events.Internal.RaidLootUpdate, 1)
+
+    assertEqual(scheduledCount, 1, "expected duplicate raid loot updates to reuse one pending refresh")
+    assertEqual(cancelledCount, 0, "expected duplicate raid loot updates to avoid cancelling the pending refresh")
+    h.flushTimers()
+    assertEqual(Logger.Loot._ctrl.dirtyCount, 1, "expected coalesced logger loot refresh to dirty the list once")
+    assertEqual(Logger._lootUiHandle, nil, "expected logger loot refresh handle to clear after firing")
 end)
 
 test("logger actions resolve edit winner against boss attendees", function()
@@ -11278,6 +11521,20 @@ test("runtime perf logger reports only slow measured blocks", function()
     currentTime = 1000.012
     h.addon:_PerfFinish("slow block", start, "items=2")
 
+    local stats = h.addon:_PerfGetStats()
+    assertEqual(#stats, 2, "expected perf stats to include slow and fast measured blocks")
+    assertEqual(stats[1].label, "slow block", "expected slowest perf block to sort first by total time")
+    assertEqual(stats[1].count, 1, "expected slow block count to be tracked")
+    assertTrue(math.abs(stats[1].totalMs - 8) < 0.0001, "expected slow block total milliseconds to be tracked")
+    assertTrue(math.abs(stats[1].maxMs - 8) < 0.0001, "expected slow block max milliseconds to be tracked")
+    assertTrue(math.abs(stats[1].avgMs - 8) < 0.0001, "expected slow block average milliseconds to be tracked")
+    assertEqual(stats[2].label, "fast block", "expected fast measured blocks to remain visible in perf stats")
+    assertEqual(stats[2].count, 1, "expected fast block count to be tracked")
+    assertTrue(math.abs(stats[2].totalMs - 4) < 0.0001, "expected fast block total milliseconds to be tracked")
+
+    h.addon:_PerfResetStats()
+    assertEqual(#h.addon:_PerfGetStats(), 0, "expected perf stats reset to clear accumulated rows")
+
     _G.LibStub = oldLibStub
     _G.GetTime = oldGetTime
 
@@ -12731,6 +12988,7 @@ end)
 
 test("master assignment buttons stay disabled until a target is selected", function()
     local h = newHarness()
+    local perfRows = {}
 
     h.addon.Services.Loot = {
         GetItem = function()
@@ -12768,6 +13026,17 @@ test("master assignment buttons stay disabled until a target is selected", funct
         rank = 2,
         isMasterLooter = true,
     })
+    h.addon.hasPerf = true
+    h.addon._PerfStart = function()
+        return #perfRows + 1
+    end
+    h.addon._PerfFinish = function(_, label, startedAt, details)
+        perfRows[#perfRows + 1] = {
+            label = label,
+            startedAt = startedAt,
+            details = details,
+        }
+    end
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.UI = h.addon.UI
@@ -12827,6 +13096,10 @@ test("master assignment buttons stay disabled until a target is selected", funct
 
     refreshMasterFrameForTest(Master)
 
+    assertEqual(#perfRows, 1, "expected first Master refresh to record one perf row")
+    assertEqual(perfRows[1].label, "Master.RefreshUI", "expected Master refresh perf label")
+    assertEqual(perfRows[1].startedAt, 1, "expected Master refresh to finish the started measurement")
+    assertContains({ perfRows[1].details }, "items=1 rolls=0", "expected Master refresh perf context")
     assertEqual(_G.KRTMasterHoldBtn._enabled, false, "expected Hold to disable when no holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, false, "expected Bank to disable when no banker is selected")
     assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to disable when no disenchanter is selected")
@@ -12837,6 +13110,8 @@ test("master assignment buttons stay disabled until a target is selected", funct
 
     refreshMasterFrameForTest(Master)
 
+    assertEqual(#perfRows, 2, "expected second Master refresh to record one perf row")
+    assertEqual(perfRows[2].label, "Master.RefreshUI", "expected repeated Master refresh perf label")
     assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
     assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to stay disabled without a target")
@@ -14194,6 +14469,11 @@ test("master roll rows stay clickable through the shared list controller", funct
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
+    local rollListDirtyCount = 0
+    local rollListUpdateCount = 0
+    local rollListController = Master._rollListController
+    local oldRollListDirty = rollListController and rollListController.Dirty or nil
+    local oldRollListUpdateNow = rollListController and rollListController.UpdateNow or nil
     local frame = h.makeFrame(true, "KRTMaster")
     local suffixes = {
         "ConfigBtn",
@@ -14226,6 +14506,19 @@ test("master roll rows stay clickable through the shared list controller", funct
         "ItemBtn",
     }
 
+    assertTrue(type(oldRollListDirty) == "function", "expected Master roll list controller to expose Dirty")
+    assertTrue(type(oldRollListUpdateNow) == "function", "expected Master roll list controller to expose UpdateNow")
+
+    function rollListController:Dirty()
+        rollListDirtyCount = rollListDirtyCount + 1
+        return oldRollListDirty(self)
+    end
+
+    function rollListController:UpdateNow()
+        rollListUpdateCount = rollListUpdateCount + 1
+        return oldRollListUpdateNow(self)
+    end
+
     _G.KRTMaster = frame
     for i = 1, #suffixes do
         local name = "KRTMaster" .. suffixes[i]
@@ -14238,6 +14531,16 @@ test("master roll rows stay clickable through the shared list controller", funct
     Master.RequestRefresh = function() end
     loadMasterFrameForTest(Master, frame)
     refreshMasterFrameForTest(Master)
+
+    assertTrue(rollListDirtyCount > 0, "expected first Master refresh to dirty the roll list")
+    assertTrue(rollListUpdateCount > 0, "expected first Master refresh to update the roll list")
+
+    local dirtyAfterFirstRefresh = rollListDirtyCount
+    local updatesAfterFirstRefresh = rollListUpdateCount
+    refreshMasterFrameForTest(Master)
+
+    assertEqual(rollListDirtyCount, dirtyAfterFirstRefresh, "expected unchanged Master refresh to skip roll list dirtying")
+    assertEqual(rollListUpdateCount, updatesAfterFirstRefresh, "expected unchanged Master refresh to skip roll list update")
 
     local row = _G.KRTMasterPlayerBtn1
     assertTrue(row ~= nil, "expected the shared list controller to create the first roll row")
@@ -15459,6 +15762,63 @@ test("reserves import explicit format prevents cross-format fallback", function(
     assertEqual(jsonAsCsvReason, "NO_ROWS", "expected encoded JSON rejected as missing CSV rows")
 end)
 
+test("reserves import query and render hot paths record perf measurements", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {}
+
+    local perfRows = {}
+    h.addon.hasPerf = true
+    h.addon._PerfStart = function()
+        return #perfRows + 1
+    end
+    h.addon._PerfFinish = function(_, label, startedAt, details)
+        perfRows[#perfRows + 1] = {
+            label = label,
+            startedAt = startedAt,
+            details = details,
+        }
+    end
+
+    h:load("!KRT/Services/Reserves.lua")
+    local Reserves = h.addon.Services.Reserves
+    local csv = table.concat({
+        '"item","itemid","from","name","class","spec","note","plus"',
+        '"Coldsteel",1201,"Naxx","Alice","MAGE","Arcane","main",4',
+        '"Frost Edge",1301,"Naxx","Bob","WARRIOR","Arms","off",1',
+    }, "\n")
+
+    local parsed = Reserves:ParseImport(csv, "plus", { format = "csv" })
+    assertTrue(type(parsed) == "table", "expected CSV import to parse")
+    local ok = Reserves:ApplyImport(parsed, nil, { silentInfo = true, reason = "perf_test" })
+    assertTrue(ok == true, "expected parsed reserves to apply")
+
+    Reserves:GetDisplayList()
+    Reserves:QueryMissingItems(true)
+    Reserves:GetReadinessReport(1201)
+
+    local function findPerf(label, detail)
+        for i = 1, #perfRows do
+            local row = perfRows[i]
+            if row.label == label and (not detail or tostring(row.details or ""):find(detail, 1, true)) then
+                return row
+            end
+        end
+        return nil
+    end
+
+    local function assertPerf(label, detail)
+        local row = findPerf(label, detail)
+        assertTrue(row ~= nil, "expected " .. label .. " perf measurement with " .. tostring(detail))
+    end
+
+    assertPerf("Reserves.ParseImport", "players=2")
+    assertPerf("Reserves.ApplyImport", "players=2")
+    assertPerf("Reserves.GetDisplayList", "rows=2")
+    assertPerf("Reserves.QueryItemInfo", "item=1201")
+    assertPerf("Reserves.QueryMissingItems", "missing=2")
+    assertPerf("Reserves.GetReadinessReport", "item=1201")
+end)
+
 test("reserves item-info updates coalesce into a single refresh", function()
     local h = newHarness()
     _G.KRT_Reserves = {
@@ -16216,6 +16576,130 @@ test("slash perf toggles runtime performance logging", function()
 
     assertTrue(h.addon.State.perfEnabled ~= true, "expected /krt perf off to disable runtime performance logging")
     assertContains(h.logs.info, "Performance logging: disabled.", "expected perf command to report disabled state")
+end)
+
+test("slash perf reports and resets runtime performance aggregates", function()
+    local h = newHarness()
+    local rows = {
+        { label = "slow block", count = 2, totalMs = 12, avgMs = 6, maxMs = 8 },
+        { label = "fast block", count = 1, totalMs = 4, avgMs = 4, maxMs = 4 },
+    }
+    local resetCalled = false
+    _G.SlashCmdList = {}
+
+    function h.addon:_PerfGetStats()
+        local out = {}
+        for i = 1, #rows do
+            out[i] = rows[i]
+        end
+        return out
+    end
+
+    function h.addon:_PerfResetStats()
+        resetCalled = true
+        rows = {}
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("perf report")
+
+    assertContains(h.logs.info, "Performance report: 2 block(s).", "expected perf report title")
+    assertContains(h.logs.info, "1) slow block count=2 total=12ms avg=6ms max=8ms", "expected slow block perf row")
+    assertContains(h.logs.info, "2) fast block count=1 total=4ms avg=4ms max=4ms", "expected fast block perf row")
+
+    _G.SlashCmdList.KRT("perf reset")
+
+    assertTrue(resetCalled, "expected perf reset command to clear runtime perf stats")
+    assertContains(h.logs.info, "Performance report reset.", "expected perf reset acknowledgement")
+
+    _G.SlashCmdList.KRT("perf report")
+
+    assertContains(h.logs.info, "Performance report: no measured blocks.", "expected empty perf report after reset")
+end)
+
+test("slash perf reports and resets sync payload metrics", function()
+    local h = newHarness()
+    local resetCalled = false
+    _G.SlashCmdList = {}
+
+    h.Database.GetSyncer = function()
+        return {
+            GetSyncMetrics = function()
+                return {
+                    outgoingMessages = 3,
+                    outgoingChunks = 2,
+                    outgoingBytes = 360,
+                    outgoingRequests = 1,
+                    outgoingSnapshots = 1,
+                    incomingMessages = 4,
+                    incomingChunks = 3,
+                    incomingBytes = 540,
+                    incomingRequests = 1,
+                    incomingSnapshots = 1,
+                    modes = {
+                        {
+                            mode = "PUSH",
+                            outgoingMessages = 2,
+                            outgoingChunks = 2,
+                            outgoingBytes = 360,
+                            outgoingRequests = 0,
+                            outgoingSnapshots = 1,
+                            incomingMessages = 3,
+                            incomingChunks = 3,
+                            incomingBytes = 540,
+                            incomingRequests = 0,
+                            incomingSnapshots = 1,
+                        },
+                        {
+                            mode = "SYNC",
+                            outgoingMessages = 1,
+                            outgoingChunks = 0,
+                            outgoingBytes = 0,
+                            outgoingRequests = 1,
+                            outgoingSnapshots = 0,
+                            incomingMessages = 1,
+                            incomingChunks = 0,
+                            incomingBytes = 0,
+                            incomingRequests = 1,
+                            incomingSnapshots = 0,
+                        },
+                    },
+                }
+            end,
+            ResetSyncMetrics = function()
+                resetCalled = true
+            end,
+        }
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("perf sync")
+
+    assertContains(
+        h.logs.info,
+        "Sync performance report: out messages=3 chunks=2 bytes=360 requests=1 snapshots=1; in messages=4 chunks=3 bytes=540 requests=1 snapshots=1.",
+        "expected sync perf summary"
+    )
+    assertContains(
+        h.logs.info,
+        "PUSH out messages=2 chunks=2 bytes=360 requests=0 snapshots=1; in messages=3 chunks=3 bytes=540 requests=0 snapshots=1.",
+        "expected PUSH sync perf row"
+    )
+    assertContains(
+        h.logs.info,
+        "SYNC out messages=1 chunks=0 bytes=0 requests=1 snapshots=0; in messages=1 chunks=0 bytes=0 requests=1 snapshots=0.",
+        "expected SYNC sync perf row"
+    )
+
+    _G.SlashCmdList.KRT("perf reset")
+
+    assertTrue(resetCalled, "expected perf reset to clear sync payload metrics")
 end)
 
 test("slash bug prints local diagnostic summary", function()

@@ -1862,7 +1862,11 @@ do
     end
 
     local function refreshMasterFrame()
+        local perfStart = addon.hasPerf and addon:_PerfStart() or nil
         uiState.Refresh()
+        if perfStart then
+            addon:_PerfFinish("Master.RefreshUI", perfStart, "items=" .. tostring(lootState.lootCount or 0) .. " rolls=" .. tostring(lootState.rollsCount or 0))
+        end
     end
 
     Private.RefreshFrame = refreshMasterFrame
@@ -2552,7 +2556,8 @@ do
             module._dirtyFlags.buttons = false
         end
 
-        if module._rollListController then
+        local rollListDirty = module._dirtyFlags.rolls or module._dirtyFlags.winner
+        if module._rollListController and rollListDirty then
             if module._rollListController.Dirty then
                 module._rollListController:Dirty()
             end

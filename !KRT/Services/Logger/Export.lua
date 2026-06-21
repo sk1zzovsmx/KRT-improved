@@ -66,6 +66,13 @@ local function normalizeContext(context)
     return type(context) == "table" and context or {}
 end
 
+local function startPerf()
+    if addon.hasPerf and addon._PerfStart then
+        return addon:_PerfStart()
+    end
+    return nil
+end
+
 local function formatTimestamp(timestamp)
     local resolvedTimestamp = tonumber(timestamp) or 0
     if resolvedTimestamp <= 0 then
@@ -106,6 +113,17 @@ end
 
 local function getRaidNid(raid)
     return tonumber(raid and raid.raidNid) or ""
+end
+
+local function finishPerf(label, startedAt, raid, rows, csvText)
+    if not (startedAt and addon._PerfFinish) then
+        return
+    end
+
+    local rowCount = type(rows) == "table" and #rows or 0
+    local byteCount = type(csvText) == "string" and #csvText or 0
+    local details = "raid=" .. tostring(getRaidNid(raid)) .. " rows=" .. tostring(rowCount) .. " bytes=" .. tostring(byteCount)
+    addon:_PerfFinish(label, startedAt, details)
 end
 
 local function getRaidDate(raid)
@@ -160,6 +178,7 @@ function Export:GetCSV(mode, raid, context)
 end
 
 function Export:GetLootCSV(raid, context)
+    local perfStart = startPerf()
     context = normalizeContext(context)
     local queries = getRaidQueries()
     local playerName = getSelectedPlayerName(raid, context)
@@ -191,10 +210,13 @@ function Export:GetLootCSV(raid, context)
         end
     end
 
-    return buildCSV(HEADER_LOOT, rows)
+    local csv = buildCSV(HEADER_LOOT, rows)
+    finishPerf("Logger.Export.GetLootCSV", perfStart, raid, rows, csv)
+    return csv
 end
 
 function Export:GetRaidAttendanceCSV(raid)
+    local perfStart = startPerf()
     local queries = getRaidQueries()
     local attendanceRows = queries and queries.GetRaidAttendance and queries:GetRaidAttendance(raid) or {}
     local rows = {}
@@ -221,7 +243,9 @@ function Export:GetRaidAttendanceCSV(raid)
         end
     end
 
-    return buildCSV(HEADER_RAID_ATTENDANCE, rows)
+    local csv = buildCSV(HEADER_RAID_ATTENDANCE, rows)
+    finishPerf("Logger.Export.GetRaidAttendanceCSV", perfStart, raid, rows, csv)
+    return csv
 end
 
 local registry = feature.ModuleRegistry

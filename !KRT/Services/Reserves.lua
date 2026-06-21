@@ -82,6 +82,13 @@ do
         return false
     end
 
+    local function startPerf()
+        if addon.hasPerf and addon._PerfStart then
+            return addon:_PerfStart()
+        end
+        return nil
+    end
+
     local function normalizeImportMode(mode)
         return (mode == "plus") and "plus" or "multi"
     end
@@ -355,6 +362,25 @@ do
             end
         end
         return players, entries
+    end
+
+    local function finishPerf(label, startedAt, details)
+        if not (startedAt and addon._PerfFinish) then
+            return
+        end
+        addon:_PerfFinish(label, startedAt, tostring(details or ""))
+    end
+
+    local function getParsedReserveCounts(parsed)
+        local players, entries = countReserves(parsed and parsed.reservesData)
+        if players == 0 and parsed and parsed.nPlayers then
+            players = tonumber(parsed.nPlayers) or players
+        end
+        return players, entries
+    end
+
+    local function perfBool(value)
+        return value and "1" or "0"
     end
 
     local function buildReservesChecksum(sourceData, mode)
@@ -785,11 +811,32 @@ do
     end
 
     function Service:ParseImport(text, mode, opts)
-        return importParser.ParseImport(self, text, mode, opts)
+        local perfStart = startPerf()
+        local parsed, errCode, errData = importParser.ParseImport(self, text, mode, opts)
+        local players, entries = getParsedReserveCounts(parsed)
+        finishPerf(
+            "Reserves.ParseImport",
+            perfStart,
+            "mode="
+                .. normalizeImportMode(mode)
+                .. " bytes="
+                .. tostring(type(text) == "string" and #text or 0)
+                .. " players="
+                .. tostring(players)
+                .. " entries="
+                .. tostring(entries)
+                .. " ok="
+                .. perfBool(type(parsed) == "table")
+                .. " reason="
+                .. tostring(errCode or "")
+        )
+        return parsed, errCode, errData
     end
 
     function Service:ApplyImport(parsed, raidId, opts)
+        local perfStart = startPerf()
         if type(parsed) ~= "table" or type(parsed.reservesData) ~= "table" then
+            finishPerf("Reserves.ApplyImport", perfStart, "ok=0 reason=INVALID_PARSED")
             return false, "INVALID_PARSED"
         end
 
@@ -814,12 +861,20 @@ do
 
         local reason = (opts and opts.reason) or "import"
         Bus.TriggerEvent(InternalEvents.ReservesDataChanged, reason, raidId, mode, nPlayers)
+        local players, entries = countReserves(reservesData)
+        finishPerf(
+            "Reserves.ApplyImport",
+            perfStart,
+            "mode=" .. tostring(mode) .. " players=" .. tostring(players) .. " entries=" .. tostring(entries) .. " nPlayers=" .. tostring(nPlayers) .. " ok=1"
+        )
         return true, nPlayers
     end
 
     -- ----- Item Info Querying ----- --
     function Service:QueryItemInfo(itemId)
+        local perfStart = startPerf()
         if not itemId then
+            finishPerf("Reserves.QueryItemInfo", perfStart, "item=? ready=0 pending=" .. tostring(pendingItemCount))
             return
         end
         if isDebugEnabled() then
@@ -861,6 +916,7 @@ do
                 addon:debug(Diag.D.LogReservesItemInfoReady:format(itemId, name))
             end
             completePendingItem(itemId)
+            finishPerf("Reserves.QueryItemInfo", perfStart, "item=" .. tostring(itemId) .. " ready=1 pending=" .. tostring(pendingItemCount))
             return true
         end
 
@@ -869,11 +925,13 @@ do
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesItemInfoPendingQuery:format(itemId))
         end
+        finishPerf("Reserves.QueryItemInfo", perfStart, "item=" .. tostring(itemId) .. " ready=0 pending=" .. tostring(pendingItemCount))
         return false
     end
 
     -- Query all missing items for reserves
     function Service:QueryMissingItems(silent, primeFn)
+        local perfStart = startPerf()
         local seen = {}
         local count = 0
         local updated = false
@@ -909,6 +967,7 @@ do
             addon:debug(Diag.D.LogReservesMissingItems:format(count))
             addon:debug(Diag.D.LogSRQueryMissingItems:format(tostring(updated), count))
         end
+        finishPerf("Reserves.QueryMissingItems", perfStart, "missing=" .. tostring(count) .. " updated=" .. perfBool(updated))
         return updated, count
     end
 
@@ -967,7 +1026,22 @@ do
     end
 
     function Service:GetReadinessReport(itemId, raidNum)
-        return DisplayHelpers.GetReadinessReport(getDisplayContext(), itemId, raidNum)
+        local perfStart = startPerf()
+        local report = DisplayHelpers.GetReadinessReport(getDisplayContext(), itemId, raidNum)
+        local rosterReport = report and report.rosterReport or {}
+        finishPerf(
+            "Reserves.GetReadinessReport",
+            perfStart,
+            "item="
+                .. tostring(itemId or "")
+                .. " players="
+                .. tostring(rosterReport.totalReservePlayers or 0)
+                .. " hasData="
+                .. perfBool(report and report.hasReserveData == true)
+                .. " hasItem="
+                .. perfBool(report and report.hasItemReserves == true)
+        )
+        return report
     end
 
     function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
@@ -1007,7 +1081,11 @@ do
     end
 
     function Service:GetDisplayList()
-        return DisplayHelpers.GetDisplayList(getDisplayContext())
+        local perfStart = startPerf()
+        local wasDirty = reservesDirty == true
+        local list = DisplayHelpers.GetDisplayList(getDisplayContext())
+        finishPerf("Reserves.GetDisplayList", perfStart, "rows=" .. tostring(type(list) == "table" and #list or 0) .. " dirty=" .. perfBool(wasDirty))
+        return list
     end
 
     function Service:GetSyncMetadata()

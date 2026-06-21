@@ -33,6 +33,12 @@ Release-Version: 0.8.0-beta.1
   helpers, centralized indexed list row names in `UI.Lists`, and documented the
   decision to keep nested vendored copies untouched unless release packaging
   policy changes.
+- **Runtime performance diagnostics** - Added `/krt perf report` and
+  `/krt perf reset` so runtime performance measurements can be reviewed and
+  cleared from chat without enabling extra frame work, and extended measured
+  hot paths to Logger view/filter list builders, CSV exports, and Reserves
+  import, item-query, readiness, display-list paths, and sync payload
+  byte/chunk counters exposed through `/krt perf sync`.
 - **Raid query ownership** - Removed fallback boss and looter lookup copies from
   Logger, Raid, and sync services so raid-domain reads delegate to the shared
   raid query facade instead of maintaining parallel lookup logic.

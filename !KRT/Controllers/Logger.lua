@@ -3179,8 +3179,7 @@ do
         end
 
         if module._lootUiHandle then
-            module:CancelTimer(module._lootUiHandle)
-            module._lootUiHandle = nil
+            return
         end
         module._lootUiHandle = module:ScheduleTimer(function()
             module._lootUiHandle = nil
