@@ -241,11 +241,23 @@
 					</Anchors>
 					<Color r="1" g="0.82" b="0.36" a="1" />
 				</FontString>
+				<Texture name="$parentSpecIcon" hidden="true">
+					<Size>
+						<AbsDimension x="12" y="12" />
+					</Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</Texture>
 				<FontString name="$parentName" inherits="GameFontNormal" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT">
 							<Offset>
-								<AbsDimension x="18" y="0" />
+								<AbsDimension x="30" y="0" />
 							</Offset>
 						</Anchor>
 						<Anchor point="RIGHT" relativeTo="$parentInfo" relativePoint="LEFT">
@@ -263,7 +275,7 @@
 					<Anchors>
 						<Anchor point="LEFT" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="2" y="0" />
+								<AbsDimension x="16" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>

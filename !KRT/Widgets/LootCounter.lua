@@ -93,6 +93,8 @@ do
     local RESET_BTN_W = 18 -- per-row reset button
     local RESET_BTN_GAP = 16 -- wide gap between FREE section and reset button (avoids accidental clicks)
     local RIGHT_EDGE = -2 -- offset from scrollChild right for the reset button
+    local SPEC_ICON_SIZE = 14
+    local SPEC_ICON_GAP = 4
     local resetAllCounts
 
     -- One section = count label + gap + minus button + gap + plus button
@@ -468,8 +470,14 @@ do
             addColumnSeparator(row, row.freeSection, 2, 2)
             addColumnSeparator(row, row.reset, 2, 2)
 
+            row.specIcon = row:CreateTexture(nil, "OVERLAY")
+            row.specIcon:SetSize(SPEC_ICON_SIZE, SPEC_ICON_SIZE)
+            row.specIcon:SetPoint("LEFT", row, "LEFT", 0, 0)
+            row.specIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            row.specIcon:Hide()
+
             row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+            row.name:SetPoint("LEFT", row, "LEFT", SPEC_ICON_SIZE + SPEC_ICON_GAP, 0)
             row.name:SetPoint("RIGHT", row.msSection, "LEFT", -COL_GAP, 0)
             row.name:SetJustifyH("LEFT")
 
@@ -650,6 +658,26 @@ do
                 row.name:SetTextColor(r, g, b)
                 row._lastClass = class
             end
+            local specIcon = nil
+            local specInspect = Services.SpecInspect
+            if specInspect and specInspect.GetPlayerSpecSnapshot and name then
+                local spec = specInspect:GetPlayerSpecSnapshot(name)
+                specIcon = spec and spec.icon or nil
+            end
+
+            if row.specIcon then
+                if row._lastSpecIcon ~= specIcon then
+                    row._lastSpecIcon = specIcon
+                    if specIcon and specIcon ~= "" then
+                        row.specIcon:SetTexture(specIcon)
+                        row.specIcon:Show()
+                    else
+                        row.specIcon:Hide()
+                    end
+                end
+            else
+                row._lastSpecIcon = specIcon
+            end
 
             local msCount = (data and tonumber(data.msCount)) or 0
             local osCount = (data and tonumber(data.osCount)) or 0
@@ -754,6 +782,9 @@ do
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
     Bus.RegisterCallback(InternalEvents.PlayerCountChanged, requestRefresh)
+
+    -- Refresh when spec inspection updates.
+    Bus.RegisterCallback(InternalEvents.SpecInspectUpdated, requestRefresh)
 
     -- New raid session: reset view.
     Bus.RegisterCallback(InternalEvents.RaidCreate, requestRefresh)

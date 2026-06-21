@@ -822,6 +822,15 @@ do
         for key, value in pairs(source) do
             copy[key] = value
         end
+        local specInspect = Services.SpecInspect
+        if specInspect and specInspect.GetPlayerSpecSnapshot and copy.name then
+            local spec = specInspect:GetPlayerSpecSnapshot(copy.name)
+            if spec then
+                copy.specIcon = spec.icon
+                copy.specName = spec.specName
+                copy.specRole = spec.role
+            end
+        end
         return copy
     end
 
@@ -903,7 +912,7 @@ do
             keyName = "MasterRolls",
             rowName = UI.Lists.MakeIndexedRowName("PlayerBtn"),
             rowTmpl = "KRTSelectPlayerTemplate",
-            _rowParts = { "Name", "Roll", "Counter", "Info", "Star" },
+            _rowParts = { "Name", "Roll", "Counter", "Info", "Star", "SpecIcon" },
             getData = copyVisibleRollRows,
             drawRow = UI.Lists.CreateRowRenderer(drawRollRow),
             highlightFn = function(_, data)
@@ -4074,6 +4083,12 @@ do
     -- Redraw after toggling the optional +N column in the MS roll list.
     Bus.RegisterCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
         requestCoalescedUiRefresh("roll-counter")
+    end)
+
+    Bus.RegisterCallback(InternalEvents.SpecInspectUpdated, function()
+        invalidateRollUiModel()
+        module._dirtyFlags.rolls = true
+        module:RequestRefresh()
     end)
 end
 

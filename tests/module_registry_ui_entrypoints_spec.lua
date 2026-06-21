@@ -1027,6 +1027,9 @@ end
 local function assertLootCounterDependencyLocalContract()
     local source = read("!KRT/Widgets/LootCounter.lua")
     assertContains(source, "local Options = feature.Options", "LootCounter must localize Options from feature shared")
+    assertContains(source, "row.specIcon", "LootCounter must render spec icons")
+    assertContains(source, "GetPlayerSpecSnapshot", "LootCounter must consume SpecInspect snapshots")
+    assertContains(source, "SpecInspectUpdated", "LootCounter must refresh on spec updates")
     assertNotContains(source, "addon.Options", "LootCounter must use the local Options dependency")
     assertNotContains(source, "addon.Database.GetCurrentRaid", "LootCounter must use the local Database dependency")
 end

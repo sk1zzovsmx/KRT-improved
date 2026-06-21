@@ -195,6 +195,7 @@ local function getMasterRollRowRefs(row)
             counter = "Counter",
             info = "Info",
             star = "Star",
+            specIcon = "SpecIcon",
         })
     end
     return nil
@@ -480,6 +481,7 @@ function Rows.DrawMasterRollRow(row, data, onClick)
     local counterStr = ui and (ui.counter or ui.Counter) or nil
     local infoStr = ui and (ui.info or ui.Info) or nil
     local star = ui and (ui.star or ui.Star) or nil
+    local specIcon = ui and (ui.specIcon or ui.SpecIcon) or nil
 
     if nameStr then
         local class = data.class or "UNKNOWN"
@@ -504,6 +506,18 @@ function Rows.DrawMasterRollRow(row, data, onClick)
     if infoStr then
         infoStr:SetText(data.infoText or "")
         infoStr:Show()
+    end
+
+    if specIcon then
+        if data.specIcon and data.specIcon ~= "" then
+            specIcon:SetTexture(data.specIcon)
+            if specIcon.SetTexCoord then
+                specIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
+            specIcon:Show()
+        else
+            specIcon:Hide()
+        end
     end
 
     Primitives.SetShown(star, data.showStar == true)
