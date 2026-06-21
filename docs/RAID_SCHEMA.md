@@ -21,6 +21,7 @@ Strict mode status: current-schema reads are enabled; retired payload keys are s
 | `disenchanter` | string | no | `nil` | Optional current disenchanter target (Master UI target). |
 | `players` | table(array) | yes | `{}` | Canonical persisted player records. |
 | `attendance` | table(array) | yes | `{}` | Canonical per-player attendance segments keyed by `playerNid`. |
+| `inspect` | table(map) | no | `nil` | Optional raid-start inspect snapshots keyed by `playerNid`. |
 | `bossKills` | table(array) | yes | `{}` | Canonical boss kill records. |
 | `loot` | table(array) | yes | `{}` | Canonical loot records. |
 | `changes` | table(map) | yes | `{}` | Player -> spec change map for MS changes UI. |
@@ -59,6 +60,42 @@ Strict mode status: current-schema reads are enabled; retired payload keys are s
 | `endTime` | number/nil | no | `nil` | Segment end timestamp, `nil` when still active. |
 | `subgroup` | number | no | `nil` | Raid subgroup when not the default group `1`. |
 | `online` | boolean | no | `nil` | `false` means offline; omitted/`nil` means online. |
+
+## RaidInspectSnapshot (`raid.inspect`)
+
+`raid.inspect` is optional. Old raids may omit it.
+
+Persisted root fields:
+- `startedAt` (optional number)
+- `completedAt` (optional number)
+- `mode` (optional string)
+
+Persisted player snapshot fields under `players[playerNid]`:
+- `playerNid`
+- `name`
+- `guid`
+- `class`
+- `status`
+- `reason`
+- `inspectedAt`
+- `avgIlvl`
+- `specName`
+- `specIcon`
+- `mainTalentTree`
+
+Persisted item fields under `players[playerNid].items[slotId]`:
+- `slot`
+- `itemId`
+- `itemLink`
+- `texture`
+- `quality`
+- `ilvl`
+- `enchantId`
+- `gems`
+
+Only final inspect states persist: `ready`, `skipped`, `timeout`, and `failed`.
+Runtime states `queued` and `pending` must not persist. Inspect snapshots are
+not included in DBSyncer or Logger export payloads in this phase.
 
 ## BossKillRecord (`raid.bossKills[i]`)
 

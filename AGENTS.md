@@ -44,7 +44,8 @@ non-trivial code change. The user may also refer to it explicitly by name.
 - `code-mapper` is read-only exploration and should map ownership, call paths, branch points,
   and unknowns before edits when uncertainty is material.
 - `spark_implementer` is implementation-only and should use `gpt-5.3-codex-spark`.
-- `tooling_worker` should use `gpt-4o` for scripts, tooling, transforms, reports, and
+- `tooling_worker` should use `gpt-5.5` with medium reasoning effort for scripts, tooling,
+  transforms, reports, and
   documentation-oriented technical work around the addon.
 
 Use `tooling_worker` when the task is primarily:
@@ -61,8 +62,9 @@ Use models by task type:
 
 - `gpt-5.5` is the default model for core addon reasoning: architecture, mapping, planning,
   debugging, review, final correction, and behavior-sensitive runtime work.
-- `gpt-4o` is preferred for tooling, utility scripts, local automation, text/data transforms,
-  reports, and documentation-oriented technical work around the addon.
+- `gpt-5.5` with medium reasoning effort is preferred for tooling, utility scripts, local
+  automation, text/data transforms, reports, and documentation-oriented technical work around
+  the addon when a dedicated tooling worker is used in this environment.
 - `spark_implementer` on `gpt-5.3-codex-spark` is for micro-patches only. It should not own
   design, architecture, multi-file reasoning, or behavior-sensitive refactors.
 
@@ -74,7 +76,8 @@ Prefer `gpt-5.5` whenever the task touches:
 - `!KRT/!KRT.toc`
 - SavedVariables shape, load order, service/controller boundaries, or public behavior
 
-Prefer `gpt-4o` when the task is outside the runtime-critical addon core and is primarily:
+Prefer `tooling_worker` on `gpt-5.5` medium when the task is outside the runtime-critical addon
+core and is primarily:
 
 - `tools/*` work
 - helper scripts

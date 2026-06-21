@@ -41,6 +41,16 @@ Observed persisted attendance fields:
 - `attendance[].segments[].subgroup` (optional number; group `1` can be omitted)
 - `attendance[].segments[].online` (optional boolean; omitted/`nil` means online, `false` means offline)
 
+Observed optional inspect fields:
+- `inspect.startedAt`
+- `inspect.completedAt`
+- `inspect.mode`
+- `inspect.players[playerNid]` compact final per-player snapshot
+
+Only final inspect states are persisted: `ready`, `skipped`, `timeout`, and
+`failed`. Runtime queue states `queued` and `pending` are intentionally absent
+after `/reload`.
+
 v5 storage policy:
 - optional/default-only fields can be omitted during save compaction,
 - runtime readers resolve defaults when fields are omitted.

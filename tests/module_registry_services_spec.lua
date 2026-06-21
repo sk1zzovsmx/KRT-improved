@@ -233,6 +233,24 @@ local expectedSpecInspectService = {
     events = "-- events: listens wow.READY_CHECK and LibGroupTalents callbacks; emits SpecInspectUpdated",
 }
 
+local expectedRaidInspectService = {
+    name = "Services/RaidInspect",
+    path = "!KRT/Services/RaidInspect.lua",
+    registryFromFeature = true,
+    owner = "module",
+    separator = ":",
+    deps = {
+        "Init",
+        "Modules/ModuleRegistry",
+        "Modules/Events",
+        "Modules/Bus",
+        "Modules/Timer",
+        "Modules/Strings",
+        "Services/Raid/Roster",
+        "Services/Raid/Attendance",
+    },
+}
+
 local expectedSpammerServices = {
     {
         name = "Services/Spammer/Draft",
@@ -931,6 +949,7 @@ local moduleTocPaths = {
     ["Services/Loot/Rules"] = "Services\\Loot\\Rules.lua",
     ["Services/Loot/DistributionSession"] = "Services\\Loot\\DistributionSession.lua",
     ["Services/Loot/Service"] = "Services\\Loot\\Service.lua",
+    ["Services/RaidInspect"] = "Services\\RaidInspect.lua",
     ["Services/Raid/State"] = "Services\\Raid\\State.lua",
     ["Services/Raid/Capabilities"] = "Services\\Raid\\Capabilities.lua",
     ["Services/Raid/Counts"] = "Services\\Raid\\Counts.lua",
@@ -1022,6 +1041,7 @@ end
 for i = 1, #expectedSpammerServices do
     assertBefore(toc, "Modules\\ModuleRegistry.lua", moduleTocPaths[expectedSpammerServices[i].name])
 end
+assertBefore(toc, "Modules\\ModuleRegistry.lua", moduleTocPaths[expectedRaidInspectService.name])
 
 local namespaceOptionFiles = {
     "!KRT/Services/Chat.lua",
@@ -1570,6 +1590,7 @@ for i = 1, #expectedSpammerServices do
 end
 
 assertServiceRegistryContract(expectedSpecInspectService)
+assertServiceRegistryContract(expectedRaidInspectService)
 
 local pending = {}
 for i = 1, #preRegistryCoreModules do
@@ -1635,6 +1656,8 @@ end
 
 registry.AddModule(expectedSpecInspectService.name, { deps = expectedSpecInspectService.deps })
 registry.SetLoaded(expectedSpecInspectService.name)
+registry.AddModule(expectedRaidInspectService.name, { deps = expectedRaidInspectService.deps })
+registry.SetLoaded(expectedRaidInspectService.name)
 
 for i = 1, #expectedRollServices do
     local expected = expectedRollServices[i]
@@ -1681,6 +1704,10 @@ assertDeps(status.Deps, expectedService.deps, expectedService.name)
 local specInspectStatus = registry.GetStatus(expectedSpecInspectService.name)
 assert(specInspectStatus and specInspectStatus.Loaded == true, "Services/SpecInspect must be loaded in registry")
 assertDeps(specInspectStatus.Deps, expectedSpecInspectService.deps, expectedSpecInspectService.name)
+
+local raidInspectStatus = registry.GetStatus(expectedRaidInspectService.name)
+assert(raidInspectStatus and raidInspectStatus.Loaded == true, "Services/RaidInspect must be loaded in registry")
+assertDeps(raidInspectStatus.Deps, expectedRaidInspectService.deps, expectedRaidInspectService.name)
 
 for i = 1, #expectedRollServices do
     local expected = expectedRollServices[i]

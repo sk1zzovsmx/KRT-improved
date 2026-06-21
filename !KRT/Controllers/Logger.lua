@@ -122,16 +122,34 @@ local LOGGER_LOOT_COLUMN_RATIOS = {
     time = 0.11,
 }
 
-local LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS = {
+local LOGGER_ATTENDANCE_COMPACT_COLUMN_MIN_WIDTHS = {
     name = 106,
     join = LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH,
     leave = LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH,
 }
 
-local LOGGER_ATTENDANCE_COLUMN_RATIOS = {
+local LOGGER_ATTENDANCE_COMPACT_COLUMN_RATIOS = {
     name = 0.56,
     join = 0.22,
     leave = 0.22,
+}
+
+local LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS = {
+    name = 68,
+    join = 39,
+    leave = 39,
+    ilvl = 30,
+    spec = 25,
+    inspect = 0,
+}
+
+local LOGGER_ATTENDANCE_COLUMN_RATIOS = {
+    name = 0,
+    join = 0,
+    leave = 0,
+    ilvl = 0,
+    spec = 0,
+    inspect = 1,
 }
 
 local LOGGER_BOSS_COLUMN_MIN_WIDTHS = {
@@ -320,7 +338,12 @@ local function getLootColumnWidths(frameName)
 end
 
 local function getAttendanceColumnWidths(frameName)
-    local budget = getLoggerListColumnBudget(frameName, LOGGER_ROW_LEFT_INSET, 2)
+    local isInspectPanel = frameName == "KRTRaidAttendanceRaidAttendees"
+    local gapCount = isInspectPanel and 5 or 2
+    local budget = getLoggerListColumnBudget(frameName, LOGGER_ROW_LEFT_INSET, gapCount)
+    if not isInspectPanel then
+        return calculateLoggerColumnWidths(budget, LOGGER_ATTENDANCE_COMPACT_COLUMN_MIN_WIDTHS, LOGGER_ATTENDANCE_COMPACT_COLUMN_RATIOS)
+    end
     return calculateLoggerColumnWidths(budget, LOGGER_ATTENDANCE_COLUMN_MIN_WIDTHS, LOGGER_ATTENDANCE_COLUMN_RATIOS)
 end
 
@@ -386,11 +409,18 @@ local function applyAttendanceListColumnWidths(frameName)
         return
     end
     local widths = getAttendanceColumnWidths(frameName)
-    positionLoggerHeaderColumns(frameName, {
+    local isInspectPanel = frameName == "KRTRaidAttendanceRaidAttendees"
+    local columns = {
         { header = _G[frameName .. "HeaderName"], width = widths.name, trailingGap = true },
         { header = _G[frameName .. "HeaderJoin"], width = widths.join, trailingGap = true },
-        { header = _G[frameName .. "HeaderLeave"], width = widths.leave, trailingGap = false },
-    }, LOGGER_PANEL_SCROLL_LEFT_OFFSET + LOGGER_ROW_LEFT_INSET)
+        { header = _G[frameName .. "HeaderLeave"], width = widths.leave, trailingGap = isInspectPanel },
+    }
+    if isInspectPanel then
+        columns[#columns + 1] = { header = _G[frameName .. "HeaderIlvl"], width = widths.ilvl, trailingGap = true }
+        columns[#columns + 1] = { header = _G[frameName .. "HeaderSpec"], width = widths.spec, trailingGap = true }
+        columns[#columns + 1] = { header = _G[frameName .. "HeaderInspect"], width = widths.inspect, trailingGap = false }
+    end
+    positionLoggerHeaderColumns(frameName, columns, LOGGER_PANEL_SCROLL_LEFT_OFFSET + LOGGER_ROW_LEFT_INSET)
 end
 
 local function applyAttendanceRowColumnWidths(ui, frameName)
@@ -401,6 +431,214 @@ local function applyAttendanceRowColumnWidths(ui, frameName)
     setWidgetWidth(ui.Name, widths.name)
     setWidgetWidth(ui.Join, widths.join)
     setWidgetWidth(ui.Leave, widths.leave)
+    if frameName == "KRTRaidAttendanceRaidAttendees" then
+        setWidgetWidth(ui.Ilvl, widths.ilvl)
+        setWidgetWidth(ui.Spec, widths.spec)
+        setWidgetWidth(ui.InspectStatus, widths.inspect)
+    end
+end
+
+local RAID_INSPECT_SLOTS = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 }
+local RAID_INSPECT_ICON_SIZE = 19
+local RAID_INSPECT_ICON_GAP = 0.5
+local RAID_SPEC_ICON_SIZE = 19
+
+local function getInspectStatusLabel(status, reason)
+    local safeStatus = status and tostring(status):lower() or ""
+    if safeStatus == "ready" then
+        return ""
+    end
+    if safeStatus == "" then
+        return L.StrInspectNotInspected
+    end
+    if safeStatus == "queued" then
+        return L.StrInspectQueued
+    end
+    if safeStatus == "pending" then
+        return L.StrInspectPending
+    end
+    if safeStatus == "skipped" then
+        if reason and reason ~= "" then
+            return (L.StrInspectSkippedReason):format(reason)
+        end
+        return L.StrInspectSkipped
+    end
+    if safeStatus == "timeout" then
+        return L.StrInspectTimeout
+    end
+    if safeStatus == "failed" then
+        if reason and reason ~= "" then
+            return (L.StrInspectFailedReason):format(reason)
+        end
+        return L.StrInspectFailed
+    end
+    return tostring(status)
+end
+
+local function ensureAttendanceInspectIcon(row, index, ui)
+    if not row or not ui then
+        return nil
+    end
+    row._krtAttendanceInspectIcons = row._krtAttendanceInspectIcons or {}
+    local list = row._krtAttendanceInspectIcons
+    local icon = list[index]
+    if icon then
+        return icon
+    end
+
+    icon = CreateFrame("Button", nil, row)
+    icon:EnableMouse(true)
+    icon:SetSize(RAID_INSPECT_ICON_SIZE, RAID_INSPECT_ICON_SIZE)
+    icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    icon.texture:SetAllPoints(icon)
+    icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetScript("OnEnter", function(self)
+        local link = self._krtItemLink
+        if not link then
+            return
+        end
+        if GameTooltip and GameTooltip.SetOwner and GameTooltip.SetHyperlink then
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+            GameTooltip:SetHyperlink(link)
+            GameTooltip:Show()
+        end
+    end)
+    icon:SetScript("OnLeave", function()
+        if GameTooltip and GameTooltip.Hide then
+            GameTooltip:Hide()
+        end
+    end)
+    list[index] = icon
+    return icon
+end
+
+local function clearAttendanceInspectIcons(row)
+    if not row or not row._krtAttendanceInspectIcons then
+        return
+    end
+
+    for i = 1, #row._krtAttendanceInspectIcons do
+        local icon = row._krtAttendanceInspectIcons[i]
+        if icon then
+            icon:Hide()
+            icon._krtItemLink = nil
+            icon._krtPlayerNid = nil
+            if icon.texture then
+                if icon.texture.SetDesaturated then
+                    icon.texture:SetDesaturated(false)
+                end
+                icon.texture:SetTexture(nil)
+            end
+        end
+    end
+end
+
+local GetItemIcon = _G.GetItemIcon or function(itemId)
+    if not itemId then
+        return nil
+    end
+    return nil
+end
+
+local function ensureAttendanceSpecIcon(row)
+    if not row then
+        return nil
+    end
+    if row._krtAttendanceSpecIcon then
+        return row._krtAttendanceSpecIcon
+    end
+
+    local icon = row:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    row._krtAttendanceSpecIcon = icon
+    return icon
+end
+
+local function setAttendanceSpecIcon(row, ui, specIcon)
+    if ui and ui.Spec and ui.Spec.SetText then
+        ui.Spec:SetText("")
+    end
+
+    local icon = ensureAttendanceSpecIcon(row)
+    if not icon then
+        return
+    end
+    if not (ui and ui.Spec) then
+        icon:Hide()
+        return
+    end
+
+    icon:ClearAllPoints()
+    icon:SetPoint("CENTER", ui.Spec, "CENTER", 0, -1)
+
+    if specIcon and specIcon ~= "" then
+        icon:SetTexture(specIcon)
+        icon:Show()
+        return
+    end
+
+    icon:Hide()
+    icon:SetTexture(nil)
+end
+
+local function renderAttendanceInspectIcons(row, ui, playerNid, snapshot)
+    if not row then
+        return
+    end
+    clearAttendanceInspectIcons(row)
+    if not ui or not playerNid then
+        if ui and ui.InspectStatus then
+            ui.InspectStatus:SetText("")
+        end
+        return
+    end
+
+    local status = snapshot and snapshot.status
+    local reason = snapshot and snapshot.reason
+    local label = getInspectStatusLabel(status, reason)
+    if ui.InspectStatus then
+        ui.InspectStatus:SetText(label)
+    end
+
+    if not snapshot or tostring(status or ""):lower() ~= "ready" then
+        return
+    end
+
+    local items = snapshot.items
+    if type(items) ~= "table" then
+        return
+    end
+
+    local x = 0
+    local count = 0
+    for i = 1, #RAID_INSPECT_SLOTS do
+        local slot = RAID_INSPECT_SLOTS[i]
+        local item = items[slot]
+        if item and (item.texture or item.itemLink) then
+            count = count + 1
+            local icon = ensureAttendanceInspectIcon(row, count, ui)
+            if not icon then
+                break
+            end
+            icon._krtItemLink = item.itemLink
+            icon._krtPlayerNid = playerNid
+            local iconTexture = item.texture
+            if not iconTexture and item.itemId then
+                iconTexture = GetItemIcon(item.itemId)
+            end
+            if icon.texture then
+                icon.texture:SetTexture(iconTexture or 134400)
+                if icon.texture.SetDesaturated then
+                    icon.texture:SetDesaturated(false)
+                end
+            end
+            icon:ClearAllPoints()
+            icon:SetPoint("TOPLEFT", ui.InspectStatus, "TOPLEFT", x, -1)
+            icon:Show()
+            x = x + RAID_INSPECT_ICON_SIZE + RAID_INSPECT_ICON_GAP
+        end
+    end
 end
 
 local function applyBossListColumnWidths(frameName)
@@ -2552,6 +2790,15 @@ do
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
+            if _G[n .. "HeaderIlvl"] then
+                _G[n .. "HeaderIlvl"]:SetText("")
+            end
+            if _G[n .. "HeaderSpec"] then
+                _G[n .. "HeaderSpec"]:SetText("")
+            end
+            if _G[n .. "HeaderInspect"] then
+                _G[n .. "HeaderInspect"]:SetText("")
+            end
             applyAttendanceListColumnWidths(n)
             local addBtn = _G[n .. "AddBtn"]
             if addBtn then
@@ -3291,15 +3538,13 @@ local function initializeRaidAttendanceFrame()
         local history = refs.history
         setAttendancePanelVisible(refs.raids, true)
         setAttendancePanelVisible(refs.raidAttendees, true)
-        setAttendancePanelVisible(refs.bosses, true)
+        setAttendancePanelVisible(refs.bosses, false)
 
         placePanel(refs.raids, "TOPLEFT", history, "TOPLEFT", 0, 0, 335, 430)
-        placePanel(refs.raidAttendees, "TOPLEFT", refs.raids, "TOPRIGHT", 7, 0, 265, 430)
-        placePanel(refs.bosses, "TOPLEFT", refs.raidAttendees, "TOPRIGHT", 7, 0, 335, 430)
+        placePanel(refs.raidAttendees, "TOPLEFT", refs.raids, "TOPRIGHT", 7, 0, 607, 430)
 
         applyRaidListColumnWidths(ATTENDANCE_RAIDS_FRAME)
         applyAttendanceListColumnWidths(ATTENDANCE_PLAYERS_FRAME)
-        applyBossListColumnWidths(ATTENDANCE_BOSSES_FRAME)
     end
 
     module._isRaidAttendanceViewingCurrentRaid = function()
@@ -3409,13 +3654,16 @@ local function initializeRaidAttendanceFrame()
     attendancePlayersController = makeLoggerList({
         keyName = "RaidAttendancePlayersList",
         poolTag = "logger-attendance-players",
-        _rowParts = { "Name", "Join", "Leave" },
+        _rowParts = { "Name", "Join", "Leave", "Ilvl", "Spec", "InspectStatus" },
 
         localize = function(n)
             module._setPanelTitle(n, L.StrRaidAttendees)
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
+            _G[n .. "HeaderIlvl"]:SetText(L.StrIlvl)
+            _G[n .. "HeaderSpec"]:SetText(L.StrSpec)
+            _G[n .. "HeaderInspect"]:SetText(L.StrInspectItems)
             applyAttendanceListColumnWidths(n)
             if _G[n .. "AddBtn"] then
                 _G[n .. "AddBtn"]:SetText(L.BtnUpdate)
@@ -3429,6 +3677,27 @@ local function initializeRaidAttendanceFrame()
                     deleteSelectedRaidAttendancePlayer()
                 end)
             end
+            local forceBtn = _G[n .. "ForceInspectBtn"]
+            if forceBtn then
+                forceBtn:SetText(L.BtnForceInspect)
+                UI.Frames.SetScriptSafely(forceBtn, "OnClick", function()
+                    local selectedRaid = module.attendanceSelectedRaid
+                    local selectedPlayer = module.attendanceSelectedPlayer
+                    if not (selectedRaid and selectedPlayer) then
+                        return
+                    end
+                    local currentRaid = Database.GetCurrentRaid()
+                    if not (currentRaid and tonumber(currentRaid) == tonumber(selectedRaid)) then
+                        return
+                    end
+                    if Services.RaidInspect and Services.RaidInspect.ForcePlayer then
+                        Services.RaidInspect:ForcePlayer(selectedRaid, selectedPlayer)
+                        if attendancePlayersController then
+                            attendancePlayersController:Dirty()
+                        end
+                    end
+                end)
+            end
 
             local frame = _G[n]
             if frame and not frame._krtAttendanceBound then
@@ -3440,6 +3709,12 @@ local function initializeRaidAttendanceFrame()
                 end)
                 UI.Frames.SetScriptSafely(_G[n .. "HeaderLeave"], "OnClick", function()
                     attendancePlayersController:Sort("leave")
+                end)
+                UI.Frames.SetScriptSafely(_G[n .. "HeaderIlvl"], "OnClick", function()
+                    attendancePlayersController:Sort("ilvl")
+                end)
+                UI.Frames.SetScriptSafely(_G[n .. "HeaderSpec"], "OnClick", function()
+                    attendancePlayersController:Sort("spec")
                 end)
                 frame._krtAttendanceBound = true
             end
@@ -3455,7 +3730,7 @@ local function initializeRaidAttendanceFrame()
 
         rowName = UI.Lists.MakeIndexedRowName("PlayerBtn"),
         rowTmpl = "KRTLoggerRaidAttendeeButton",
-
+        rowHeight = LOGGER_COMPACT_ROW_HEIGHT + 1,
         drawRow = UI.Lists.CreateRowRenderer(function(row, it)
             if not row._krtAttendanceBound then
                 UI.Frames.SetScriptSafely(row, "OnClick", function(self, button)
@@ -3465,11 +3740,19 @@ local function initializeRaidAttendanceFrame()
             end
             local ui = row._p
             applyAttendanceRowColumnWidths(ui, ATTENDANCE_PLAYERS_FRAME)
+            local rowId = it.id or it.playerNid
+            if rowId then
+                row:SetID(tonumber(rowId) or rowId)
+            end
+            row._krtPlayerNid = rowId
             ui.Name:SetText(it.name)
             local r, g, b = Colors.GetClassColor(it.class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Join:SetText(it.joinFmt)
             ui.Leave:SetText(it.leaveFmt)
+            ui.Ilvl:SetText(it.avgIlvlFmt or "")
+            setAttendanceSpecIcon(row, ui, it.inspect and it.inspect.specIcon)
+            renderAttendanceInspectIcons(row, ui, row._krtPlayerNid, it.inspect)
         end),
 
         postUpdate = function(n)
@@ -3492,6 +3775,15 @@ local function initializeRaidAttendanceFrame()
             if deleteBtn then
                 UI.Primitives.SetEnabled(deleteBtn, module.attendanceSelectedPlayer ~= nil)
             end
+            local forceBtn = _G[n .. "ForceInspectBtn"]
+            if forceBtn then
+                local currentRaid = Database.GetCurrentRaid()
+                local canForce = currentRaid
+                    and module.attendanceSelectedPlayer
+                    and module.attendanceSelectedRaid
+                    and tonumber(module.attendanceSelectedRaid) == tonumber(currentRaid)
+                UI.Primitives.SetEnabled(forceBtn, canForce and true or false)
+            end
         end,
 
         sorters = {
@@ -3504,6 +3796,12 @@ local function initializeRaidAttendanceFrame()
             leave = function(a, b, asc)
                 local missing = asc and math.huge or -math.huge
                 return CompareNumbers(a.leave, b.leave, asc, missing)
+            end,
+            ilvl = function(a, b, asc)
+                return CompareNumbers(a.avgIlvl, b.avgIlvl, asc, 0)
+            end,
+            spec = function(a, b, asc)
+                return compareStrings(a.specName, b.specName, asc)
             end,
         },
     }, "attendanceSelectedPlayer", nil, { debugTag = "RaidAttendanceSelectPlayer" })
@@ -3697,6 +3995,28 @@ local function initializeRaidAttendanceFrame()
         end
         module.attendanceSelectedRaid = tonumber(raidId) or raidId
         module.attendanceSelectedPlayer = nil
+        markAttendanceListsDirty()
+    end)
+    Bus.RegisterCallback(InternalEvents.RaidInspectUpdated, function(_, raidId)
+        if not (module.attendanceSelectedRaid and tonumber(module.attendanceSelectedRaid) == tonumber(raidId)) then
+            return
+        end
+        if attendancePlayersController then
+            attendancePlayersController:Dirty()
+        end
+    end)
+    Bus.RegisterCallback(InternalEvents.RaidInspectCompleted, function(_, raidId)
+        if not (module.attendanceSelectedRaid and tonumber(module.attendanceSelectedRaid) == tonumber(raidId)) then
+            return
+        end
+        if attendancePlayersController then
+            attendancePlayersController:Dirty()
+        end
+    end)
+    Bus.RegisterCallback(InternalEvents.RaidAttendanceChanged, function(_, raidId)
+        if not (module.attendanceSelectedRaid and tonumber(module.attendanceSelectedRaid) == tonumber(raidId)) then
+            return
+        end
         markAttendanceListsDirty()
     end)
 end

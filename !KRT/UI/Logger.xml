@@ -395,6 +395,42 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
+				<FontString name="$parentIlvl" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
+					<Size>
+						<AbsDimension x="42" y="18" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentLeave" relativePoint="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="6" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSpec" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
+					<Size>
+						<AbsDimension x="30" y="18" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIlvl" relativePoint="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="6" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentInspectStatus" inherits="GameFontDisableSmall" justifyH="LEFT" justifyV="MIDDLE">
+					<Size>
+						<AbsDimension x="286" y="18" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentSpec" relativePoint="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="6" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
 			</Layer>
 		</Layers>
 		<HighlightTexture>
@@ -1073,7 +1109,7 @@
 					</Button>
 					<Button name="$parentHeaderJoin" inherits="KRTLoggerTableHeader">
 						<Size>
-							<AbsDimension x="55" y="20" />
+							<AbsDimension x="56" y="20" />
 						</Size>
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeTo="$parentHeaderName" relativePoint="TOPRIGHT">
@@ -1085,7 +1121,7 @@
 					</Button>
 					<Button name="$parentHeaderLeave" inherits="KRTLoggerTableHeader">
 						<Size>
-							<AbsDimension x="55" y="20" />
+							<AbsDimension x="56" y="20" />
 						</Size>
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeTo="$parentHeaderJoin" relativePoint="TOPRIGHT">
@@ -1627,7 +1663,7 @@
 			</Frame>
 			<Frame name="KRTRaidAttendanceRaidAttendees" inherits="KRTLoggerFrameTemplate" parent="KRTRaidAttendanceHistory">
 				<Size>
-					<AbsDimension x="265" y="430" />
+					<AbsDimension x="607" y="430" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="KRTRaidAttendanceRaids" relativePoint="TOPRIGHT">
@@ -1695,6 +1731,18 @@
 							</Anchor>
 						</Anchors>
 					</Button>
+					<Button name="$parentForceInspectBtn" inherits="KRTActionButtonTemplate">
+						<Size>
+							<AbsDimension x="65" y="25" />
+						</Size>
+						<Anchors>
+							<Anchor point="LEFT" relativeTo="$parentDeleteBtn" relativePoint="RIGHT">
+								<Offset>
+									<AbsDimension x="3" y="0" />
+								</Offset>
+							</Anchor>
+						</Anchors>
+					</Button>
 					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="85" y="20" />
@@ -1709,7 +1757,7 @@
 					</Button>
 					<Button name="$parentHeaderJoin" inherits="KRTLoggerTableHeader">
 						<Size>
-							<AbsDimension x="55" y="20" />
+							<AbsDimension x="39" y="20" />
 						</Size>
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeTo="$parentHeaderName" relativePoint="TOPRIGHT" />
@@ -1717,10 +1765,34 @@
 					</Button>
 					<Button name="$parentHeaderLeave" inherits="KRTLoggerTableHeader">
 						<Size>
-							<AbsDimension x="55" y="20" />
+							<AbsDimension x="39" y="20" />
 						</Size>
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeTo="$parentHeaderJoin" relativePoint="TOPRIGHT" />
+						</Anchors>
+					</Button>
+					<Button name="$parentHeaderIlvl" inherits="KRTLoggerTableHeader">
+						<Size>
+							<AbsDimension x="30" y="20" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderLeave" relativePoint="TOPRIGHT" />
+						</Anchors>
+					</Button>
+					<Button name="$parentHeaderSpec" inherits="KRTLoggerTableHeader">
+						<Size>
+							<AbsDimension x="25" y="20" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderIlvl" relativePoint="TOPRIGHT" />
+						</Anchors>
+					</Button>
+					<Button name="$parentHeaderInspect" inherits="KRTLoggerTableHeader">
+						<Size>
+							<AbsDimension x="322" y="20" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderSpec" relativePoint="TOPRIGHT" />
 						</Anchors>
 					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">

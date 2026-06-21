@@ -14,8 +14,22 @@ local Time = feature.Time
 
 local InternalEvents = Events.Internal
 
+local GetNumRaidMembers = GetNumRaidMembers or function()
+    return 0
+end
+local GetRaidRosterInfo = GetRaidRosterInfo or function()
+    return nil
+end
+
 local tinsert = table.insert
-local type, tonumber = type, tonumber
+local type, tonumber, strlower = type, tonumber, strlower
+
+local function normalizeName(value)
+    if type(value) ~= "string" then
+        return nil
+    end
+    return strlower(value)
+end
 
 do
     feature.EnsureServiceNamespace("Raid")
@@ -58,6 +72,26 @@ do
         return entry
     end
 
+    local function findRaidPlayerByName(raid, playerName)
+        local resolvedName = normalizeName(playerName)
+        if not resolvedName then
+            return nil
+        end
+
+        local players = raid and raid.players or nil
+        if type(players) ~= "table" then
+            return nil
+        end
+
+        for i = 1, #players do
+            local player = players[i]
+            if type(player) == "table" and normalizeName(player.name) == resolvedName then
+                return player
+            end
+        end
+        return nil
+    end
+
     local function getOpenSegment(entry)
         local segments = entry and entry.segments or nil
         if type(segments) ~= "table" then
@@ -89,31 +123,46 @@ do
         return true
     end
 
+    local function closeAllOpenSegments(entry, timestamp)
+        local changed = false
+        if type(entry) ~= "table" then
+            return false
+        end
+
+        local openSegment = getOpenSegment(entry)
+        while openSegment do
+            changed = closeOpenSegment(entry, timestamp) or changed
+            openSegment = getOpenSegment(entry)
+        end
+
+        return changed
+    end
+
     local function openSegment(entry, timestamp, subgroup, online)
         local resolvedTimestamp = tonumber(timestamp) or Time.GetCurrentTime()
         local resolvedSubgroup = tonumber(subgroup) or 1
-        local resolvedOnline = online ~= false
+        local resolvedOnline = nil
+        if online == false then
+            resolvedOnline = false
+        end
         local segment = getOpenSegment(entry)
 
         if segment then
             local segmentSubgroup = tonumber(segment.subgroup) or 1
-            local segmentOnline = segment.online ~= false
+            local segmentOnline = segment.online
             if segmentSubgroup == resolvedSubgroup and segmentOnline == resolvedOnline then
                 return segment
             end
             closeOpenSegment(entry, resolvedTimestamp)
         end
 
-        local segmentOnline = nil
-        if not resolvedOnline then
-            segmentOnline = false
-        end
-
         local newSegment = {
             startTime = resolvedTimestamp,
             subgroup = resolvedSubgroup > 1 and resolvedSubgroup or nil,
-            online = segmentOnline,
         }
+        if resolvedOnline == false then
+            newSegment.online = false
+        end
         tinsert(entry.segments, newSegment)
         return newSegment
     end
@@ -149,6 +198,35 @@ do
         return changed
     end
 
+    local function seedFromCurrentRoster(raid, reason)
+        local now = Time.GetCurrentTime()
+        local playerCount = tonumber(GetNumRaidMembers()) or 0
+        if playerCount <= 0 then
+            return false
+        end
+
+        local changed = false
+        for i = 1, playerCount do
+            local name, _, subgroup, _, _, _, _, online = GetRaidRosterInfo(i)
+            if type(name) == "string" and name ~= "" then
+                local player = findRaidPlayerByName(raid, name)
+                if player then
+                    local entry = ensureAttendanceEntry(raid, player.playerNid)
+                    if type(entry) == "table" then
+                        openSegment(entry, tonumber(player.join) or now, subgroup, online)
+                        changed = true
+                    end
+                end
+            end
+        end
+
+        if changed then
+            local raidId = tonumber(raid.raidNid) or tonumber(raid.id) or tonumber(raid.raidNum)
+            Bus.TriggerEvent(InternalEvents.RaidAttendanceChanged, raidId, reason or "raid_start")
+        end
+        return changed
+    end
+
     local function handleRosterDelta(_, delta, _, raidNum)
         local resolvedRaidNum = tonumber(raidNum) or tonumber(delta and delta.raidNum) or 0
         if resolvedRaidNum <= 0 or type(delta) ~= "table" then
@@ -162,9 +240,14 @@ do
         Database.EnsureRaidSchema(raid)
 
         local timestamp = tonumber(delta.timestamp) or Time.GetCurrentTime()
-        applyRosterList(raid, delta.joined, timestamp, false)
-        applyRosterList(raid, delta.updated, timestamp, false)
-        applyRosterList(raid, delta.left, timestamp, true)
+        local joined = applyRosterList(raid, delta.joined, timestamp, false)
+        local updated = applyRosterList(raid, delta.updated, timestamp, false)
+        local left = applyRosterList(raid, delta.left, timestamp, true)
+        local changed = joined or updated or left
+
+        if changed then
+            Bus.TriggerEvent(InternalEvents.RaidAttendanceChanged, resolvedRaidNum, delta.reason)
+        end
     end
 
     -- ----- Public methods ----- --
@@ -193,8 +276,57 @@ do
         return nil
     end
 
+    function module:SeedAttendanceFromCurrentRoster(raidOrId, reason)
+        local raidId = tonumber(raidOrId)
+        if not raidId then
+            if type(raidOrId) == "table" then
+                raidId = tonumber(raidOrId.id) or tonumber(raidOrId.raidNum) or tonumber(raidOrId.raidNid)
+            end
+        end
+        if not raidId then
+            return false
+        end
+        local raid = Database.EnsureRaidById(raidId)
+        if not raid then
+            return false
+        end
+        return seedFromCurrentRoster(raid, reason or "raid_start")
+    end
+
+    function module:CloseAttendanceForRaid(raidOrId, timestamp, reason)
+        local raid = raidOrId
+        if type(raidOrId) ~= "table" then
+            raid = Database.EnsureRaidById(tonumber(raidOrId) or 0)
+        end
+        if type(raid) ~= "table" then
+            return false
+        end
+
+        local attendance = ensureAttendanceTable(raid)
+        local resolvedTimestamp = tonumber(timestamp) or Time.GetCurrentTime()
+        local changed = false
+
+        for i = 1, #attendance do
+            local entry = attendance[i]
+            if type(entry) == "table" and type(entry.segments) == "table" then
+                changed = closeAllOpenSegments(entry, resolvedTimestamp) or changed
+            end
+        end
+
+        if changed then
+            local raidId = tonumber(raid.raidNid) or tonumber(raid.id) or tonumber(raid.raidNum)
+            Bus.TriggerEvent(InternalEvents.RaidAttendanceChanged, raidId, reason or "attendance_end")
+        end
+        return changed
+    end
+
     if Bus and Bus.RegisterCallback and InternalEvents and InternalEvents.RaidRosterDelta then
         Bus.RegisterCallback(InternalEvents.RaidRosterDelta, handleRosterDelta)
+    end
+    if Bus and Bus.RegisterCallback and InternalEvents and InternalEvents.RaidCreate then
+        Bus.RegisterCallback(InternalEvents.RaidCreate, function(_, raidId)
+            module:SeedAttendanceFromCurrentRoster(raidId, "raid_start")
+        end)
     end
 end
 

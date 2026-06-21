@@ -157,6 +157,7 @@
 |   |   |   \\-- Store.lua
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
+|   |   |-- RaidInspect.lua
 |   |   |-- README.md
 |   |   |-- Reserves.lua
 |   |   \\-- SpecInspect.lua
@@ -265,6 +266,7 @@
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-s3-reserves-service.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-u1-ui-scaffold-infrastructure.md
 |   |   |   |-- 2026-06-14-docs-current-addon-state.md
+|   |   |   |-- 2026-06-15-raidinspect-attendance-redesign.md
 |   |   |   \\-- 2026-06-15-tools-current-state-refresh.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
@@ -331,6 +333,8 @@
 |   |-- module_registry_ui_entrypoints_spec.lua
 |   |-- module_registry_ui_spec.lua
 |   |-- raid_grid_spec_icon_spec.lua
+|   |-- raid_inspect_service_spec.lua
+|   |-- raid_inspect_source_contract_spec.lua
 |   |-- release_stabilization_spec.lua
 |   |-- screen_notice_runtime_spec.lua
 |   |-- spec_inspect_service_spec.lua

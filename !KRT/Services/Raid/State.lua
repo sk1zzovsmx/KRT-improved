@@ -1395,6 +1395,9 @@ do
                 end
             end
             raid.endTime = currentTime
+            if type(module.CloseAttendanceForRaid) == "function" then
+                module:CloseAttendanceForRaid(raid, currentTime, "raid_end")
+            end
         end
         Database.SetCurrentRaid(nil)
         Database.SetLastBoss(nil)

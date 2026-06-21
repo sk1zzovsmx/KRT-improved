@@ -1,6 +1,6 @@
 name = "tooling_worker"
-description = "Focused gpt-4o worker for tooling, utility scripts, local automation, reports, transforms, and documentation-oriented technical tasks around the addon."
-model = "gpt-4o"
+description = "Focused gpt-5.5 worker for tooling, utility scripts, local automation, reports, transforms, and documentation-oriented technical tasks around the addon."
+model = "gpt-5.5"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """

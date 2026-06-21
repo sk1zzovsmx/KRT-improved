@@ -18,6 +18,13 @@ Release-Version: 0.8.0-beta.1
 
 ### Fixes
 
+- **Raid attendance inspect snapshots** - Added one-shot raid-start inspect snapshots
+  to the dedicated Raid Attendance window. Attendance keeps continuous
+  join/leave tracking throughout the raid, while inspect data is captured at
+  raid start or by explicit current-raid player force.
+- **Raid attendance inspect snapshots** - Fixed WotLK inspect completion by
+  listening for `INSPECT_TALENT_READY`, preventing online players from falling
+  through to timeout after `NotifyInspect`.
 - **Spec role inspector** - Added runtime spec icons beside player names in
   Master Loot and Loot Counter, backed by `LibGroupTalents-1.0` and
   refreshable with `/krt specinspect`.
@@ -95,6 +102,8 @@ Release-Version: 0.8.0-beta.1
 - **Logger sync payload optimization** - Reduced repeated player-name bytes in
   Logger DB sync snapshots by sending player NID references for boss attendees
   and loot winners when the canonical raid player rows are available.
+- **Logger attendance headers** - Fixed styling for Raid Attendance `ilvl`,
+  `spec`, and `inspect` headers so they use the same Logger header tab chrome.
 - **Master roll model allocation** - Reduced temporary table allocation in
   Loot Master roll display refreshes by reusing the roll model, row list, and
   per-player row tables while clearing UI decoration fields between rebuilds.

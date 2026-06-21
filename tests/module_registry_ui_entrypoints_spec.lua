@@ -46,6 +46,12 @@ local function getPostRegistryDeps(source, moduleName)
     return collectQuotedValues(source:sub(depsStart, depsEnd))
 end
 
+local raidInspectSource = nil
+pcall(function()
+    raidInspectSource = read("!KRT/Services/RaidInspect.lua")
+end)
+assert(raidInspectSource, "Services/RaidInspect.lua must exist for UI entrypoint registry coverage")
+
 local function findLastExportedFunction(source, owner, separator)
     local lastStart = nil
     local startIndex = 1
@@ -426,6 +432,20 @@ local expectedService = {
     deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Timer", "Modules/Strings", "Modules/Comms" },
 }
 
+local expectedRaidInspectService = {
+    name = "Services/RaidInspect",
+    deps = {
+        "Init",
+        "Modules/ModuleRegistry",
+        "Modules/Events",
+        "Modules/Bus",
+        "Modules/Timer",
+        "Modules/Strings",
+        "Services/Raid/Roster",
+        "Services/Raid/Attendance",
+    },
+}
+
 local expectedSpammerServices = {
     {
         name = "Services/Spammer/Draft",
@@ -696,6 +716,7 @@ local moduleTocPaths = {
     ["Services/Loot/Rules"] = "Services\\Loot\\Rules.lua",
     ["Services/Loot/DistributionSession"] = "Services\\Loot\\DistributionSession.lua",
     ["Services/Loot/Service"] = "Services\\Loot\\Service.lua",
+    ["Services/RaidInspect"] = "Services\\RaidInspect.lua",
     ["Services/Raid/State"] = "Services\\Raid\\State.lua",
     ["Services/Raid/Capabilities"] = "Services\\Raid\\Capabilities.lua",
     ["Services/Raid/Counts"] = "Services\\Raid\\Counts.lua",
@@ -1303,6 +1324,8 @@ registerList(expectedLootServices)
 registerList(expectedRaidServices)
 registry.AddModule(expectedService.name, { deps = expectedService.deps })
 registry.SetLoaded(expectedService.name)
+registry.AddModule(expectedRaidInspectService.name, { deps = expectedRaidInspectService.deps })
+registry.SetLoaded(expectedRaidInspectService.name)
 registerList(expectedEntryPoints)
 registerList(expectedRollServices)
 registerList(expectedDebugServices)
@@ -1346,6 +1369,7 @@ local function findSpec(name)
         { expectedService },
         expectedEntryPoints,
         expectedRollServices,
+        { expectedRaidInspectService },
         expectedSpammerServices,
         expectedDebugServices,
         expectedControllers,

@@ -86,6 +86,8 @@ local function seedBootstrapEvents()
     Wow.OpenMasterLootList = Wow.OpenMasterLootList or "wow.OPEN_MASTER_LOOT_LIST"
     Wow.UpdateMasterLootList = Wow.UpdateMasterLootList or "wow.UPDATE_MASTER_LOOT_LIST"
     Wow.ReadyCheck = Wow.ReadyCheck or "wow.READY_CHECK"
+    Wow.InspectTalentReady = Wow.InspectTalentReady or "wow.INSPECT_TALENT_READY"
+    Wow.PlayerRegenEnabled = Wow.PlayerRegenEnabled or "wow.PLAYER_REGEN_ENABLED"
     Wow.PlayerTargetChanged = Wow.PlayerTargetChanged or "wow.PLAYER_TARGET_CHANGED"
     Wow.UiErrorMessage = Wow.UiErrorMessage or "wow.UI_ERROR_MESSAGE"
     Wow.ChatMsgWhisper = Wow.ChatMsgWhisper or "wow.CHAT_MSG_WHISPER"
@@ -882,6 +884,8 @@ do
         TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
         TRADE_CLOSED = "TRADE_CLOSED",
         READY_CHECK = "READY_CHECK",
+        INSPECT_TALENT_READY = "INSPECT_TALENT_READY",
+        PLAYER_REGEN_ENABLED = "PLAYER_REGEN_ENABLED",
         PLAYER_LOGOUT = "PLAYER_LOGOUT",
     }
 
@@ -899,6 +903,8 @@ do
             TRADE_REQUEST_CANCEL = WowEvents.TradeRequestCancel,
             TRADE_CLOSED = WowEvents.TradeClosed,
             READY_CHECK = WowEvents.ReadyCheck,
+            INSPECT_TALENT_READY = WowEvents.InspectTalentReady,
+            PLAYER_REGEN_ENABLED = WowEvents.PlayerRegenEnabled,
         }
 
         for eventName, busEventName in pairs(wowBusEvents) do

@@ -16,6 +16,7 @@ local GetLootSortName = Sort.GetLootSortName
 local twipe = table.wipe
 local tostring, tonumber = tostring, tonumber
 local date, time = date, time
+local floor = math.floor
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "View")
@@ -35,6 +36,68 @@ end
 
 local function getRaidPerfId(raid)
     return tostring((raid and raid.raidNid) or "?")
+end
+
+local function getRaidInspectSnapshot(raid, playerNid)
+    local raidInspect = Services.RaidInspect
+    local nid = tonumber(playerNid)
+    if not nid then
+        return nil
+    end
+
+    if raidInspect and type(raidInspect.GetSnapshot) == "function" then
+        local snapshot = raidInspect:GetSnapshot(raid, nid)
+        if snapshot then
+            return snapshot
+        end
+    end
+
+    local inspectData = raid and raid.inspect
+    local players = inspectData and inspectData.players
+    if type(players) ~= "table" then
+        return nil
+    end
+
+    return players[nid] or players[tostring(nid)]
+end
+
+local function enrichAttendanceRowsWithInspect(raid, out)
+    if type(out) ~= "table" then
+        return
+    end
+
+    for i = 1, #out do
+        local row = out[i]
+        local rowId = tonumber(row.playerNid) or tonumber(row.id)
+        row.playerNid = rowId
+
+        if rowId then
+            local snapshot = getRaidInspectSnapshot(raid, rowId)
+            row.inspect = snapshot
+            if snapshot then
+                local avgIlvl = tonumber(snapshot.avgIlvl)
+                row.avgIlvl = avgIlvl
+                if avgIlvl and avgIlvl > 0 then
+                    row.avgIlvlFmt = tostring(floor(avgIlvl + 0.5))
+                else
+                    row.avgIlvlFmt = ""
+                end
+                row.specName = snapshot.specName
+                row.specFmt = snapshot.specName or ""
+            else
+                row.avgIlvl = nil
+                row.avgIlvlFmt = ""
+                row.specName = nil
+                row.specFmt = ""
+            end
+        else
+            row.inspect = nil
+            row.avgIlvl = nil
+            row.avgIlvlFmt = ""
+            row.specName = nil
+            row.specFmt = ""
+        end
+    end
 end
 
 local function finishPerf(label, startedAt, raid, out, extraDetails)
@@ -124,6 +187,7 @@ function View:FillRaidAttendeesList(out, raid)
     local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.GetRaidAttendance then
         local result = queries:GetRaidAttendance(raid, out)
+        enrichAttendanceRowsWithInspect(raid, out)
         finishPerf("Logger.View.FillRaidAttendeesList", perfStart, raid, out)
         return result
     end
@@ -138,6 +202,7 @@ function View:FillRaidAttendeesList(out, raid)
         it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
         return it
     end)
+    enrichAttendanceRowsWithInspect(raid, out)
     finishPerf("Logger.View.FillRaidAttendeesList", perfStart, raid, out)
 end
 
