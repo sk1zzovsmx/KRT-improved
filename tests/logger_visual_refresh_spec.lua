@@ -47,7 +47,7 @@ assert(visuals:find("function Rows.SetLoggerRowIndex", 1, true), "Logger row str
 assert(visuals:find("function Rows.ApplyLoggerSkin", 1, true), "Logger panel skin must live in shared row visuals")
 assert(visuals:find("function Rows.DrawMasterRollRow", 1, true), "Master roll row rendering must live in shared row visuals")
 assert(logger:find("Rows.SetLoggerRowIndex(row, visibleIndex)", 1, true), "Logger row striping must use visible list position")
-assert(logger:find("Rows.ApplyLoggerSkin(loggerPanelNames)", 1, true), "Logger controller must apply shared Logger skin")
+assert(logger:find("Rows.ApplyLoggerSkin(module._loggerPanelNames)", 1, true), "Logger controller must apply shared Logger skin")
 assert(logger:find("rightInset = 0", 1, true), "Logger lists must keep the existing scrollbar inset policy")
 assert(logger:find("setPanelVisible%(refs%.bossAttendees, false%)", 1, false), "Logger refresh must keep the boss attendee panel hidden")
 assert(frames:find("function Tooltips.ShowLines", 1, true), "Reusable multiline tooltip rendering must live in shared UI tooltips")

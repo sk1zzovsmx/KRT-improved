@@ -167,15 +167,6 @@ local function getActivePassiveLootRollByRollId(rollId)
     return entry
 end
 
-local function hasPassiveLootRollEntries()
-    local state = raidState.passiveLootRolls
-    if type(state) ~= "table" or type(state.byRollId) ~= "table" then
-        return false
-    end
-
-    return next(state.byRollId) ~= nil
-end
-
 local function getLoggedPassiveLootState()
     raidState.loggedPassiveLoot = raidState.loggedPassiveLoot or {}
     return raidState.loggedPassiveLoot

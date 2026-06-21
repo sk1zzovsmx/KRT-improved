@@ -1811,6 +1811,11 @@ do
         module._screenshotWarn = false
     end
 
+    local function handleTradeClosedOrCancelled()
+        resetTradeState()
+        module:RequestRefresh()
+    end
+
     registerAwardedItem = function(count)
         local targetCount = tonumber(lootState.selectedItemCount) or 1
         if targetCount < 1 then
@@ -3565,14 +3570,12 @@ do
 
     -- TRADE_CLOSED: trade window closed (completed or canceled)
     function module:TRADE_CLOSED()
-        resetTradeState()
-        module:RequestRefresh()
+        handleTradeClosedOrCancelled()
     end
 
     -- TRADE_REQUEST_CANCEL: trade request canceled before opening
     function module:TRADE_REQUEST_CANCEL()
-        resetTradeState()
-        module:RequestRefresh()
+        handleTradeClosedOrCancelled()
     end
 
     -- ============================================================================

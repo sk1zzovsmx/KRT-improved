@@ -635,6 +635,24 @@ local function isValidRollValue(text)
     return true, value
 end
 
+local function placePanel(frame, point, relativeTo, relativePoint, x, y, width, height)
+    if not frame then
+        return
+    end
+    if frame.ClearAllPoints then
+        frame:ClearAllPoints()
+    end
+    if frame.SetPoint then
+        frame:SetPoint(point, relativeTo, relativePoint, x, y)
+    end
+    if frame.SetSize then
+        frame:SetSize(width, height)
+    elseif frame.SetWidth and frame.SetHeight then
+        frame:SetWidth(width)
+        frame:SetHeight(height)
+    end
+end
+
 -- Timer ownership: refresh debounce for roster-bound lists.
 Timer.BindMixin(module, "Logger")
 
@@ -868,24 +886,6 @@ do
         UI.Primitives.SetShown(frame, visible)
     end
 
-    local function placePanel(frame, point, relativeTo, relativePoint, x, y, width, height)
-        if not frame then
-            return
-        end
-        if frame.ClearAllPoints then
-            frame:ClearAllPoints()
-        end
-        if frame.SetPoint then
-            frame:SetPoint(point, relativeTo, relativePoint, x, y)
-        end
-        if frame.SetSize then
-            frame:SetSize(width, height)
-        elseif frame.SetWidth and frame.SetHeight then
-            frame:SetWidth(width)
-            frame:SetHeight(height)
-        end
-    end
-
     local function refreshLoggerTabLayout()
         local refs = module.refs or {}
         local activeTab = module.activeTab or "loot"
@@ -921,25 +921,6 @@ do
         if PanelTemplates_SetTab then
             PanelTemplates_SetTab(getFrame(), isLootTab and 1 or 2)
         end
-    end
-
-    local function setActiveLoggerTab(tabName)
-        module.activeTab = tabName == "attendance" and "attendance" or "loot"
-        if module.activeTab == "loot" then
-            clearSelection(module, "selectedBoss", MS_CTX_BOSS)
-            clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
-            clearSelection(module, "selectedPlayer", MS_CTX_RAIDATT)
-        else
-            clearSelection(module, "selectedBoss", MS_CTX_BOSS)
-            clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
-            clearSelection(module, "selectedItem", MS_CTX_LOOT)
-        end
-        refreshLoggerTabLayout()
-        triggerSelectionEvent(module, "selectedBoss")
-        triggerSelectionEvent(module, "selectedBossPlayer")
-        triggerSelectionEvent(module, "selectedPlayer")
-        triggerSelectionEvent(module, "selectedItem")
-        triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
     module._deleteSelectedAttendees = function(ctx, deleteFn, onRemoved)
@@ -3305,24 +3286,6 @@ local function initializeRaidAttendanceFrame()
         end
     end
 
-    local function placeAttendancePanel(frame, point, relativeTo, relativePoint, x, y, width, height)
-        if not frame then
-            return
-        end
-        if frame.ClearAllPoints then
-            frame:ClearAllPoints()
-        end
-        if frame.SetPoint then
-            frame:SetPoint(point, relativeTo, relativePoint, x, y)
-        end
-        if frame.SetSize then
-            frame:SetSize(width, height)
-        elseif frame.SetWidth and frame.SetHeight then
-            frame:SetWidth(width)
-            frame:SetHeight(height)
-        end
-    end
-
     local function refreshRaidAttendanceLayout()
         local refs = attendanceUi.refs or {}
         local history = refs.history
@@ -3330,9 +3293,9 @@ local function initializeRaidAttendanceFrame()
         setAttendancePanelVisible(refs.raidAttendees, true)
         setAttendancePanelVisible(refs.bosses, true)
 
-        placeAttendancePanel(refs.raids, "TOPLEFT", history, "TOPLEFT", 0, 0, 335, 430)
-        placeAttendancePanel(refs.raidAttendees, "TOPLEFT", refs.raids, "TOPRIGHT", 7, 0, 265, 430)
-        placeAttendancePanel(refs.bosses, "TOPLEFT", refs.raidAttendees, "TOPRIGHT", 7, 0, 335, 430)
+        placePanel(refs.raids, "TOPLEFT", history, "TOPLEFT", 0, 0, 335, 430)
+        placePanel(refs.raidAttendees, "TOPLEFT", refs.raids, "TOPRIGHT", 7, 0, 265, 430)
+        placePanel(refs.bosses, "TOPLEFT", refs.raidAttendees, "TOPRIGHT", 7, 0, 335, 430)
 
         applyRaidListColumnWidths(ATTENDANCE_RAIDS_FRAME)
         applyAttendanceListColumnWidths(ATTENDANCE_PLAYERS_FRAME)

@@ -54,18 +54,18 @@ No non-conformant methods found.
 | API | File | Line |
 | --- | --- | ---: |
 | addon:ADDON_LOADED | !KRT/Init.lua | 913 |
-| addon:CHAT_MSG_ADDON | !KRT/Init.lua | 1142 |
-| addon:CHAT_MSG_LOOT | !KRT/Init.lua | 1073 |
-| addon:CHAT_MSG_MONSTER_YELL | !KRT/Init.lua | 1161 |
-| addon:CHAT_MSG_SYSTEM | !KRT/Init.lua | 1100 |
-| addon:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Init.lua | 1173 |
-| addon:PLAYER_DIFFICULTY_CHANGED | !KRT/Init.lua | 1020 |
-| addon:PLAYER_ENTERING_WORLD | !KRT/Init.lua | 1032 |
-| addon:PLAYER_LOGOUT | !KRT/Init.lua | 1181 |
+| addon:CHAT_MSG_ADDON | !KRT/Init.lua | 1145 |
+| addon:CHAT_MSG_LOOT | !KRT/Init.lua | 1076 |
+| addon:CHAT_MSG_MONSTER_YELL | !KRT/Init.lua | 1164 |
+| addon:CHAT_MSG_SYSTEM | !KRT/Init.lua | 1103 |
+| addon:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Init.lua | 1176 |
+| addon:PLAYER_DIFFICULTY_CHANGED | !KRT/Init.lua | 1025 |
+| addon:PLAYER_ENTERING_WORLD | !KRT/Init.lua | 1035 |
+| addon:PLAYER_LOGOUT | !KRT/Init.lua | 1184 |
 | addon:RAID_INSTANCE_WELCOME | !KRT/Init.lua | 1003 |
 | addon:RAID_ROSTER_UPDATE | !KRT/Init.lua | 985 |
-| addon:START_LOOT_ROLL | !KRT/Init.lua | 1129 |
-| addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 1026 |
+| addon:START_LOOT_ROLL | !KRT/Init.lua | 1132 |
+| addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 1030 |
 
 ## Extraction Rules
 

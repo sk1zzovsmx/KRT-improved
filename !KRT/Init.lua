@@ -1016,16 +1016,19 @@ do
         scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, true)
     end
 
-    -- PLAYER_DIFFICULTY_CHANGED: Re-check raid session when raid difficulty changes.
-    function addon:PLAYER_DIFFICULTY_CHANGED()
+    local function handleRaidInstanceInfoChanged()
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
         scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, false)
     end
 
+    -- PLAYER_DIFFICULTY_CHANGED: Re-check raid session when raid difficulty changes.
+    function addon:PLAYER_DIFFICULTY_CHANGED()
+        handleRaidInstanceInfoChanged()
+    end
+
     -- UPDATE_INSTANCE_INFO: Re-check raid session after server pushes instance-save info refreshes.
     function addon:UPDATE_INSTANCE_INFO()
-        local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-        scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, false)
+        handleRaidInstanceInfoChanged()
     end
 
     -- PLAYER_ENTERING_WORLD: Performs initial checks when the player logs in.
