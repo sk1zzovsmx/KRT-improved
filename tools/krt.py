@@ -308,6 +308,71 @@ def launch_codex_client(args: argparse.Namespace) -> dict[str, Any]:
     return {"ok": True, "method": "command", "command": command}
 
 
+def git_current_branch() -> str:
+    completed = run_command_capture(["git", "branch", "--show-current"], cwd=REPO_ROOT)
+    if completed.returncode != 0:
+        raise CliError("Unable to determine the current git branch.")
+    branch = (completed.stdout or "").strip()
+    if not branch:
+        raise CliError("Current git branch is detached or unavailable.")
+    return branch
+
+
+def git_worktree_dirty() -> bool:
+    completed = run_command_capture(["git", "status", "--porcelain"], cwd=REPO_ROOT)
+    if completed.returncode != 0:
+        raise CliError("Unable to inspect git worktree status.")
+    return bool((completed.stdout or "").strip())
+
+
+def slugify_branch_text(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    if not slug:
+        return "task"
+    parts = [part for part in slug.split("-") if part]
+    return "-".join(parts[:8])[:48].strip("-") or "task"
+
+
+def ensure_codex_55to53_branch(args: argparse.Namespace, classification: str, user_prompt: str) -> dict[str, Any]:
+    current_branch = git_current_branch()
+    result: dict[str, Any] = {
+        "attempted": False,
+        "created": False,
+        "current_branch": current_branch,
+    }
+
+    if args.branch_mode == "off" or classification != "complex-orchestrated":
+        result["skipped"] = True
+        result["reason"] = "Branch automation is disabled or the task is not complex-orchestrated."
+        return result
+
+    dirty = git_worktree_dirty()
+    result["attempted"] = True
+    result["dirty_worktree"] = dirty
+    if dirty and not args.allow_dirty_branch:
+        result["blocked"] = True
+        result["reason"] = (
+            "Worktree is dirty. Refusing automatic branch creation to avoid carrying unrelated "
+            "changes into a new task branch. Commit, stash, or rerun with --allow-dirty-branch."
+        )
+        return result
+
+    slug = slugify_branch_text(user_prompt)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    branch_name = f"codex/55to53-{slug}-{timestamp}"
+    completed = run_command_capture(["git", "checkout", "-b", branch_name], cwd=REPO_ROOT)
+    if completed.returncode != 0:
+        result["blocked"] = True
+        result["branch_name"] = branch_name
+        result["reason"] = (completed.stderr or completed.stdout or "git checkout -b failed").strip()
+        return result
+
+    result["created"] = True
+    result["branch_name"] = branch_name
+    result["source_branch"] = current_branch
+    return result
+
+
 def classify_codex_55to53_prompt(prompt: str) -> str:
     lowered = prompt.lower()
     bullet_count = len(re.findall(r"(?m)^\s*(?:[-*]|\d+\.)\s+", prompt))
@@ -384,6 +449,22 @@ def codex_55to53(args: argparse.Namespace) -> int:
         if args.classification != "auto"
         else classify_codex_55to53_prompt(user_prompt)
     )
+    branch_result = ensure_codex_55to53_branch(args, classification, user_prompt)
+    if branch_result.get("blocked"):
+        result = {
+            "profile": args.profile,
+            "classification": classification,
+            "mode": args.mode,
+            "branch_result": branch_result,
+        }
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"Profile: {args.profile}")
+            print(f"Classification: {classification}")
+            print(f"Branch automation blocked: {branch_result['reason']}")
+        return 2
+
     wrapped_prompt = build_codex_55to53_prompt(user_prompt, classification)
 
     payload = {
@@ -391,6 +472,7 @@ def codex_55to53(args: argparse.Namespace) -> int:
         "classification": classification,
         "mode": args.mode,
         "codex_command": args.codex_command,
+        "branch_result": branch_result,
         "wrapped_prompt": wrapped_prompt,
     }
 
@@ -401,6 +483,10 @@ def codex_55to53(args: argparse.Namespace) -> int:
             print(f"Profile: {args.profile}")
             print(f"Classification: {classification}")
             print("Mode: print")
+            if branch_result.get("created"):
+                print(f"Created branch: {branch_result['branch_name']}")
+            elif branch_result.get("reason"):
+                print(f"Branch handling: {branch_result['reason']}")
             print("")
             print(wrapped_prompt)
         return 0
@@ -437,6 +523,10 @@ def codex_55to53(args: argparse.Namespace) -> int:
             print(f"Profile: {args.profile}")
             print(f"Classification: {classification}")
             print("Mode: handoff")
+            if branch_result.get("created"):
+                print(f"Created branch: {branch_result['branch_name']}")
+            elif branch_result.get("reason"):
+                print(f"Branch handling: {branch_result['reason']}")
             print(f"Prompt file: {output_path}")
             if launch_result.get("ok"):
                 print(f"Launched Codex client via {launch_result['method']}.")
@@ -1830,6 +1920,8 @@ def build_parser() -> argparse.ArgumentParser:
     codex_orchestrator.add_argument("--mode", choices=("print", "exec", "handoff"), default="print")
     codex_orchestrator.add_argument("--output-file", default="")
     codex_orchestrator.add_argument("--launch-client", action="store_true")
+    codex_orchestrator.add_argument("--branch-mode", choices=("auto", "off"), default="auto")
+    codex_orchestrator.add_argument("--allow-dirty-branch", action="store_true")
     codex_orchestrator.add_argument("--json", action="store_true")
     codex_orchestrator.set_defaults(handler=codex_55to53)
 

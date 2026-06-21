@@ -85,8 +85,11 @@ control.
 - `agent-skills.manifest.json`: source of truth for repo-managed skill sync
 - `tools/krt.py codex-55to53`: repo-local launcher that classifies a task and
   emits, runs, or writes a wrapped Codex prompt for the delegated 55to53
-  workflow. On Windows, `--mode handoff --launch-client` uses the installed
-  Codex app via `shell:AppsFolder` when available.
+  workflow. For `complex-orchestrated` tasks it also auto-creates a dedicated
+  `codex/55to53-*` branch by default, even when you start from another
+  `codex/*` branch, unless the worktree is dirty. On Windows, `--mode handoff
+  --launch-client` uses the installed Codex app via `shell:AppsFolder` when
+  available.
 - `api-contract-cleanup-wave.md`: reusable staged cleanup prompt for addon-wide
   contract, docs, and catalog cleanup waves
 

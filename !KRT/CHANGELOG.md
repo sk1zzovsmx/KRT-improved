@@ -8,6 +8,9 @@ Release-Version: 0.8.0-beta.1
 
 ### Fixes
 
+- **Spec role inspector** - Added runtime spec icons beside player names in
+  Master Loot and Loot Counter, backed by `LibGroupTalents-1.0` and
+  refreshable with `/krt specinspect`.
 - **Loot Master roll list finalization** - Fixed roll rows disappearing or
   staying non-clickable after countdown completion or interruption by isolating
   displayed roll-list row data from shared list-controller recycling and

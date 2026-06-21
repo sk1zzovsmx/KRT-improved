@@ -7,3 +7,4 @@ dist/
 *.sublime-project
 *.sublime-workspace
 Skada/Skada_Bak.lua
+.codex/hooks/state/

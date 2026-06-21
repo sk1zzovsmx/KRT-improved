@@ -113,6 +113,9 @@ The final response must include:
 - Keep project-specific orchestrator skills under `.agents/skills/` in the repository.
 - Prefer the repo-local launcher `py -3 tools/krt.py codex-55to53 ...` when starting
   complex delegated Codex tasks from the command line.
+- For `complex-orchestrated` tasks started through the repo-local launcher, use a
+  dedicated task branch for the specific work item before implementation begins,
+  even if the current checkout is already a `codex/*` branch.
 - Treat `.codex/config.toml`, `.codex/agents/*`, `.codex/hooks*`, and `.codex/rules/*`
   as project infrastructure, not personal machine-local preferences.
 - Do not move this workflow back to a global profile unless the user explicitly requests it.
