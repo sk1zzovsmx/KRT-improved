@@ -242,10 +242,12 @@
 |   |   |   |-- 2026-06-07-master-service-split.md
 |   |   |   |-- 2026-06-07-runtime-cleanup-followup.md
 |   |   |   |-- 2026-06-12-controller-service-duplication-reduction.md
-|   |   |   \\-- 2026-06-12-master-controller-service-reduction.md
+|   |   |   |-- 2026-06-12-master-controller-service-reduction.md
+|   |   |   \\-- 2026-06-13-spec-role-inspector.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
-|   |       \\-- 2026-06-05-master-loot-grid-design.md
+|   |       |-- 2026-06-05-master-loot-grid-design.md
+|   |       \\-- 2026-06-13-spec-role-inspector-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY.csv
