@@ -99,20 +99,9 @@ block:SetTexturePath("Interface\\Buttons\\UI-ActionButton-Border", "Action butto
 Each entry is intended to become one preview block with a 36x36 texture sample and the path as
 tooltip text. For sheets, preview the full sheet first, then add `TexCoords` when choosing a slice.
 
-For actual Windows-side visual previews, run the local BLP-to-JPEG generator. It reads an extracted
-`Interface` folder, converts BLP files to JPEG thumbnails, and writes a browser gallery outside the
-release addon files. The script requires Pillow with BLP support; this Codex desktop runtime already
-provides it.
-
-```text
-C:\Users\ferra\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe ^
-  tools\build-interface-texture-catalog.py ^
-  --source C:\Users\ferra\Desktop\WoW_Interface_AddOn_Kit_3.3.5a\Interface ^
-  --output .codex\local-interface-texture-catalog
-```
-
-Open `.codex\local-interface-texture-catalog\index.html` to inspect the visual catalog.
-The generated JPEG files are local inspection artifacts and should not be redistributed.
+Visual inspection of the listed textures still works using client-side in-game frame
+testing or external extract/preview tooling. The static path index in this document
+is intentionally kept as the authoritative reference for texture usage and reuse.
 
 ### Dialog and window skins
 

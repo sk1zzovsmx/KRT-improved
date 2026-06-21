@@ -12,12 +12,21 @@ Release-Version: 0.8.0-beta.1
   active CLI, MCP server, readiness checks, and development docs.
 - **Repo tooling docs** - Refreshed `tools/` guidance and readiness/MCP wording
   to match the current non-Mechanic workflow.
-- **MarkItDown MCP** - Added project-local MarkItDown MCP registration plus
-  `tools/requirements-mcp.txt` and launcher for attachment/document
-  conversion dependency support.
+- **Tooling cleanup** - Removed optional attachment-conversion MCP wrapper/dependency
+  references and related optional script mentions from docs and MCP registration.
 
 ### Fixes
 
+- **Reserve List footer** - Replaced the top-row Spam SR action with Import and
+  moved Spam msg below the SoftRes whisper checkboxes, disabling it when both
+  whisper options are off, raised the whisper option block slightly, and aligned
+  the reserve status text with Spam msg.
+- **Reserve List remove confirmation** - Shows the item link instead of the item
+  ID when confirming reserve removal.
+- **Slash commands** - Removed redundant public aliases for command help, Master
+  Loot toggles, Loot History, Logger attendance, and SoftRes readiness so the
+  addon accepts the canonical `/krt help`, `/krt ml`, `/krt history`,
+  `/krt attendance`, and `/krt res check` commands.
 - **Loot Master roll announcements** - Added missing localized multi-item roll
   announcement templates so roll messages no longer print localization keys
   such as `ChatRollMSMultipleHigh`.
@@ -56,6 +65,9 @@ Release-Version: 0.8.0-beta.1
   redrawing the list when winner selection becomes available.
 - **Loot Master item selection** - Fixed Select Item doing nothing when loot was
   opened before the Loot Master selection popup had been created.
+- **Loot Master item selection** - Restored the Select Item dropdown list of
+  loot-window items while passively observing Group Loot, without unlocking
+  protected loot actions, and darkened its background for readability.
 - **Group Loot inventory trades** - Loot Master inventory-item roll and trade
   actions now use a separate inventory-trade permission, so raid leaders,
   assistants, and the active Master Looter can trade already-held items while

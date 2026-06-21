@@ -263,6 +263,27 @@ do
         return Raid.CanObservePassiveLoot and Raid:CanObservePassiveLoot() or false
     end
 
+    local function canUseItemSelection()
+        if lootState.fromInventory == true then
+            return RaidApi.CanUseCapability(Raid, "inventory_trade")
+        end
+        return canHandleLootWindow()
+    end
+
+    local function ensureItemSelectionAccess()
+        if lootState.fromInventory == true then
+            if RaidApi.CanUseCapability(Raid, "inventory_trade") then
+                return true
+            end
+            addon:warn(L.WarnInventoryTradeNoPermission or L.WarnMLOnlyMode)
+            return false
+        end
+        if canHandleLootWindow() then
+            return true
+        end
+        return RaidApi.EnsureMasterOnlyAccess(Raid)
+    end
+
     local function canAutoManageLootFrame()
         return Raid.IsMasterLooter and Raid:IsMasterLooter() or false
     end
@@ -498,13 +519,12 @@ do
         UI.Frames.SetScriptSafely(refs.configBtn, "OnClick", function()
             UI.Widgets.Call("Config", "Toggle")
         end)
-        UI.Frames.SetScriptSafely(
-            refs.selectItemBtn,
-            "OnClick",
-            wrapMasterOnlyClick(function(self, button)
-                Private.BtnSelectItem(self, button)
-            end, true)
-        )
+        UI.Frames.SetScriptSafely(refs.selectItemBtn, "OnClick", function(self, button)
+            if not ensureItemSelectionAccess() then
+                return
+            end
+            Private.BtnSelectItem(self, button)
+        end)
         UI.Frames.SetScriptSafely(refs.spamLootBtn, "OnClick", function(self, button)
             if not ensureSpamLootAccess() then
                 return
@@ -1255,13 +1275,6 @@ do
         module._dirtyFlags.dropdowns = true
         if prepareDropDowns then
             prepareDropDowns()
-        end
-    end
-
-    function module._PendingCounter:CancelAward(pending)
-        if pending and pending.timeoutHandle then
-            module:CancelTimer(pending.timeoutHandle)
-            pending.timeoutHandle = nil
         end
     end
 
@@ -2033,13 +2046,6 @@ do
         return name
     end
 
-    Private.GetLootSpamHeader = function()
-        local plan = MasterService.BuildLootSpamPlan({
-            sourceName = Private.GetLootSpamSourceName(),
-        })
-        return plan and plan.header or L.ChatSpamLoot
-    end
-
     Private.AnnounceLootLinks = function(includeSoftRes)
         if lootState.fromInventory == true or lootState.lootCount <= 0 then
             return false
@@ -2485,8 +2491,10 @@ do
         local autoLootSuggestion = Loot.GetAutoLootSuggestion and Loot:GetAutoLootSuggestion() or nil
         local countdownRunning = isCountdownRunning()
         local hasInventoryTradeAccess = RaidApi.CanUseCapability(Raid, "inventory_trade")
+        local hasLootSelectionAccess = canUseItemSelection()
         flagButtonsOnChange("hasEligibleRaidReserve", hasEligibleRaidReserve)
         flagButtonsOnChange("hasLootAccess", hasLootAccess)
+        flagButtonsOnChange("hasLootSelectionAccess", hasLootSelectionAccess)
         flagButtonsOnChange("hasInventoryTradeAccess", hasInventoryTradeAccess)
         flagButtonsOnChange("hasReadyCheckAccess", hasReadyCheckAccess)
         flagButtonsOnChange("autoLootSuggestion", buildAutoLootSuggestionToken(autoLootSuggestion))
@@ -2531,6 +2539,7 @@ do
             hasEligibleRaidReserve = hasEligibleRaidReserve,
             hasInventoryTradeAccess = hasInventoryTradeAccess,
             hasLootAccess = hasLootAccess,
+            hasLootSelectionAccess = hasLootSelectionAccess,
             hasReadyCheckAccess = hasReadyCheckAccess,
             hasReserves = hasReserves,
             holder = lootState.holder,
@@ -2561,6 +2570,7 @@ do
                 hasItem = hasItem,
                 hasInventoryTradeAccess = hasInventoryTradeAccess,
                 hasLootAccess = hasLootAccess,
+                hasLootSelectionAccess = hasLootSelectionAccess,
                 hasReadyCheckAccess = hasReadyCheckAccess,
                 hasReserves = hasReserves,
                 holder = lootState.holder,
@@ -3115,6 +3125,22 @@ do
         })
     end
 
+    local function anchorSelectionFrame()
+        if not module._selectionFrame then
+            return
+        end
+        local selectItemBtn = getNamedPart("SelectItemBtn")
+        if not selectItemBtn then
+            return
+        end
+        if module._selectionFrame.ClearAllPoints then
+            module._selectionFrame:ClearAllPoints()
+        end
+        if module._selectionFrame.SetPoint then
+            module._selectionFrame:SetPoint("TOPLEFT", selectItemBtn, "BOTTOMLEFT", 0, -3)
+        end
+    end
+
     local function ensureSelectionButton(index)
         local frameName = getFrameName()
         if not frameName then
@@ -3149,6 +3175,7 @@ do
             module._selectionFrame = CreateFrame("Frame", selectionName, frame, "KRTItemSelectionFrame")
             module._selectionFrame:Hide()
         end
+        anchorSelectionFrame()
         for i = 1, #module._selectionButtons do
             local btn = module._selectionButtons[i]
             if btn then

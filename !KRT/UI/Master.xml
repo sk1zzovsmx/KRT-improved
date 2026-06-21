@@ -5,7 +5,7 @@
 		<Size>
 			<AbsDimension x="225" y="100" />
 		</Size>
-		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" tile="true">
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark" tile="true">
 			<TileSize>
 				<AbsValue val="6" />
 			</TileSize>

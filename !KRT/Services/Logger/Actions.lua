@@ -82,17 +82,6 @@ trimText = function(value)
     return Strings.NormalizeName(value) or ""
 end
 
-local function removeFromList(list, value)
-    if not (list and value) then
-        return
-    end
-    local i = addon.tIndexOf(list, value)
-    while i do
-        tremove(list, i)
-        i = addon.tIndexOf(list, value)
-    end
-end
-
 local function hasTableEntries(value)
     if type(value) ~= "table" then
         return false
@@ -964,36 +953,6 @@ function Actions:ResolveLootEditWinner(raidID, lootNid, rawText)
     return winner
 end
 
-function Actions:DeleteBoss(rID, bossNid, opts)
-    local raid = Store:GetRaid(rID)
-    if not (raid and bossNid) then
-        return 0
-    end
-
-    local _, bossIndex = Store:GetBoss(raid, bossNid)
-    if not bossIndex then
-        return 0
-    end
-
-    local removed = 0
-    for i = #raid.loot, 1, -1 do
-        local l = raid.loot[i]
-        if l and tonumber(l.bossNid) == tonumber(bossNid) then
-            tremove(raid.loot, i)
-            removed = removed + 1
-        end
-    end
-
-    tremove(raid.bossKills, bossIndex)
-    commitRaidSelections(raid, opts)
-
-    if Database.GetCurrentRaid() == rID and tonumber(Database.GetLastBoss()) == tonumber(bossNid) then
-        Database.SetLastBoss(nil)
-    end
-
-    return removed
-end
-
 -- Bulk delete: removes multiple loot entries (by nid) with a single Commit()
 -- Returns: number of removed entries
 function Actions:DeleteLootMany(rID, lootNids, opts)
@@ -1025,24 +984,6 @@ function Actions:DeleteLootMany(rID, lootNids, opts)
         commitRaidSelections(raid, opts)
     end
     return removed
-end
-
-function Actions:DeleteBossAttendee(rID, bossNid, playerNid)
-    local raid = Store:GetRaid(rID)
-    if not (raid and bossNid and playerNid) then
-        return false
-    end
-    local bossKill = Store:GetBoss(raid, bossNid)
-    if not (bossKill and bossKill.players and raid.players) then
-        return false
-    end
-    local queryNid = tonumber(playerNid)
-    if not queryNid or queryNid <= 0 then
-        return false
-    end
-    removeFromList(bossKill.players, queryNid)
-    Store._InvalidateIndexes(raid)
-    return true
 end
 
 -- Bulk delete: removes multiple raid attendees (by playerNid) with a single Commit()
@@ -1665,95 +1606,6 @@ function Actions:SetCurrentRaid(rID)
     Services.Raid:UpdateRaidRoster()
 
     addon:info(L.LogRaidSetCurrent:format(sel, tostring(raid.zone), raidSize))
-    return true
-end
-
--- Upsert boss kill (edit if bossNid provided, otherwise append new boss kill).
--- Returns bossNid on success, nil on failure.
-function Actions:UpsertBossKill(rID, bossNid, name, ts, mode, opts)
-    local raid = Store:GetRaid(rID)
-    if not raid then
-        return nil
-    end
-
-    name = Strings.TrimText(name or "")
-    mode = Strings.NormalizeLower(mode or "n")
-    ts = tonumber(ts) or time()
-
-    if bossNid then
-        local bossKill = Store:GetBoss(raid, bossNid)
-        if not bossKill then
-            addon:error(L.ErrAttendeesInvalidRaidBoss)
-            return nil
-        end
-        bossKill.name = name
-        bossKill.time = ts
-        bossKill.mode = (mode == "h") and "h" or "n"
-        -- keep existing players/hash; hash is stable per nid
-        opts = opts or {}
-        opts.invalidate = false
-        commitRaidSelections(raid, opts)
-        return bossKill.bossNid
-    end
-
-    local newNid = tonumber(raid.nextBossNid) or 1
-    raid.nextBossNid = newNid + 1
-
-    tinsert(raid.bossKills, {
-        bossNid = newNid,
-        name = name,
-        time = ts,
-        mode = (mode == "h") and "h" or "n",
-        players = {},
-        hash = Base64.Encode(rID .. "|" .. name .. "|" .. newNid),
-    })
-
-    commitRaidSelections(raid, opts)
-    return newNid
-end
-
--- Add existing raid player to the selected boss attendees list.
--- nameRaw is matched (case-insensitive) against raid.players[].name.
-function Actions:AddBossAttendee(rID, bossNid, nameRaw, opts)
-    local name = Strings.TrimText(nameRaw or "")
-    local normalizedName = Strings.NormalizeLower(name)
-    if normalizedName == "" then
-        addon:error(L.ErrAttendeesInvalidName)
-        return false
-    end
-
-    local raid = (rID and bossNid) and Store:GetRaid(rID) or nil
-    if not (raid and bossNid) then
-        addon:error(L.ErrAttendeesInvalidRaidBoss)
-        return false
-    end
-
-    local bossKill = Store:GetBoss(raid, bossNid)
-    if not bossKill then
-        addon:error(L.ErrAttendeesInvalidRaidBoss)
-        return false
-    end
-
-    bossKill.players = bossKill.players or {}
-    local playerName, _, player = Store:FindRaidPlayerByNormName(raid, normalizedName)
-    local playerNid = tonumber(player and player.playerNid)
-    if not (playerName and playerNid and playerNid > 0) then
-        addon:error(L.ErrAttendeesInvalidName)
-        return false
-    end
-
-    for i = 1, #bossKill.players do
-        if tonumber(bossKill.players[i]) == playerNid then
-            addon:error(L.ErrAttendeesPlayerExists)
-            return false
-        end
-    end
-
-    tinsert(bossKill.players, playerNid)
-    addon:info(L.StrAttendeesAddSuccess)
-    opts = opts or {}
-    opts.invalidate = false
-    commitRaidSelections(raid, opts)
     return true
 end
 

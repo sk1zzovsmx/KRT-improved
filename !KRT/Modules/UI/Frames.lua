@@ -111,15 +111,6 @@ function ModuleState.MarkDirty(module, reason)
     return uiState
 end
 
-function ModuleState.ClearDirty(module)
-    local uiState = ModuleState.Get(module)
-    if uiState then
-        uiState.Dirty = false
-        uiState.Reason = nil
-    end
-    return uiState
-end
-
 function Frames.EnableDrag(frame, dragButton)
     if not frame or not frame.RegisterForDrag then
         return

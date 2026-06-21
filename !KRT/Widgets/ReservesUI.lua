@@ -179,16 +179,6 @@ do
         return false
     end
 
-    local function clampNumber(value, minValue, maxValue)
-        if value < minValue then
-            return minValue
-        end
-        if value > maxValue then
-            return maxValue
-        end
-        return value
-    end
-
     local function getRaidMemberCount()
         if type(GetNumRaidMembers) == "function" then
             local count = tonumber(GetNumRaidMembers()) or 0
@@ -213,6 +203,7 @@ do
     function uiState.AcquireRefs(frame)
         return {
             whisperHelpButton = Frames.GetRef(frame, "WhisperHelpButton"),
+            importButton = Frames.GetRef(frame, "ImportButton"),
             clearBtn = Frames.GetRef(frame, "ClearBtn"),
             editButton = Frames.GetRef(frame, "EditButton"),
             queryButton = Frames.GetRef(frame, "QueryButton"),
@@ -319,6 +310,8 @@ do
             row.removeButton:SetText("X")
             row.removeButton._playerName = playerName
             row.removeButton._itemId = itemData.itemId
+            row.removeButton._itemName = itemData.itemName
+            row.removeButton._itemLink = itemData.itemLink
         end
         setPlayerEditState(row)
     end
@@ -449,7 +442,17 @@ do
         end
     end
 
-    local function confirmRemovePlayerReserveFromUI(playerName, itemId)
+    local function getReserveItemConfirmText(itemId, itemName, itemLink)
+        if type(itemLink) == "string" and itemLink ~= "" then
+            return itemLink
+        end
+        if type(itemName) == "string" and itemName ~= "" then
+            return "[" .. itemName .. "]"
+        end
+        return tostring(itemId)
+    end
+
+    local function confirmRemovePlayerReserveFromUI(playerName, itemId, itemName, itemLink)
         if not playerName or not itemId then
             return false
         end
@@ -466,7 +469,8 @@ do
             end
         end
 
-        local popupText = format(L.StrConfirmRemoveReserveRow, tostring(playerName), tostring(itemId))
+        local itemText = getReserveItemConfirmText(itemId, itemName, itemLink)
+        local popupText = format(L.StrConfirmRemoveReserveRow, tostring(playerName), itemText)
         if showReserveConfirm(REMOVE_RESERVE_ROW_POPUP_KEY, popupText, onAccept, REMOVE_RESERVE_ROW_POPUP_KEY, options) then
             return true
         end
@@ -535,7 +539,7 @@ do
         if row.nameText then
             row.nameText:SetText(info.itemLink or info.itemName or itemFallback)
             if row.nameText.GetStringWidth and row.nameText.SetWidth then
-                row.nameText:SetWidth(clampNumber((row.nameText:GetStringWidth() or 0) + 6, 60, 220))
+                row.nameText:SetWidth((row.nameText:GetStringWidth() or 0) + 6)
             end
         end
         if row.itemNameHotspot and row.nameText and row.nameText.GetWidth then
@@ -602,6 +606,10 @@ do
         if queryButton then
             queryButton:SetText(L.BtnQueryItem)
         end
+        local importButton = frameName and _G[frameName .. "ImportButton"]
+        if importButton then
+            importButton:SetText(L.BtnImport)
+        end
         local whisperHelpButton = frameName and _G[frameName .. "WhisperHelpButton"]
         if whisperHelpButton then
             whisperHelpButton:SetText(L.BtnSpamSoftResWhisper)
@@ -661,21 +669,33 @@ do
         end
 
         local reservesNs = Options and Options.Get and Options.Get("Reserves") or nil
+        local softResAcceptEnabled = false
+        local softResResponseWispEnabled = false
         local softResAccept = _G[frameName .. "SoftResAccept"]
-        if softResAccept and softResAccept.SetChecked and reservesNs then
+        if reservesNs then
             local value = reservesNs:Get("softResWhisperAdds")
             if value == nil then
                 value = false
             end
-            softResAccept:SetChecked(value == true)
+            softResAcceptEnabled = value == true
+            if softResAccept and softResAccept.SetChecked then
+                softResAccept:SetChecked(softResAcceptEnabled)
+            end
         end
         local softResResponseWisp = _G[frameName .. "SoftResResponseWisp"]
-        if softResResponseWisp and softResResponseWisp.SetChecked and reservesNs then
+        if reservesNs then
             local value = reservesNs:Get("softResWhisperReplies")
             if value == nil then
                 value = false
             end
-            softResResponseWisp:SetChecked(value == true)
+            softResResponseWispEnabled = value == true
+            if softResResponseWisp and softResResponseWisp.SetChecked then
+                softResResponseWisp:SetChecked(softResResponseWispEnabled)
+            end
+        end
+        local whisperHelpButton = _G[frameName .. "WhisperHelpButton"]
+        if whisperHelpButton then
+            Primitives.SetEnabled(whisperHelpButton, softResAcceptEnabled or softResResponseWispEnabled)
         end
     end
 
@@ -794,10 +814,12 @@ do
                 row.removeButton:SetScript("OnClick", function()
                     local playerName = row._playerName
                     local itemId = row._itemId
+                    local itemName = row._itemName
+                    local itemLink = row._itemLink
                     if not isEditMode or not playerName or not itemId then
                         return
                     end
-                    confirmRemovePlayerReserveFromUI(playerName, itemId)
+                    confirmRemovePlayerReserveFromUI(playerName, itemId, itemName, itemLink)
                 end)
             end
             if row.quantityEdit then
@@ -1016,9 +1038,17 @@ do
             return false
         end
         local targetName = getWhisperTargetName()
-        Chat:Announce(format(L.ChatSoftResWhisperHelpQuery, targetName, targetName), "RAID")
-        Chat:Announce(format(L.ChatSoftResWhisperHelpAdd, targetName, targetName), "RAID")
-        return true
+        local reservesNs = getReservesOptions()
+        local announced = false
+        if reservesNs and reservesNs:Get("softResWhisperReplies") == true then
+            Chat:Announce(format(L.ChatSoftResWhisperHelpQuery, targetName), "RAID")
+            announced = true
+        end
+        if reservesNs and reservesNs:Get("softResWhisperAdds") == true then
+            Chat:Announce(format(L.ChatSoftResWhisperHelpAdd, targetName), "RAID")
+            announced = true
+        end
+        return announced
     end
 
     -- ----- Public methods ----- --
@@ -1085,6 +1115,15 @@ do
             end)
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
+            end
+        end
+
+        if refs.importButton then
+            refs.importButton:SetScript("OnClick", function()
+                UIWidgets.Call("Reserves", "ToggleImport")
+            end)
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesBindButton:format("ImportButton", "ToggleImport"))
             end
         end
 

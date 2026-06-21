@@ -10823,17 +10823,17 @@ test("reserve list clear edit and spam actions follow state contract", function(
     h.addon.L.BtnImport = "Import"
     h.addon.L.BtnQueryItem = "Query Item"
     h.addon.L.BtnClose = "Close"
-    h.addon.L.BtnSpamSoftResWhisper = "Spam SR"
+    h.addon.L.BtnSpamSoftResWhisper = "Spam msg"
     h.addon.L.StrReserveListAcceptSR = "Accept SR"
     h.addon.L.StrReserveListResponseWisp = "Response Wisp"
     h.addon.L.StrReserveListWhisperHelp = "Whisper ML +sr to see reserves.\n" .. "Whisper ML +sr [itemLink] to add one."
     h.addon.L.StrReserveListAcceptSRTooltipTitle = "Accept SR"
-    h.addon.L.StrReserveListAcceptSRTooltipText = "Allows players to whisper +sr [itemLink] or +softres [itemLink] to add a reserve. This changes local reserve data."
+    h.addon.L.StrReserveListAcceptSRTooltipText = "Allows players to whisper +sr [itemLink] to add a reserve and receive a confirmation. This changes local reserve data."
     h.addon.L.StrReserveListResponseWispTooltipTitle = "Response Wisp"
-    h.addon.L.StrReserveListResponseWispTooltipText = "Allows players to whisper +sr or +softres to receive their current reserves. This does not change reserve data."
+    h.addon.L.StrReserveListResponseWispTooltipText = "Allows players to whisper +sr without an item link to receive their current reserves. This does not change reserve data."
     h.addon.L.StrReserveListStatus = "Players: %d - Reserved Players: %d"
-    h.addon.L.ChatSoftResWhisperHelpQuery = "SoftRes: To see your reserves /w %s +sr or /w %s +softres"
-    h.addon.L.ChatSoftResWhisperHelpAdd = "SoftRes: To add one with /w %s +sr [item link] or /w %s +softres [item link]"
+    h.addon.L.ChatSoftResWhisperHelpQuery = "SoftRes: To see your reserves /w %s +sr"
+    h.addon.L.ChatSoftResWhisperHelpAdd = "SoftRes: To add one and receive confirmation /w %s +sr [item link]"
     h.addon.L.StrConfirmClearReserves = "Clear all saved loot reserve data?"
     h.addon.L.StrRaidReserves = "KRT : Loot Reserve"
     _G.UnitName = function(unit)
@@ -10982,6 +10982,7 @@ test("reserve list clear edit and spam actions follow state contract", function(
     local clearButton = h.makeFrame(true, "KRTReserveListFrameClearBtn")
     local editButton = h.makeFrame(true, "KRTReserveListFrameEditButton")
     local queryButton = h.makeFrame(true, "KRTReserveListFrameQueryButton")
+    local importButton = h.makeFrame(true, "KRTReserveListFrameImportButton")
     local whisperHelpButton = h.makeFrame(true, "KRTReserveListFrameWhisperHelpButton")
     local softResHelpText = h.makeFrame(true, "KRTReserveListFrameSoftResHelpText")
     local softResStatusText = h.makeFrame(true, "KRTReserveListFrameSoftResStatusText")
@@ -11026,6 +11027,7 @@ test("reserve list clear edit and spam actions follow state contract", function(
     _G.KRTReserveListFrameClearBtn = clearButton
     _G.KRTReserveListFrameEditButton = editButton
     _G.KRTReserveListFrameQueryButton = queryButton
+    _G.KRTReserveListFrameImportButton = importButton
     _G.KRTReserveListFrameWhisperHelpButton = whisperHelpButton
     _G.KRTReserveListFrameSoftResHelpText = softResHelpText
     _G.KRTReserveListFrameSoftResStatusText = softResStatusText
@@ -11051,7 +11053,8 @@ test("reserve list clear edit and spam actions follow state contract", function(
     assertTrue(clearButton:IsEnabled() == false or clearButton:IsShown() == false, "expected clear action hidden or disabled with no data")
     assertEqual(editButton:GetText(), "Edit", "expected edit action to be labeled Edit")
     assertEqual(editButton:IsEnabled(), false, "expected edit action to stay disabled with no data")
-    assertEqual(whisperHelpButton:GetText(), "Spam SR", "expected footer action to advertise SoftRes whispers")
+    assertEqual(importButton:GetText(), "Import", "expected footer top-row action to open SoftRes import")
+    assertEqual(whisperHelpButton:GetText(), "Spam msg", "expected checkbox footer action to advertise SoftRes whisper message spam")
     assertTrue(softResHelpText ~= nil, "expected softres help text control stub")
     assertTrue(softResStatusText ~= nil, "expected softres status text control stub")
     assertTrue(softResAcceptCheck ~= nil, "expected accept SR option checkbox stub")
@@ -11072,23 +11075,29 @@ test("reserve list clear edit and spam actions follow state contract", function(
     assertEqual(tooltipBindings[2].text, h.addon.L.StrReserveListResponseWispTooltipText, "expected response Wisp tooltip text")
     assertEqual(softResAcceptCheck:GetChecked(), nil, "expected add whisper option default false")
     assertEqual(softResResponseWispCheck:GetChecked(), nil, "expected replies option default false")
+    assertEqual(whisperHelpButton:IsEnabled(), false, "expected Spam msg disabled while both whisper options are off")
     softResAcceptCheck:SetChecked(true)
     softResAcceptCheck:Click()
     softResResponseWispCheck:SetChecked(false)
     softResResponseWispCheck:Click()
     assertEqual(getHarnessOption(h, "Reserves", "softResWhisperAdds"), true, "expected accept SR option to persist")
     assertTrue(getHarnessOption(h, "Reserves", "softResWhisperReplies") ~= true, "expected response whisper option to stay disabled")
+    assertEqual(whisperHelpButton:IsEnabled(), true, "expected Spam msg enabled when Accept SR is on")
     softResResponseWispCheck:SetChecked(1)
     softResResponseWispCheck:Click()
     assertEqual(getHarnessOption(h, "Reserves", "softResWhisperReplies"), true, "expected numeric checkbox state to persist")
+    assertEqual(whisperHelpButton:IsEnabled(), true, "expected Spam msg enabled when Response Wisp is on")
 
     clearButton.OnClick(clearButton)
+    importButton.OnClick(importButton)
     whisperHelpButton.OnClick(whisperHelpButton)
     if editButton.OnClick then
         editButton.OnClick(editButton)
     end
 
-    assertEqual(#uiCalls, 0, "expected no import action with clear/edit controls")
+    assertEqual(#uiCalls, 1, "expected import action to use widget API")
+    assertEqual(uiCalls[1].name, "Reserves", "expected import action to target reserves widget")
+    assertEqual(uiCalls[1].methodName, "ToggleImport", "expected import action to open the import window")
     assertEqual(#announcements, 0, "expected SoftRes whisper help button to stay silent outside raid")
     assertEqual(softResStatusText:GetText(), "Players: 0 - Reserved Players: 0", "expected softres status line to stay zero with no data")
 
@@ -11102,10 +11111,30 @@ test("reserve list clear edit and spam actions follow state contract", function(
     assertEqual(softResResponseWispCheck:IsEnabled(), true, "expected response whisper checkbox available")
     assertEqual(announcements[1].channel, "RAID", "expected SoftRes whisper help to use raid chat")
     assertEqual(announcements[2].channel, "RAID", "expected SoftRes add help to use raid chat")
-    local expectedSoftResQuery = "SoftRes: To see your reserves /w Masterlooter +sr or /w Masterlooter +softres"
-    local expectedSoftResAdd = "SoftRes: To add one with /w Masterlooter +sr [item link] or /w Masterlooter +softres [item link]"
+    local expectedSoftResQuery = "SoftRes: To see your reserves /w Masterlooter +sr"
+    local expectedSoftResAdd = "SoftRes: To add one and receive confirmation /w Masterlooter +sr [item link]"
     assertEqual(announcements[1].message, expectedSoftResQuery, "expected SoftRes help to include reserve query commands")
     assertEqual(announcements[2].message, expectedSoftResAdd, "expected SoftRes help to include reserve add commands")
+
+    announcements = {}
+    softResAcceptCheck:SetChecked(false)
+    softResAcceptCheck:Click()
+    assertEqual(whisperHelpButton:IsEnabled(), true, "expected Spam msg to remain enabled with Response Wisp still on")
+    whisperHelpButton.OnClick(whisperHelpButton)
+    assertEqual(#announcements, 1, "expected SoftRes whisper help to omit add line when Accept SR is disabled")
+    assertEqual(announcements[1].message, expectedSoftResQuery, "expected SoftRes whisper help to keep query line when replies are enabled")
+
+    announcements = {}
+    softResResponseWispCheck:SetChecked(false)
+    softResResponseWispCheck:Click()
+    assertEqual(whisperHelpButton:IsEnabled(), false, "expected Spam msg disabled when both whisper options are off")
+    softResAcceptCheck:SetChecked(true)
+    softResAcceptCheck:Click()
+    assertEqual(whisperHelpButton:IsEnabled(), true, "expected Spam msg enabled again when Accept SR is re-enabled")
+    whisperHelpButton.OnClick(whisperHelpButton)
+    assertEqual(#announcements, 1, "expected SoftRes whisper help to omit query line when Response Wisp is disabled")
+    assertEqual(announcements[1].message, expectedSoftResAdd, "expected SoftRes whisper help to keep add line when Accept SR is enabled")
+
     assertEqual(clearCount, 0, "expected empty reserves action not to clear saved data")
     assertEqual(editButton:IsEnabled(), false, "expected edit action to remain disabled with no data")
 
@@ -11452,7 +11481,8 @@ test("reserves ui edit actions commit and remove through service APIs", function
     rowRemove.OnClick(rowRemove)
     assertEqual(#popupCalls, 1, "expected remove action to request confirmation while edit mode is on")
     assertEqual(popupCalls[1].key, "KRT_RESERVES_REMOVE_ROW", "expected remove confirmation popup key")
-    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmRemoveReserveRow:format("Alice", "1201"), "expected remove confirmation text")
+    local expectedRemoveItemLink = "|cff0070dd|Hitem:1201:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r"
+    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmRemoveReserveRow:format("Alice", expectedRemoveItemLink), "expected remove confirmation text")
     assertEqual(popupCalls[1].options.button1, h.addon.L.BtnDelete, "expected remove confirmation button text")
     assertEqual(popupCalls[1].options.button2, h.addon.L.BtnCancel, "expected remove confirmation cancel text")
     assertEqual(removeCount, 0, "expected remove action to wait for confirmation")
@@ -11466,7 +11496,7 @@ test("reserves ui edit actions commit and remove through service APIs", function
     assertTrue(bobRow ~= nil, "expected Bob row after confirmed Alice remove refresh")
     bobRow.removeButton.OnClick(bobRow.removeButton)
     assertEqual(#popupCalls, 1, "expected second remove confirmation to reuse a refreshed popup callback")
-    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmRemoveReserveRow:format("Bob", "1201"), "expected second remove confirmation text to be refreshed")
+    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmRemoveReserveRow:format("Bob", expectedRemoveItemLink), "expected second remove confirmation text to be refreshed")
     assertEqual(removeCount, 1, "expected second remove action to wait for confirmation")
     popupCalls[1].onAccept()
     assertEqual(removeCount, 2, "expected second remove confirmation to remove the current player")
@@ -11927,6 +11957,40 @@ test("reserves import XML allocates expanded paste area", function()
     assertTrue(xml:find('<AbsDimension x="276" y="114" />', 1, true) ~= nil, "expected import scroll frame to fit inside the shortened edit box panel")
     assertTrue(xml:find('<AbsDimension x="244" y="114" />', 1, true) ~= nil, "expected import edit box text area to stay inside the shortened scroll viewport")
     assertTrue(xml:find('<AbsDimension x="20" y="51" />', 1, true) ~= nil, "expected import status lane to stay visible below the paste area")
+end)
+
+test("reserve list XML keeps import in the top action row and spam under whisper options", function()
+    local file = assert(io.open("!KRT/UI/Reserves.xml", "r"))
+    local xml = file:read("*a")
+    file:close()
+
+    local importPos = xml:find('name="$parentImportButton"', 1, true)
+    local acceptLabelPos = xml:find('name="$parentSoftResAcceptStr"', 1, true)
+    local responseLabelPos = xml:find('name="$parentSoftResResponseWispStr"', 1, true)
+    local statusPos = xml:find('name="$parentSoftResStatusText"', 1, true)
+    local acceptPos = xml:find('name="$parentSoftResAccept"', 1, true)
+    local responsePos = xml:find('name="$parentSoftResResponseWisp"', 1, true)
+    local spamPos = xml:find('name="$parentWhisperHelpButton"', 1, true)
+
+    assertTrue(importPos ~= nil, "expected ReserveList XML to expose a dedicated Import button")
+    assertTrue(spamPos ~= nil, "expected ReserveList XML to keep a dedicated Spam msg button")
+    assertTrue(importPos < acceptPos, "expected Import to remain in the top footer action row before checkbox options")
+    assertTrue(responsePos < spamPos, "expected Spam msg XML control to live after Response Wisp checkbox")
+    assertTrue(xml:find('<AbsDimension x="96" y="20" />', spamPos, true) ~= nil, "expected Spam msg to use a compact footer button size")
+    assertTrue(xml:find('<AbsDimension x="278" y="57" />', acceptLabelPos, true) ~= nil, "expected Accept SR label to sit in the raised whisper block")
+    assertTrue(xml:find('<AbsDimension x="278" y="35" />', responseLabelPos, true) ~= nil, "expected Response Wisp label to sit in the raised whisper block")
+    assertTrue(xml:find('<AbsDimension x="252" y="52" />', acceptPos, true) ~= nil, "expected Accept SR checkbox to sit in the raised whisper block")
+    assertTrue(xml:find('<AbsDimension x="252" y="32" />', responsePos, true) ~= nil, "expected Response Wisp checkbox to sit in the raised whisper block")
+    assertTrue(xml:find('<AbsDimension x="16" y="12" />', statusPos, true) ~= nil, "expected status text to align vertically with Spam msg")
+    assertTrue(xml:find('<AbsDimension x="-16" y="12" />', spamPos, true) ~= nil, "expected Spam msg to sit under the raised whisper checkboxes")
+end)
+
+test("english localization labels reserve whisper spam as message spam", function()
+    local file = assert(io.open("!KRT/Localization/localization.en.lua", "r"))
+    local lua = file:read("*a")
+    file:close()
+
+    assertTrue(lua:find('L.BtnSpamSoftResWhisper = "Spam msg"', 1, true) ~= nil, "expected reserve footer spam label to say Spam msg")
 end)
 
 test("ui primitives expose pixel-aligned sizing helpers", function()
@@ -15380,6 +15444,61 @@ test("master enables inventory Trade in group loot without unlocking loot-window
     assertEqual(_G.KRTMasterMSBtn._enabled, false, "expected loot-window roll starts to stay gated behind Master Loot access")
 end)
 
+test("master allows passive loot item selection without unlocking loot actions", function()
+    local h = newHarness()
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Master/ButtonState.lua")
+
+    local ButtonState = h.addon.Services.Master.ButtonState
+    local tooltipState = ButtonState.BuildTooltipState({
+        hasEligibleRaidReserve = true,
+        hasInventoryTradeAccess = false,
+        hasLootAccess = false,
+        hasLootSelectionAccess = true,
+        lootState = {
+            fromInventory = false,
+            lootCount = 2,
+        },
+        rollModel = {},
+        selectedItemCount = 1,
+    })
+    local state = ButtonState.BuildState({
+        countdownRunning = false,
+        hasInventoryTradeAccess = false,
+        hasItem = true,
+        hasLootAccess = false,
+        hasLootSelectionAccess = true,
+        hasReadyCheckAccess = false,
+        hasReserves = false,
+        labels = {
+            readyCheck = "Ready Check",
+            trade = "Trade",
+        },
+        lootState = {
+            fromInventory = false,
+            lootCount = 2,
+            rollsCount = 1,
+        },
+        tooltipState = tooltipState,
+        workflowState = {
+            canAward = false,
+            canReserveList = true,
+            canRollSelf = false,
+            canSpamLoot = false,
+            canStartRolls = false,
+            canStartSR = false,
+        },
+    })
+
+    assertEqual(state.canSelectItem, true, "expected passive loot selection to enable Select Item")
+    assertEqual(state.selectItemTooltip, h.addon.L.TipMasterSelectItem, "expected Select Item tooltip to stay actionable")
+    assertEqual(state.canStartRolls, false, "expected passive selection not to unlock roll starts")
+    assertEqual(state.canSpamLoot, false, "expected passive selection not to unlock Spam Loot")
+    assertEqual(state.canAward, false, "expected passive selection not to unlock Award")
+    assertEqual(state.msTooltip, h.addon.L.WarnMLOnlyMode, "expected roll buttons to keep the ML-only tooltip")
+end)
+
 test("master auto loot suggestions stay visual only", function()
     local h = newHarness()
     local link = h.registerItem(9400, "Suggestion Dust")
@@ -16255,6 +16374,139 @@ test("master item selection popup builds on demand after hidden loot open", func
     firstButton:OnClick("LeftButton")
 
     assertEqual(selectedIndex, 1, "expected on-demand selection popup button to pick the corresponding loot index")
+end)
+
+test("master passive loot Select Item click opens selection popup", function()
+    local h = newHarness()
+    local selectedIndex = nil
+    local masterOnlyChecks = 0
+    _G.KRTMasterItemSelectionFrame = nil
+    _G.KRTMasterItemSelectionBtn1 = nil
+    _G.KRTMasterItemSelectionBtn2 = nil
+    local linkOne = h.registerItem(9405, "Passive Popup Blade")
+    local linkTwo = h.registerItem(9406, "Passive Popup Axe")
+    local items = {
+        [1] = { itemLink = linkOne, itemName = "Passive Popup Blade", itemTexture = "IconOne", count = 1 },
+        [2] = { itemLink = linkTwo, itemName = "Passive Popup Axe", itemTexture = "IconTwo", count = 1 },
+    }
+    local function resolveIndex(index)
+        if type(index) ~= "number" then
+            index = h.feature.lootState.currentItemIndex or 1
+        end
+        return index
+    end
+
+    h.addon.Services.Loot = {
+        FetchLoot = function()
+            h.feature.lootState.lootCount = 2
+            h.feature.lootState.currentItemIndex = 1
+        end,
+        GetItem = function(index)
+            return items[resolveIndex(index)]
+        end,
+        GetItemLink = function(index)
+            local item = items[resolveIndex(index)]
+            return item and item.itemLink or nil
+        end,
+        GetItemName = function(index)
+            local item = items[resolveIndex(index)]
+            return item and item.itemName or nil
+        end,
+        GetItemTexture = function(index)
+            local item = items[resolveIndex(index)]
+            return item and item.itemTexture or nil
+        end,
+        GetCurrentItemCount = function()
+            return 1
+        end,
+        SelectItem = function(_, index)
+            selectedIndex = index
+        end,
+        ItemExists = function(_, index)
+            if index == nil then
+                return true
+            end
+            return items[index] ~= nil
+        end,
+    }
+    h.addon.Services.Raid = {
+        IsMasterLooter = function()
+            return false
+        end,
+        CanObservePassiveLoot = function()
+            return true
+        end,
+        CanUseCapability = function()
+            return false
+        end,
+        EnsureMasterOnlyAccess = function()
+            masterOnlyChecks = masterOnlyChecks + 1
+            return false
+        end,
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+        _EnsureLootWindowItemContext = function()
+            return nil
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = false,
+    })
+
+    h:load("!KRT/Modules/UI/Frames.lua")
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.UI = h.addon.UI
+    loadMasterController(h)
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    installMasterFrameParts(h, frame)
+    Master.RequestRefresh = function() end
+    Master:BindUI()
+    Master.EnsureUI = function()
+        return frame
+    end
+
+    Master:LOOT_OPENED()
+    refreshMasterFrameForTest(Master)
+
+    assertEqual(_G.KRTMasterSelectItemBtn._enabled, true, "expected passive Select Item to stay enabled")
+    assertEqual(_G.KRTMasterMSBtn._enabled, false, "expected passive loot observation not to unlock roll starts")
+
+    _G.KRTMasterSelectItemBtn:OnClick("LeftButton")
+
+    assertEqual(masterOnlyChecks, 0, "expected passive Select Item not to use the ML-only click guard")
+    assertTrue(_G.KRTMasterItemSelectionFrame:IsShown(), "expected passive Select Item to show the selection frame")
+    assertTrue(_G.KRTMasterItemSelectionFrame._points ~= nil, "expected selection frame to be anchored")
+    assertEqual(_G.KRTMasterItemSelectionFrame._points[1].relativeTo, _G.KRTMasterSelectItemBtn, "expected selection frame to anchor to Select Item")
+    assertTrue(_G.KRTMasterItemSelectionBtn1 ~= nil, "expected passive Select Item to build the first popup button")
+    assertTrue(_G.KRTMasterItemSelectionBtn2 ~= nil, "expected passive Select Item to build the second popup button")
+
+    _G.KRTMasterItemSelectionBtn1:OnClick("LeftButton")
+
+    assertEqual(selectedIndex, 1, "expected passive selection popup button to pick the corresponding loot index")
 end)
 
 test("master workflow model exposes compact session winners", function()
@@ -18862,9 +19114,21 @@ test("slash help supports focused command pages", function()
     h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/EntryPoints/SlashEvents.lua")
 
-    _G.SlashCmdList.KRT("help logger")
+    _G.SlashCmdList.KRT("help history")
 
-    assertContains(h.logs.info, "Commands: valid subcommands for |caaf49141/krt logger|r:", "expected focused logger help header")
+    assertContains(h.logs.info, "Commands: valid subcommands for |caaf49141/krt history|r:", "expected focused history help header")
+end)
+
+test("slash routing does not register retired public aliases", function()
+    local source = readText("!KRT/EntryPoints/SlashEvents.lua")
+
+    assertTextNotContains(source, '{ "help", "commands" }', "commands alias should not stay registered")
+    assertTextNotContains(source, '{ "loot", "ml", "master" }', "loot/master aliases should not stay registered")
+    assertTextNotContains(source, '{ "logger", "history", "log" }', "logger alias should not stay registered")
+    assertTextNotContains(source, '{ "history", "log" }', "log alias should not stay registered")
+    assertTextNotContains(source, 'cmd == "show" or cmd == "toggle"', "top-level show/toggle aliases should not stay handled")
+    assertTextNotContains(source, 'sub == "attendance" or sub == "attendees" or sub == "att"', "logger attendance aliases should not stay handled")
+    assertTextNotContains(source, 'sub == "check" or sub == "readiness"', "res readiness alias should not stay handled")
 end)
 
 test("slash reserves alias commands persist aliases and print list", function()
@@ -20221,7 +20485,7 @@ test("reserves whisper softres replies with plus suffix in plus mode", function(
     assertTrue(string.find(sent[2].msg, "P+4", 1, true) ~= nil, "expected plus value in plus-mode reply")
 end)
 
-test("reserves whisper softres accepts advertised aliases", function()
+test("reserves whisper softres accepts compatibility aliases", function()
     local h = newHarness()
     local sent = {}
     _G.KRT_Reserves = {
@@ -20421,7 +20685,7 @@ test("reserves whisper softres reports invalid item links for add requests", fun
 
     assertTrue(handled == true, "expected invalid add request to be handled")
     assertEqual(#sent, 1, "expected invalid add request to reply once")
-    assertEqual(sent[1].msg, "Shift-click an item link after +sr or +softres to add a reserve.", "expected item-link help")
+    assertEqual(sent[1].msg, "Shift-click an item link after +sr to add a reserve.", "expected item-link help")
     assertEqual(h.addon.Services.Reserves:HasData(), false, "expected invalid add request to avoid creating reserves")
 end)
 

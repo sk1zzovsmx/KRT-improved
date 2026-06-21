@@ -372,14 +372,6 @@ function Primitives.SetNamedPartEnabled(frameName, suffix, cond)
     return frame
 end
 
-function Primitives.SetNamedPartShown(frameName, suffix, cond)
-    local frame = getNamedFramePart(frameName, suffix)
-    if frame then
-        Primitives.SetShown(frame, cond)
-    end
-    return frame
-end
-
 function Primitives.UpdateNamedPartModeText(frameName, suffix, str1, str2, mode, lastMode)
     if mode ~= lastMode then
         setTextNamedPart(frameName, suffix, str1, str2, mode)

@@ -138,44 +138,6 @@ local function dominantTalentTab(specName, t1, t2, t3)
     return bestTab, specName
 end
 
-local function buildSpecIcon(unit, dominantTab, specName)
-    local icon
-    if not lgt or type(lgt.GetTalentTabInfo) ~= "function" then
-        return nil
-    end
-
-    if isNonEmptyString(specName) and type(dominantTab) == "number" then
-        local tabName, tabIcon = lgt:GetTalentTabInfo(unit, dominantTab)
-        if tabName == specName and isNonEmptyString(tabIcon) then
-            icon = tabIcon
-        end
-    end
-    if not isNonEmptyString(icon) and isNonEmptyString(specName) then
-        for tab = 1, 3 do
-            local tabName, tabIcon = lgt:GetTalentTabInfo(unit, tab)
-            if tabName == specName and isNonEmptyString(tabIcon) then
-                icon = tabIcon
-                break
-            end
-        end
-    end
-    if isNonEmptyString(icon) then
-        return icon
-    end
-
-    local bestPoints = -1
-    for tab = 1, 3 do
-        local _, tabIcon, tabPoints = lgt:GetTalentTabInfo(unit, tab)
-        local points = tonumber(tabPoints) or 0
-        if points > bestPoints and isNonEmptyString(tabIcon) then
-            bestPoints = points
-            icon = tabIcon
-        end
-    end
-
-    return icon
-end
-
 local function getTalentGroupCount(unit)
     if lgt and type(lgt.GetNumTalentGroups) == "function" then
         return tonumber(lgt:GetNumTalentGroups(unit)) or 1

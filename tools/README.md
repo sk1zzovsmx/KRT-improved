@@ -7,6 +7,39 @@ and Lua helper scripts remain available when a lower-level script contract is
 needed by hooks, CI, MCP, or manual debugging. Paths stay flat under `tools/`
 because AGENTS, hooks, docs, and MCP registrations reference them directly.
 
+## `tools/krt.py` Command Index
+
+Run these as `py -3 tools/krt.py <command>` on Windows or
+`python3 tools/krt.py <command>` on Linux/macOS.
+
+| Command | Purpose |
+|---|---|
+| `build-release-zip` | Build addon ZIPs containing only `!KRT/`. |
+| `install-hooks` | Set `git core.hooksPath=.githooks`. |
+| `repo-quality-check --check <name>` | Run one repo-local quality check. |
+| `api-catalog-refresh` | Regenerate function/API catalogs and `docs/TREE.md`. |
+| `api-catalog-check` | Regenerate catalogs and fail on drift. |
+| `run-release-targeted-tests` | Run the release stabilization Lua spec. |
+| `run-raid-validator` | Validate one SavedVariables file. |
+| `run-sv-inspector` | Inspect one SavedVariables file. |
+| `run-sv-roundtrip` | Validate SavedVariables serialization stability. |
+| `skills-manifest` | Print the managed skill manifest. |
+| `skills-sync` | Sync or verify vendored skill snapshots. |
+| `run-krt-mcp` | Start the repo-local MCP server. |
+| `codex-55to53` | Classify and wrap a delegated Codex workflow prompt. |
+| `dev-stack-status` | Inspect repo tooling readiness. |
+| `install-python-dev-deps` | Install repo-local Python developer dependencies. |
+| `python-quality-check` | Run Python quality checks for tools and tests. |
+| `release-metadata` | Resolve SemVer metadata from changelog and TOC. |
+| `release-notes` | Build GitHub release notes from changelog and commits. |
+| `release-prepare` | Generate release notes, ZIP, and checksum artifacts. |
+| `release-publish-gate` | Decide whether release publication should run. |
+| `pre-commit` | Run the canonical local pre-commit entrypoint. |
+
+`repo-quality-check --check` accepts `all`, `api_nomenclature`, `layering`,
+`lua_syntax`, `lua_uniformity`, `raid_hardening`, `retired_aliases`,
+`toc_files`, and `ui_binding`.
+
 ## Daily Checks
 
 Windows:
@@ -101,9 +134,6 @@ py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
   skills into a local Codex skills root.
 - `tools/krt.py run-krt-mcp`: starts `krt_mcp_server.py` for repo-local MCP
   tools.
-- `tools/requirements-mcp.txt`: pinned dependencies for the MarkItDown MCP server.
-- `tools/run-markitdown-mcp.py`: local wrapper for launching
-  `markitdown-mcp` from repo root.
 - `run-krt-mcp.ps1`: PowerShell wrapper used by MCP registration.
 - `krt_mcp_server.py`: JSON-RPC stdio MCP server exposing skill, readiness, and
   quality-check tools.
@@ -115,10 +145,7 @@ py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
 ## Python Dev Tooling
 
 - `tools/requirements-dev.txt`: repo-local developer dependencies for Python tooling:
-  `ruff`, `pytest`, `jsonschema`, and `Pillow` layered on top of
-  `requirements-mcp.txt`.
-- `tools/requirements-mcp.txt` remains MCP-only and should stay the base set for MCP
-  runtime.
+  `ruff`, `pytest`, `jsonschema`, and `Pillow`.
 - `.venv\Scripts\python.exe -m pip install -r tools\requirements-dev.txt`
 - `.venv\Scripts\python.exe tools\krt.py install-python-dev-deps`
 - `.venv\Scripts\python.exe tools\krt.py python-quality-check`
@@ -141,16 +168,10 @@ py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
 
 ## Compatibility Wrappers
 
-- `build-release-zip.ps1`: compatibility shim around
-  `tools/krt.py build-release-zip`.
-- `install-hooks.ps1`: compatibility shim around
-  `tools/krt.py install-hooks`.
 - `pre-commit.ps1`: canonical local pre-commit entrypoint used by Git hooks and
   `tools/krt.py pre-commit`.
 - `tooling-common.ps1`: shared PowerShell helpers for repo root, Lua runtime,
   ripgrep, and path handling.
-- `api-contract-cleanup-wave.md`: reusable prompt for staged addon-wide
-  contract, docs, and catalog cleanup waves.
 
 ## Lua Helpers
 

@@ -18,8 +18,8 @@ Keep these registrations project-local so agents can use the same repo-specific 
 without relying on personal global Codex config.
 
 The workflow base depends on `AGENTS.md`, `.codex/*`, and the KRT MCP registration.
-MarkItDown MCP is also registered as an auxiliary local server for attachment and
-document conversion.
+The project-local MCP servers are `krt` (repo workflows) and `lua-lsp`
+for language tooling.
 
 ## Start Command
 
@@ -32,22 +32,15 @@ Linux:   python3 tools/krt.py run-krt-mcp
 
 Server implementation: `tools/krt_mcp_server.py`.
 
-### Installation for MCP Python dependencies
+### Python Dependencies
 
-Windows:
+The KRT MCP server uses the repo Python entrypoint and does not require a
+separate runtime requirements file. For Python tooling checks, install the
+developer dependency set:
 
 ```powershell
 py -3 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r tools/requirements-mcp.txt
-```
-
-This virtualenv is used by both `run-markitdown-mcp.py` and related attachment
-conversion tooling.
-
-### MarkItDown MCP Start Command
-
-```text
-py -3 tools/run-markitdown-mcp.py
+.venv\Scripts\python.exe -m pip install -r tools/requirements-dev.txt
 ```
 
 ## Exposed MCP Tools
@@ -101,5 +94,3 @@ python3 tools/krt.py skills-sync --verify-only
 - MCP tool operations do not patch vendored skill content directly.
 - `skills_sync` is intentionally marked as a destructive operation.
 - The server supports both newline-delimited JSON-RPC framing and `Content-Length` framing.
-- MarkItDown MCP is for local trusted usage only. It can read files and URIs with
-  current-user privileges; keep stdio transport local (no HTTP/SSE exposure).

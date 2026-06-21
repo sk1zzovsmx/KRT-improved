@@ -1643,10 +1643,6 @@ do
     end
 
     -- ----- Public methods ----- --
-    function module:GetPrefix()
-        return COMM_PREFIX
-    end
-
     function module:GetProtocolVersion()
         return PROTOCOL_VERSION
     end

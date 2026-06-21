@@ -340,8 +340,12 @@ for i = 1, #staticLootSourceDatasetFiles do
     assertContains(source, spec.note, path .. " must document its static dataset exception as a note")
     assertContains(source, "-- events: none", path .. " must document static dataset event behavior")
     assert(countPlain(source, "-- ----- Private helpers ----- --") == 1, path .. " must keep a single canonical private-helper section marker")
+    assert(countPlain(source, "-- ----- Public methods ----- --") == 1, path .. " must keep a single canonical public-methods section marker")
+    assert(not source:find("local function appendLootSources", 1, true), path .. " must append static data without a local append helper")
     assertBefore(source, "-- ----- Internal state ----- --", "-- ----- Private helpers ----- --", path .. " must order internal state before private helpers")
-    assertBefore(source, "-- ----- Private helpers ----- --", "local function appendLootSources", path .. " must place appendLootSources under private helpers")
+    assertBefore(source, "-- ----- Private helpers ----- --", "-- ----- Public methods ----- --", path .. " must keep canonical helper/public section order")
+    assertBefore(source, "-- ----- Public methods ----- --", "local lootSources = {", path .. " must declare the static data table in the public section")
+    assertBefore(source, "local lootSources = {", "for i = 1, #lootSources do", path .. " must append static data with a Lua 5.1 numeric loop")
 end
 
 local commsSource = read("!KRT/Modules/Comms.lua")

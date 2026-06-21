@@ -89,7 +89,6 @@ class PythonToolingTests(unittest.TestCase):
     def test_dev_requirements_has_expected_entries(self) -> None:
         requirements_path = Path(__file__).resolve().parents[2] / "tools" / "requirements-dev.txt"
         text = requirements_path.read_text(encoding="utf-8")
-        self.assertIn("-r requirements-mcp.txt", text)
         self.assertIn("ruff", text)
         self.assertIn("pytest", text)
         self.assertIn("jsonschema", text)

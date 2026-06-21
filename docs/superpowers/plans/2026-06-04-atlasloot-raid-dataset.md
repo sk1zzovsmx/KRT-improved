@@ -1,6 +1,8 @@
 # AtlasLoot Raid Dataset Implementation Plan
 
-**Status:** Implemented in this working tree.
+**Status:** Historical implementation plan. The curated dataset remains in the
+working tree; the build-time import helper scripts were later retired from the
+active tooling surface.
 
 **Goal:** Generate KRT-native raid and world-boss loot-source shards using AtlasLoot 3.3.5a
 as the completeness reference, with no AtlasLoot runtime dependency.
@@ -18,11 +20,9 @@ runtime-compatible generated data, existing KRT Lua test harness.
 
 - Modified: `tests/release_stabilization_spec.lua`
   - Added real-dataset assertions for AtlasLoot-derived coverage and era separation.
-- Created: `tools/atlasloot_raid_sources.py`
-  - Build-time parser/generator. Reads AtlasLoot source files from a local checkout or downloads
-    raw GitHub files. Applies the declarative raid table map and writes KRT Lua shard files.
-- Created: `tools/atlasloot_raid_source_map.py`
-  - Declarative AtlasLoot table-key mapping to expansion, raid, source, NPC ID, kind, and mode.
+- Created, then retired: build-time parser/generator and declarative source-map helper.
+  - They read AtlasLoot source files and wrote KRT Lua shard files during the original dataset
+    import. Current maintenance keeps the curated KRT data directly in the repository.
 - Modified: `!KRT/Modules/Dataset/LootSources/Vanilla.lua`
   - Generated Vanilla raid and world-boss KRT data.
 - Modified: `!KRT/Modules/Dataset/LootSources/BurningCrusade.lua`
@@ -39,8 +39,8 @@ runtime-compatible generated data, existing KRT Lua test harness.
 - [x] Added real dataset tests for representative AtlasLoot Vanilla, TBC, Wrath, and world-boss
   drops.
 - [x] Added a Classic/Wrath Naxxramas separation test.
-- [x] Added `tools/atlasloot_raid_source_map.py` with reviewed raid-instance table mappings.
-- [x] Added `tools/atlasloot_raid_sources.py` for build-time KRT shard regeneration.
+- [x] Added the retired source-map helper with reviewed raid-instance table mappings.
+- [x] Added the retired build-time generator for KRT shard regeneration.
 - [x] Regenerated Vanilla, TBC, and Wrath loot-source shards.
 - [x] Updated `docs/LOOT_SOURCES.md`.
 - [x] Updated `!KRT/CHANGELOG.md`.

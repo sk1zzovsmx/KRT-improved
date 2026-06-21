@@ -108,8 +108,8 @@ Release-Version: 0.8.0-beta.1
   enters through the same Python CLI before delegating to the existing
   PowerShell gates.
 - **Release:** GitHub packaging now uploads both `KRT-<tag>.zip` and
-  `KRT-<tag>.zip.sha256`; the legacy `tools/build-release-zip.ps1` path
-  remains only as a compatibility shim around the same Python owner.
+  `KRT-<tag>.zip.sha256` from release tooling rooted at
+  `tools/krt.py build-release-zip`.
 - **Release:** Published release tags and assets are now immutable per
   SemVer version: workflows refuse to move an existing version tag or
   clobber assets on an existing GitHub release.

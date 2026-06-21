@@ -278,7 +278,9 @@
 |   |   |   |-- 2026-06-16-krt-ui-xml-lua-homogenization.md
 |   |   |   |-- 2026-06-17-krt-logger-ui-semantic-split.md
 |   |   |   |-- 2026-06-17-krt-xml-visual-simplification.md
-|   |   |   \\-- 2026-06-20-krt-useless-code-analysis.md
+|   |   |   |-- 2026-06-20-krt-dead-code-trim-priority-1.md
+|   |   |   |-- 2026-06-20-krt-useless-code-analysis.md
+|   |   |   \\-- README.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       |-- 2026-06-05-master-loot-grid-design.md
@@ -289,6 +291,7 @@
 |   |-- API_REGISTRY_INTERNAL.csv
 |   |-- API_REGISTRY_PUBLIC.csv
 |   |-- ARCHITECTURE.md
+|   |-- COMMANDS.md
 |   |-- DEV_CHECKS.md
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
@@ -334,6 +337,7 @@
 |   |-- config_interface_options_spec.lua
 |   |-- controllers_cleanup_spec.lua
 |   |-- controller_chunk_budget_spec.lua
+|   |-- dead_code_trim_spec.lua
 |   |-- equip_inspect_service_spec.lua
 |   |-- equip_inspect_source_contract_spec.lua
 |   |-- logger_visual_refresh_spec.lua
@@ -356,11 +360,6 @@
 |   \\-- ui_xml_homogenization_source_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
-|   |-- api-contract-cleanup-wave.md
-|   |-- atlasloot_raid_sources.py
-|   |-- atlasloot_raid_source_map.py
-|   |-- build-interface-texture-catalog.py
-|   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1
@@ -373,15 +372,12 @@
 |   |-- fnmap-api-census.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
-|   |-- install-hooks.ps1
 |   |-- krt.py
 |   |-- krt_mcp_server.py
 |   |-- pre-commit.ps1
 |   |-- README.md
 |   |-- requirements-dev.txt
-|   |-- requirements-mcp.txt
 |   |-- run-krt-mcp.ps1
-|   |-- run-markitdown-mcp.py
 |   |-- run-raid-validator.ps1
 |   |-- run-release-targeted-tests.ps1
 |   |-- run-sv-inspector.ps1
@@ -402,7 +398,8 @@
 |-- AGENTS.md
 |-- CHANGELOG.md
 |-- pyproject.toml
-\\-- README.md
+|-- README.md
+\\-- README_DEBUG.md
 ```
 
 _Regenerate with tools/update-tree.ps1 -MaxDepth 4._

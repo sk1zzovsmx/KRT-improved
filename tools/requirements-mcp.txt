@@ -1,2 +1,0 @@
-# MarkItDown MCP runtime dependency for attachment conversion tooling.
-markitdown-mcp==0.0.1a4

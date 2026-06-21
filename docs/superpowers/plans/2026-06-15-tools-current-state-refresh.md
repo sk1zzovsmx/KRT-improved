@@ -159,7 +159,7 @@ skills_manifest,skills_verify,skills_sync,dev_stack_status,repo_quality_check
 ### Task 4: Refresh Cleanup Wave Prompt
 
 **Files:**
-- Modify: `tools/api-contract-cleanup-wave.md`
+- Modify: retired cleanup-wave prompt template.
 
 - [x] **Step 1: Add current workflow constraints**
 

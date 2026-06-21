@@ -75,7 +75,7 @@ smoke checks.
 
 | Command | Description |
 | --- | --- |
-| `/krt perf` | Toggle runtime performance logging or print current status. |
+| `/krt perf` | Print current runtime performance logging status. |
 | `/krt perf on` | Enable slow-block performance logging. |
 | `/krt perf off` | Disable slow-block performance logging. |
 | `/krt perf threshold <ms>` | Set the slow-block threshold in milliseconds. |

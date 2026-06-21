@@ -2,7 +2,27 @@
 
 Repo-wide cleanup program built on top of `docs/TECH_CLEANUP_WORKFLOW.md`.
 
-Status date: 2026-06-14
+Status date: 2026-06-20
+
+## 0. Active Cleanup Queue (2026-06-20)
+
+Active queue: none.
+
+The completed plan and audit files under `docs/superpowers/plans/` and
+`docs/reports/` are historical evidence, not a live execution queue. Do not
+resume an old checkbox list or "next candidate" note without a fresh inventory
+against the current tree.
+
+Closed as historical:
+
+- staged API-reduction and cleanup waves S1/S2/S3/R1/E1/E2/C1/C2/U1/B1
+- XML/UI fallback-removal and ownership audit notes already validated in their
+  own plan files
+- `docs/reports/krt-useless-code-analysis-2026-06-20.md`, which produced no
+  direct code patch under the current API-preservation and stability rules
+
+New cleanup work should start from a current owner/call-path map, a new narrow
+plan, and the gates in `docs/DEV_CHECKS.md`.
 
 ## 1.0 Lua Canonical Uniformity Snapshot (2026-06-14)
 
@@ -869,7 +889,8 @@ These are not strong cleanup candidates right now.
 If continuing the cleanup program immediately, start with:
 
 1. open a fresh inventory item only when a new owner-specific candidate is proven
-2. keep `!KRT/Init.lua` and `!KRT/Services/Reserves.lua` in hold without new call-site evidence
+2. create a new plan for that exact owner or command surface
+3. keep `!KRT/Init.lua` and `!KRT/Services/Reserves.lua` in hold without new call-site evidence
 
 That sequence gives the best technical ROI while keeping the already-stable UI
 owner layer closed.
@@ -965,11 +986,12 @@ Completed:
   `localize`, `postUpdate`, `func`, `Box._doSave`, `OnShow`, and `OnHide`
   callbacks out of the actionable duplicate queue.
 
-Next candidates:
+Queue disposition:
 
-1. Continue deeper `Services/Reserves.lua` facade review only for proven
-   package-internal contracts; alias, collapse, readiness, and display methods
-   are currently real slash/UI/controller contracts.
-2. Leave remaining `getData`/`rowName`/`localize`/`postUpdate` entries alone
-   unless ListController/UI.Scaffold contract names change; those names are
-   configuration hooks, not duplicated runtime ownership.
+- No item from this historical follow-up is active by default.
+- Continue deeper `Services/Reserves.lua` facade review only if a fresh
+  inventory proves package-internal-only contracts; alias, collapse, readiness,
+  and display methods are currently real slash/UI/controller contracts.
+- Leave remaining `getData`/`rowName`/`localize`/`postUpdate` entries alone
+  unless ListController/UI.Scaffold contract names change; those names are
+  configuration hooks, not duplicated runtime ownership.

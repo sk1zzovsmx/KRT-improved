@@ -100,11 +100,11 @@ end
 local slashHandlers = {}
 
 local cmdAchiev, cmdLFM, cmdConfig = { "ach", "achi", "achiev", "achievement" }, { "pug", "lfm", "group", "grouper" }, { "config", "conf", "options", "opt" }
-local cmdWarnings, cmdLogger = { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
+local cmdWarnings, cmdLogger = { "warning", "warnings", "warn", "rw" }, { "history" }
 local cmdAttendance = { "attendance", "attendees", "att" }
-local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
+local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "ml" }, { "counter", "counters", "counts" }
 local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve", "sr", "softres" }, { "minimap", "mm" }, { "validate" }
-local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
+local cmdHelp, cmdBug, cmdVersion = { "help" }, { "bug", "report" }, { "version", "ver", "about" }
 local cmdSpecInspect = { "specinspect", "inspectspec" }
 local cmdPerf = { "perf", "performance" }
 
@@ -141,7 +141,7 @@ local function showHelp()
     printHelp("lfm", L.StrCmdGrouper)
     printHelp("ach", L.StrCmdAchiev)
     printHelp("warnings", L.StrCmdWarnings)
-    printHelp("logger", L.StrCmdLogger)
+    printHelp("history", L.StrCmdLogger)
     printHelp("attendance", L.StrRaidAttendance)
     printHelp("debug", L.StrCmdDebug)
     printHelp("counter", L.StrCmdCounter)
@@ -912,8 +912,6 @@ local function handleLoggerCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
         callControllerMethod("Logger", "ToggleLootHistory")
-    elseif sub == "attendance" or sub == "attendees" or sub == "att" then
-        callControllerMethod("Logger", "ToggleRaidAttendance")
     elseif sub == "req" then
         callSyncerMethodWithTarget("RequestLoggerReq", arg)
     elseif sub == "push" then
@@ -921,7 +919,7 @@ local function handleLoggerCommand(rest)
     elseif sub == "sync" then
         callSyncerMethod("RequestLoggerSync")
     else
-        addon:info(format(L.StrCmdCommands, "krt logger"), "KRT")
+        addon:info(format(L.StrCmdCommands, "krt history"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
         printHelp("req <raidId|raidNid> <player>", L.StrCmdLoggerReq)
         printHelp("push <raidId|raidNid> <player>", L.StrCmdLoggerPush)
@@ -1126,7 +1124,7 @@ local function handleReservesCommand(rest)
         callWidgetMethod("Reserves", "Toggle")
     elseif sub == "import" then
         callWidgetMethod("Reserves", "ToggleImport")
-    elseif sub == "check" or sub == "readiness" then
+    elseif sub == "check" then
         printSoftResReadinessReport()
     elseif sub == "alias" then
         local reserveName, raidName = Strings.SplitArgs(arg)
@@ -1286,11 +1284,11 @@ local function handleHelpCommand(rest)
         return
     end
 
-    if topic == "logger" or topic == "history" or topic == "log" then
+    if topic == "history" then
         handleLoggerCommand("help")
     elseif topic == "res" or topic == "reserve" or topic == "reserves" then
         handleReservesCommand("help")
-    elseif topic == "ml" or topic == "loot" or topic == "master" then
+    elseif topic == "ml" then
         showToggleHelp("krt ml")
     elseif topic == "counter" or topic == "counters" or topic == "counts" then
         showToggleHelp("krt counter")
@@ -1354,10 +1352,6 @@ local function handleSlashCommand(msg)
         return
     end
 
-    if cmd == "show" or cmd == "toggle" then
-        callControllerMethod("Master", "Toggle")
-        return
-    end
     local fn = slashHandlers[cmd]
     if fn then
         return fn(rest, cmd, msg)

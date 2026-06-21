@@ -20,7 +20,7 @@
 			</Button>
 			<Button name="$parentItemNameHotspot" enableMouse="true">
 				<Size>
-					<AbsDimension x="170" y="20" />
+					<AbsDimension x="236" y="20" />
 				</Size>
 				<Anchors>
 					<Anchor point="LEFT">
@@ -52,7 +52,7 @@
 			<Layer level="ARTWORK">
 				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT">
 					<Size>
-						<AbsDimension x="170" y="18" />
+						<AbsDimension x="236" y="18" />
 					</Size>
 					<Anchors>
 						<Anchor point="LEFT">
@@ -405,7 +405,7 @@
 					<Anchors>
 						<Anchor point="BOTTOMLEFT">
 							<Offset>
-								<AbsDimension x="16" y="8" />
+								<AbsDimension x="16" y="12" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -418,7 +418,7 @@
 					<Anchors>
 						<Anchor point="BOTTOMLEFT">
 							<Offset>
-								<AbsDimension x="278" y="53" />
+								<AbsDimension x="278" y="57" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -430,7 +430,7 @@
 					<Anchors>
 						<Anchor point="BOTTOMLEFT">
 							<Offset>
-								<AbsDimension x="278" y="31" />
+								<AbsDimension x="278" y="35" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -443,7 +443,7 @@
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
-							<AbsDimension x="16" y="-32" />
+							<AbsDimension x="16" y="-38" />
 						</Offset>
 					</Anchor>
 					<Anchor point="BOTTOMRIGHT">
@@ -496,7 +496,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentWhisperHelpButton" inherits="KRTActionButtonTemplate">
+			<Button name="$parentImportButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -515,7 +515,7 @@
 				<Anchors>
 					<Anchor point="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="252" y="48" />
+							<AbsDimension x="252" y="52" />
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -527,11 +527,23 @@
 				<Anchors>
 					<Anchor point="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="252" y="28" />
+							<AbsDimension x="252" y="32" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 			</CheckButton>
+			<Button name="$parentWhisperHelpButton" inherits="KRTActionButtonTemplate">
+				<Size>
+					<AbsDimension x="96" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT">
+						<Offset>
+							<AbsDimension x="-16" y="12" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
 		</Frames>
 	</Frame>
 	<!-- ====== Start of Reserve Import Window ====== -->

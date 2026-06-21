@@ -26,14 +26,8 @@ local N25_H25 = { heroic25 = true, normal25 = true }
 local ALL_10_25 = { heroic10 = true, heroic25 = true, normal10 = true, normal25 = true }
 
 -- ----- Private helpers ----- --
-local function appendLootSources(lootSources)
-    for i = 1, #lootSources do
-        LootSourcesData.Raw[#LootSourcesData.Raw + 1] = lootSources[i]
-    end
-end
-
 -- ----- Public methods ----- --
-appendLootSources({
+local lootSources = {
     {
         name = "Molten Core",
         sources = {
@@ -2372,4 +2366,8 @@ appendLootSources({
             },
         },
     },
-})
+}
+
+for i = 1, #lootSources do
+    LootSourcesData.Raw[#LootSourcesData.Raw + 1] = lootSources[i]
+end

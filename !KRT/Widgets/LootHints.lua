@@ -282,13 +282,6 @@ do
         return buildLootReserveUiState(itemLink)
     end
 
-    module.ApplyLootReserveUi = function(frame, itemLink, icon, anchor)
-        local reserveState = buildLootReserveUiState(itemLink)
-        setLootReserveBorder(frame, icon, reserveState.hasReserves)
-        bindLootItemTooltip(frame, itemLink, reserveState, anchor)
-        return reserveState
-    end
-
     module.ApplyLootFrameReserveHints = function()
         if not _G.LootFrame then
             return

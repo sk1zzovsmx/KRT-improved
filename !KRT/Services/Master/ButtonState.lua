@@ -70,6 +70,9 @@ function ButtonState.BuildTooltipState(opts)
     opts = opts or {}
     local lootState = opts.lootState or {}
     local selectedItemCount = tonumber(opts.selectedItemCount) or 1
+    local hasLootAccess = opts.hasLootAccess == true
+    local hasInventoryTradeAccess = opts.hasInventoryTradeAccess == true
+    local hasLootSelectionAccess = opts.hasLootSelectionAccess == true or hasLootAccess
     local tooltipState = {
         config = L.TipMasterConfig,
         selectItem = lootState.fromInventory and L.TipMasterRemoveItem or L.TipMasterSelectItem,
@@ -89,11 +92,12 @@ function ButtonState.BuildTooltipState(opts)
         lootCounter = L.TipMasterLootCounter,
     }
 
-    if not opts.hasLootAccess then
+    if not hasLootAccess then
         local itemActionWarning = lootState.fromInventory and (L.WarnInventoryTradeNoPermission or L.WarnMLOnlyMode) or L.WarnMLOnlyMode
-        local hasItemActionAccess = lootState.fromInventory and opts.hasInventoryTradeAccess == true
+        local hasItemActionAccess = lootState.fromInventory and hasInventoryTradeAccess
+        local hasSelectionAccess = (lootState.fromInventory and hasInventoryTradeAccess) or ((not lootState.fromInventory) and hasLootSelectionAccess)
 
-        if not (lootState.fromInventory and opts.hasInventoryTradeAccess == true) then
+        if not hasSelectionAccess then
             tooltipState.selectItem = itemActionWarning
         end
         if not hasItemActionAccess then
@@ -138,8 +142,9 @@ function ButtonState.BuildState(opts)
     local tooltipState = opts.tooltipState or {}
     local workflowState = opts.workflowState or {}
     local labels = opts.labels or {}
-    local hasLootAccess = opts.hasLootAccess
+    local hasLootAccess = opts.hasLootAccess == true
     local hasInventoryTradeAccess = opts.hasInventoryTradeAccess == true
+    local hasLootSelectionAccess = opts.hasLootSelectionAccess == true or hasLootAccess
     local hasItemActionAccess = (lootState.fromInventory == true and hasInventoryTradeAccess) or hasLootAccess
     local countdownRunning = opts.countdownRunning
     local autoLootSuggestion = opts.autoLootSuggestion
@@ -168,7 +173,7 @@ function ButtonState.BuildState(opts)
         reserveListTooltip = tooltipState.reserveList,
         lootCounterTooltip = tooltipState.lootCounter,
         canSelectItem = (
-            ((not lootState.fromInventory) and hasLootAccess and (tonumber(lootState.lootCount) or 0) > 1)
+            ((not lootState.fromInventory) and hasLootSelectionAccess and (tonumber(lootState.lootCount) or 0) > 1)
             or (lootState.fromInventory and hasInventoryTradeAccess and (tonumber(lootState.lootCount) or 0) >= 1)
         ) and not countdownRunning,
         canChangeItem = workflowState.canChangeItem == true,

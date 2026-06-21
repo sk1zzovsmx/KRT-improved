@@ -36,12 +36,3 @@ enabled = true
 startup_timeout_sec = 30
 tool_timeout_sec = 180
 required = true
-
-[mcp_servers.markitdown]
-command = "C:\\Users\\ferra\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
-args = ["C:\\Users\\ferra\\Downloads\\KRT-improved\\tools\\run-markitdown-mcp.py"]
-cwd = "C:\\Users\\ferra\\Downloads\\KRT-improved"
-enabled = true
-startup_timeout_sec = 30
-tool_timeout_sec = 180
-required = false

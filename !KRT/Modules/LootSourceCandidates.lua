@@ -140,13 +140,6 @@ function LootSourceCandidates.ParseSharedText(value)
     return (#out > 0) and out or nil
 end
 
-function LootSourceCandidates.ParseLegacySharedText(value)
-    if not LootSourceCandidates.IsLegacySharedText(value) then
-        return nil
-    end
-    return LootSourceCandidates.ParseSharedText(value)
-end
-
 function LootSourceCandidates.Copy(candidates, fallbackText)
     local copied = {}
     local seen = {}

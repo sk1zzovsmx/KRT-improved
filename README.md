@@ -3,9 +3,16 @@
 
 Game Version: **Wrath of the Lich King 3.3.5a** (Interface **30300**)
 
-Copyright (C) 2018 **Kader Bouyakoub**  
-This repository is an **improved / reworked** fork focused on **raid-leading quality-of-life**, **master-loot automation**, **SoftRes integration**, and a **more robust raid/loot history**. All rights goes to Kader.
-It took a lot of time, effort for who isn't a code developer like ME. So please, for sake, do not judge.
+Original addon by **Kader Bouyakoub** (2018). This improved fork is focused on
+**raid-leading quality-of-life**, **master-loot automation**, **SoftRes integration**,
+and a **more robust raid/loot history**. All rights go to Kader.
+
+KRT is built for WotLK raid leaders and Master Looters who want loot distribution,
+SoftRes reserves, loot counters, raid attendance, reusable warnings, and PUG spam
+helpers in one addon.
+
+Loot decisions stay operator-driven: KRT helps announce, roll, select winners,
+award or trade items, and record history, but the raid leader remains in control.
 
 ---
 
@@ -39,12 +46,12 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 
 ## Installation
 
-1. Download / clone the repository.
+1. Download the latest release ZIP.
 2. Copy the folder **`!KRT`** into:
    - `World of Warcraft/Interface/AddOns/`
 3. Restart the game or type `/reload`.
 
-> Tip: make sure you don’t have multiple copies of KRT enabled at the same time.
+> Tip: make sure you don't have multiple copies of KRT enabled at the same time.
 
 ---
 
@@ -59,7 +66,7 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
   - From there you can open Master Looter, Loot Counter, Loot Logger, Warnings, and the LFM Spammer.
 
 - **Open Master Looter**
-  - `/krt ml` (aliases: `/krt loot`, `/krt master`)
+  - `/krt ml`
 
 - **Import SoftRes reserves**
   - `/krt res import`
@@ -73,61 +80,67 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 
 ---
 
-## Developer Docs
+## Typical Raid Flow
 
-- Architecture and layering map: `docs/ARCHITECTURE.md`
-- Runtime ownership and module map: `docs/OVERVIEW.md`
-- Lua writing rules and naming policy: `docs/LUA_WRITING_RULES.md`
-- Binding rules and coding policy: `AGENTS.md`
-- Quick layering checks: `docs/DEV_CHECKS.md`
-- Cross-platform tooling entrypoint: `tools/krt.py`
-- Agent skills and workflow: `docs/AGENT_SKILLS.md`
-- Repo-local MCP server for skill/addon workflows: `docs/KRT_MCP.md`
-- UI/XML binding and template policy: `docs/ARCHITECTURE.md`
-- Addon debug command reference: `!KRT/debug/README.md`
+1. Open `/krt config` once and set your Master Loot, SoftRes, warning, and spam options.
+2. Open `/krt ml` when raid loot starts.
+3. Import reserves with `/krt res import` if the raid uses SoftRes.
+4. Select a dropped loot item or inventory item, announce it, run MS/OS/SR/Free rolls,
+   and award or trade the winner from the Master Looter window.
+5. Use `/krt counter` to watch current MS wins and `/krt history` or `/krt attendance`
+   to review raid sessions, roster changes, bosses, and loot.
+6. Use `/krt rw` for saved raid warnings and `/krt lfm` when building or refilling a group.
 
 ---
 
-## Slash Commands
+## Addon Commands
+
+This README lists only in-game addon commands. The complete runtime command
+inventory is in `docs/COMMANDS.md`.
 
 Main entrypoints:
 - `/krt`
 - `/kraidtools`
 
-Common commands:
-- `/krt config` — open config (`/krt config reset` restores defaults)
-- `/krt ml` — Master Looter window
-- `/krt counter` — Loot Counter window
-- `/krt history` — Loot History window
-- `/krt attendance` — Raid Attendance window
-- `/krt logger req <raidId|raidNid> <player>` — request a raid snapshot
-- `/krt logger push <raidId|raidNid> <player>` — push a raid snapshot
-- `/krt logger sync` — sync matching current-raid history
-- `/krt rw` — Raid Warnings window (`/krt rw <ID>` announces a saved warning)
-- `/krt lfm` — LFM Spammer window (`/krt lfm start` / `/krt lfm stop`)
-- `/krt res` — Reserves list (`/krt res import` opens the import window)
-- `/krt res check` — local SoftRes readiness and name-match report
-- `/krt res alias <softres-name> <raid-name>` — map imported names to raid names
-- `/krt res sync|meta|clearcache` — runtime SoftRes sync diagnostics
-- `/krt minimap on|off|pos <deg>` — show/hide button or set position angle
-- `/krt debug on|off|level <name|num>` — toggle debug and/or set log level
-- `/krt debug raid seed|clear|rolls|roll` — synthetic raid/roll test helpers
-- `/krt debug mlgrid [1-40]` — Master Loot grid layout preview
-- `/krt perf on|off|threshold <ms>` — runtime slow-block diagnostics
-- `/krt validate raids [verbose]` — raid-history schema/invariant validation
-- `/krt version` — local and grouped KRT version details
-- `/krt bug` — local support summary for bug reports
+Help and primary windows:
+- `/krt help [command]` - command help.
+- `/krt config` - open config (`/krt config reset` restores defaults).
+- `/krt ml` - Master Looter window.
+- `/krt counter` - Loot Counter window.
+- `/krt history` - Loot History window.
+- `/krt attendance` - Raid Attendance window.
+- `/krt rw` - Raid Warnings window (`/krt rw <ID>` announces a saved warning).
+- `/krt lfm` - LFM Spammer window (`/krt lfm start` / `/krt lfm stop`).
+- `/krt ach <achievement-link>` - extract an achievement ID for LFM templates.
+
+Loot History sync and reserves:
+- `/krt history req <raidId|raidNid> <player>` - request a raid snapshot.
+- `/krt history push <raidId|raidNid> <player>` - push a raid snapshot.
+- `/krt history sync` - sync matching current-raid history.
+- `/krt res` - Reserves list (`/krt res import` opens the import window).
+- `/krt res check` - local SoftRes readiness report.
+- `/krt res alias <softres-name> <raid-name>` - map imported names to raid names.
+- `/krt res unalias <softres-name>` - remove a SoftRes name alias.
+- `/krt res aliases` - list SoftRes name aliases.
+- `/krt res sync|meta|clearcache` - runtime SoftRes sync diagnostics.
+
+Utility and diagnostics:
+- `/krt minimap on|off|pos <deg>` - show/hide button or set position angle.
+- `/krt specinspect [force]` - refresh raid specialization snapshots.
+- Debug, performance, validation, version, and bug-report commands are explained
+  in `README_DEBUG.md`.
+
+Full in-game command inventory: `docs/COMMANDS.md`.
 
 ---
 
-## Features
+## Feature Guide
 
-**FIRST OF ALL**
-## UI Multi-Select (Ctrl / Shift)
+### Shared List Controls (Ctrl / Shift)
 
 Several KRT panels use an **OS-like multi-selection** system to make lists faster to operate.
 
-### Common rules (lists)
+#### Common rules (lists)
 - **Left-click** focuses a row (the focused row drives dependent panels where applicable).
 - **Ctrl + Left-click** toggles a row in/out of the selection (multi-select).
 - **Shift + Left-click** selects a **range** from the last anchor to the clicked row.
@@ -141,7 +154,7 @@ Several KRT panels use an **OS-like multi-selection** system to make lists faste
 
 The Master Looter window is designed to reduce clicks and mistakes during loot distribution while keeping the workflow fast and predictable.
 
-**Database workflow**
+**Loot workflow**
 - **Select Item**: pick a loot slot from the current boss loot, or remove an inventory item from the window.
 - **Spam Loot / Ready Check**: announce what dropped (boss loot) or do a ready-check before rolling (inventory rolls).
 - **Roll types**:
@@ -172,7 +185,7 @@ When rolling loot **directly from the loot window**, KRT supports **manual multi
 - Selection becomes available **after the countdown ends**.
 - KRT **auto-prefills** the selection with the **top N** rollers, where **N = ItemCount** (number of identical copies to award).
 - Use **Ctrl + Click** on player rows to **toggle winners**.
-- The selection is **capped to N** (you can’t select more winners than the number of copies you’re awarding).
+- The selection is **capped to N** (you cannot select more winners than the number of copies you are awarding).
   - If **N = 1**, Ctrl+Click on another player acts like a **swap** (replaces the current winner).
 - Selected winners are visually highlighted and shown as: `> Name <`.
 - Press **Award** to award **exactly the selected winners** (clamped to available copies), sequentially.
@@ -187,7 +200,7 @@ This fork adds a full reserves system that integrates directly into the Master L
 
 <img width="231" height="483" alt="image" src="https://github.com/user-attachments/assets/2cbfba09-01eb-42cd-ab9a-0a7e1059d6ab" />
 
-#### Import (SoftRes CSV)
+#### Import (SoftRes JSON/CSV)
 Open the import dialog:
 - `/krt res import`
 - or via Master Looter **Reserves** button.
@@ -197,17 +210,19 @@ Open the import dialog:
 You can switch import mode:
 - **Multi-reserve**: supports *quantity > 1* reserves and/or multiple reserves per player.
 
-  If you are able to see if a player has reserved the same item multiple times, even if it is already reserved.
+  Use this when the reserve export can show duplicate picks or reserve quantities per player.
 
 <img width="375" height="531" alt="image" src="https://github.com/user-attachments/assets/a096b162-d8dc-4878-b44f-bcf244eb3a30" />
 
 - **Plus System (P+)**: supports **one reserved item per player**, with optional **priority (P+)** values.
 
-  Due the limitation of Soft Reserve you have to force only **one item pick** for player, so use the **plus** on the website as a priority.
+  Use this when each player has one reserved item and the SoftRes sheet uses plus values
+  to express priority.
 
 <img width="371" height="531" alt="image" src="https://github.com/user-attachments/assets/9abbd237-8749-4515-a026-8a741465c8d2" />
 
-If you try to import a CSV that doesn’t match the selected mode, the addon will warn you and can auto-switch you to the correct mode.
+If an import does not match the selected mode, the addon warns you and can switch to
+the matching mode.
 
 #### Reserve List UI
 - Shows reserved items with:
@@ -217,9 +232,9 @@ If you try to import a CSV that doesn’t match the selected mode, the addon wil
 
 #### SR Roll integration
 When rolling as **SR**:
-- Reserved players are highlighted, with blue colour, in the roll list.
+- Reserved players are highlighted, with blue color, in the roll list.
 - **Multi-reserve**:
-  - The addon tracks how many rolls each player is allowed (e.g. 2 reserves → up to 2 valid rolls)
+  - The addon tracks how many rolls each player is allowed (for example, 2 reserves -> up to 2 valid rolls)
   - Extra rolls are blocked (and can be whispered)
 - **Plus System (P+)**:
   - Priority is shown in the roll list as `(P+N)`
@@ -271,7 +286,7 @@ Save raid warning templates and reuse them instantly.
 
 - Create, edit, delete warnings.
 - Announce via:
-  - click → **Announce**
+  - click -> **Announce**
   - **Ctrl+Click** on a saved entry
   - `/krt rw <ID>` (macro-friendly)
 
@@ -317,7 +332,7 @@ Multi-select is primarily used for **batch delete** operations (the **Delete** b
 - **Loot**: delete multiple loot rows in one action.
 
 #### Loot context menu
-- **Right-click** on a loot row forces a **single focused row** and opens the context menu  
+- **Right-click** on a loot row forces a **single focused row** and opens the context menu
   (multi-select is not used for the context menu).
 
 #### Filter exclusivity
@@ -342,31 +357,14 @@ You can also control it via:
 
 ## Debug / Troubleshooting
 
-KRT includes runtime-only debug and diagnostic commands. The complete command
-reference and copy-ready snippets live in `!KRT/debug/README.md`.
+KRT includes runtime-only debug and diagnostic commands for support reports,
+performance checks, raid-history validation, and local roll/layout smoke tests.
 
-- Toggle debug:
-  - `/krt debug on`
-  - `/krt debug off`
-- Set log level:
-  - `/krt debug level info|debug|trace|spam` (names/numbers supported)
-- Inspect timers:
-  - `/krt debug timers`
-  - `/krt debug timers reset`
-- Run layout and roll smoke helpers:
-  - `/krt debug mlgrid [1-40]`
-  - `/krt debug raid seed`
-  - `/krt debug raid rolls`
-- Capture local support state:
-  - `/krt bug`
-  - `/krt version local`
-- Check slow blocks and raid data:
-  - `/krt perf on|off|threshold <ms>`
-  - `/krt validate raids [verbose]`
+See `README_DEBUG.md` for the command explanations and copy-ready snippets.
 
 ---
 
 ## Credits
 
-Original addon: **Kader Bouyakoub** (2018).  
+Original addon: **Kader Bouyakoub** (2018).
 This fork contains additional rework and features while keeping the original goal: **make raid leading easier**.

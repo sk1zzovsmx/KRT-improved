@@ -885,29 +885,6 @@ local function getLootPanelContextLabel(sel)
     return getRaidContextLabel(sel.selectedRaid)
 end
 
-local function getBossEmptyStateText(count, selectedRaid)
-    if (tonumber(count) or 0) > 0 then
-        return nil
-    end
-    if not selectedRaid then
-        return L.StrLoggerEmptyBossesSelectRaid
-    end
-    return L.StrLoggerEmptyBosses
-end
-
-local function getBossAttendeesEmptyStateText(count, selectedRaid, selectedBoss)
-    if (tonumber(count) or 0) > 0 then
-        return nil
-    end
-    if not selectedRaid then
-        return L.StrLoggerEmptyBossAttendeesSelectRaid
-    end
-    if not selectedBoss then
-        return L.StrLoggerEmptyBossAttendeesSelectBoss
-    end
-    return L.StrLoggerEmptyBossAttendees
-end
-
 local function getRaidAttendeesEmptyStateText(count, selectedRaid)
     if (tonumber(count) or 0) > 0 then
         return nil
@@ -1038,13 +1015,6 @@ do
         if label then
             UI.Primitives.SetShown(label, type(text) == "string" and text ~= "")
         end
-    end
-
-    module._getSelectedRaidRecord = function()
-        if not module.selectedRaid then
-            return nil
-        end
-        return Store:GetRaid(module.selectedRaid)
     end
 
     local function applyFocusedMultiSelect(opts)
@@ -1201,25 +1171,6 @@ do
         applyLootListColumnWidths("KRTLootHistoryLoot")
     end
 
-    module._deleteSelectedAttendees = function(ctx, deleteFn, onRemoved)
-        module._runWithSelectedRaid(function(_, rID)
-            local ids = UI.Selection.GetSelected(ctx)
-            if not (ids and #ids > 0) then
-                return
-            end
-
-            local removed = deleteFn(rID, ids)
-            if not removed or removed <= 0 then
-                return
-            end
-
-            UI.Selection.EnsureState(ctx)
-            if type(onRemoved) == "function" then
-                onRemoved(removed, ids)
-            end
-        end)
-    end
-
     local rosterUiRefreshDebounceSeconds = 0.25
 
     module._isLoggerViewingCurrentRaid = function()
@@ -1260,30 +1211,6 @@ do
         local rID = module.selectedRaid
         local raid = rID and Store:GetRaid(rID) or nil
         return raid, rID
-    end
-
-    module._needBoss = function(raid)
-        raid = raid or (select(1, module._needRaid()))
-        if not raid then
-            return nil
-        end
-        local bNid = module.selectedBoss
-        if not bNid then
-            return nil
-        end
-        return Store:GetBoss(raid, bNid)
-    end
-
-    module._needLoot = function(raid)
-        raid = raid or (select(1, module._needRaid()))
-        if not raid then
-            return nil
-        end
-        local lNid = module.selectedItem
-        if not lNid then
-            return nil
-        end
-        return Store:GetLoot(raid, lNid)
     end
 
     module._runWithSelectedRaid = function(fn, refreshEvent)

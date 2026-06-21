@@ -285,10 +285,6 @@ do
         return findBossBySourceKey(normalizeRaidForQuery(raid, opts), sourceKey)
     end
 
-    function module:ResolveLootLooterNid(loot)
-        return resolveLootLooterNid(loot)
-    end
-
     function module:ResolveLootLooterName(raid, loot, runtime)
         raid = normalizeRaid(raid)
         runtime = runtime or ensureRuntime(raid)
