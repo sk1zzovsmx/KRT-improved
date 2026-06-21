@@ -3591,6 +3591,58 @@ test("runtime cache indexes appended loot without rebuilding runtime", function(
     assertTrue(runtime1.lootByNid[2] == appended, "expected appended loot row to be indexed by nid")
 end)
 
+test("runtime cache builds logger history query indexes", function()
+    local h = newHarness()
+    local store = h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE", countMS = 0 },
+                { playerNid = 2, name = "Bob", class = "WARRIOR", countMS = 0 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", players = { 1, 2 } },
+                { bossNid = 11, name = "Grobbulus", players = { 2 } },
+            },
+            loot = {
+                { lootNid = 101, bossNid = 10, itemId = 9001, looterNid = 1 },
+                { lootNid = 102, bossNid = 11, itemId = 9002, looterNid = 2 },
+                { lootNid = 103, bossNid = 10, itemId = 9003, looterNid = 1 },
+            },
+            attendance = {
+                { playerNid = 1, segments = { { startTime = 1000, endTime = 1060 } } },
+                { playerNid = 2, segments = { { startTime = 1000, endTime = 1120 } } },
+            },
+            nextPlayerNid = 3,
+            nextBossNid = 12,
+            nextLootNid = 104,
+        },
+    })
+
+    local raid = h.Database.EnsureRaidById(1)
+    local runtime = store:EnsureRaidRuntime(raid)
+
+    assertTrue(runtime.playerByNid[1] == raid.players[1], "expected runtime player lookup by nid")
+    assertEqual(runtime.playerNidByName.Alice, 1, "expected runtime player name lookup")
+    assertEqual(runtime.attendanceIdxByPlayerNid[1], 1, "expected runtime attendance index by player nid")
+    assertTrue(runtime.attendanceByPlayerNid[2] == raid.attendance[2], "expected runtime attendance row lookup")
+    assertTrue(runtime.bossPlayerSetByBossNid[10][1] == true, "expected runtime boss attendee set")
+    assertTrue(runtime.bossPlayerSetByBossNid[10][2] == true, "expected runtime boss attendee set to include all attendees")
+    assertEqual(runtime.lootIdxByBossNid[10][1], 1, "expected first boss loot index")
+    assertEqual(runtime.lootIdxByBossNid[10][2], 3, "expected second boss loot index")
+    assertEqual(runtime.lootIdxByLooterNid[1][1], 1, "expected first player loot index")
+    assertEqual(runtime.lootIdxByLooterNid[1][2], 3, "expected second player loot index")
+
+    local appended = { lootNid = 104, bossNid = 10, itemId = 9004, looterNid = 2 }
+    raid.loot[#raid.loot + 1] = appended
+    local patched = store:UpsertLootIndex(raid, appended, #raid.loot)
+
+    assertTrue(patched == runtime, "expected appended loot to patch the existing runtime table")
+    assertEqual(runtime.lootIdxByBossNid[10][3], 4, "expected appended boss loot index to be patched")
+    assertEqual(runtime.lootIdxByLooterNid[2][2], 4, "expected appended looter loot index to be patched")
+end)
+
 test("runtime cache rebuilds when signature changes without explicit strip", function()
     local h = newHarness()
     h:load("!KRT/Database/DBRaidStore.lua")
@@ -4842,6 +4894,171 @@ test("logger export builds raid attendance CSV from attendance summaries", funct
     assertTextContains(csv, ",120,60,60,2")
 end)
 
+test("raid query facade filters logger history with runtime indexes", function()
+    local h = newHarness()
+    h.feature.Sort.GetLootSortName = function(itemName, itemLink, itemId)
+        return tostring(itemName or itemLink or itemId or "")
+    end
+
+    local lootRows = {}
+    local expectedBoss20Bob = 0
+    for i = 1, 90 do
+        local bossNid = (i % 3 == 0) and 20 or 10
+        local looterNid = ((i - 1) % 3) + 1
+        lootRows[#lootRows + 1] = {
+            lootNid = 1000 + i,
+            bossNid = bossNid,
+            itemId = 9000 + i,
+            itemName = "Indexed Loot " .. tostring(i),
+            looterNid = looterNid,
+            rollType = 1,
+            rollValue = i,
+            time = 1700000000 + i,
+        }
+        if bossNid == 20 and looterNid == 2 then
+            expectedBoss20Bob = expectedBoss20Bob + 1
+        end
+    end
+
+    local store = h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 55,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            startTime = 1700000000,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE", join = 1700000000 },
+                { playerNid = 2, name = "Bob", class = "WARRIOR", join = 1700000000 },
+                { playerNid = 3, name = "Cara", class = "PRIEST", join = 1700000000 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", mode = "n", time = 1700000100, players = { 1, 2, 3 } },
+                { bossNid = 20, name = "Grobbulus", mode = "h", time = 1700000200, players = { 2, 3 } },
+            },
+            loot = lootRows,
+            attendance = {
+                { playerNid = 2, segments = { { startTime = 1700000000, endTime = 1700000120 } } },
+                { playerNid = 3, segments = { { startTime = 1700000000, endTime = 1700000180, online = false } } },
+            },
+            nextPlayerNid = 4,
+            nextBossNid = 21,
+            nextLootNid = 1091,
+        },
+    })
+    h:load("!KRT/Database/DBRaidQueries.lua")
+    local queries = h.addon.DB.RaidQueries
+    local raid = h.Database.EnsureRaidById(1)
+
+    local runtime = store:EnsureRaidRuntime(raid)
+    assertTrue(runtime.lootIdxByBossNid[20] ~= nil, "expected runtime boss loot index to be available")
+    assertTrue(runtime.lootIdxByLooterNid[2] ~= nil, "expected runtime looter loot index to be available")
+
+    local bossAttendees = queries:GetBossAttendance(raid, 20)
+    assertEqual(#bossAttendees, 2, "expected boss attendance query to return indexed attendees")
+    assertEqual(bossAttendees[1].name, "Bob", "expected boss attendance to preserve raid player order")
+    assertEqual(bossAttendees[2].name, "Cara", "expected boss attendance to include second attendee")
+
+    local attendance = queries:GetRaidAttendance(raid)
+    assertEqual(#attendance, 3, "expected raid attendance query to include all players")
+    assertEqual(attendance[2].attendanceSeconds, 120, "expected indexed attendance row for Bob")
+    assertEqual(attendance[3].offlineSeconds, 180, "expected indexed attendance row for Cara")
+
+    local filteredLoot = queries:GetLoot(raid, 20, "Bob")
+    assertEqual(#filteredLoot, expectedBoss20Bob, "expected boss/player loot filters to agree with generated dataset")
+    for i = 1, #filteredLoot do
+        assertEqual(filteredLoot[i].bossNid, 20, "expected filtered loot boss nid")
+        assertEqual(filteredLoot[i].looter, "Bob", "expected filtered loot looter")
+    end
+end)
+
+test("raid query facade reuses provided output row buffers", function()
+    local h = newHarness()
+    h.feature.Sort.GetLootSortName = function(itemName, itemLink, itemId)
+        return tostring(itemName or itemLink or itemId or "")
+    end
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 56,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            startTime = 1700000000,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE", join = 1700000000 },
+                { playerNid = 2, name = "Bob", class = "WARRIOR", join = 1700000000 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", mode = "n", time = 1700000100, players = { 1, 2 } },
+                { bossNid = 20, name = "Grobbulus", mode = "h", time = 1700000200, players = { 2 } },
+            },
+            loot = {
+                {
+                    lootNid = 1001,
+                    bossNid = 10,
+                    itemId = 9001,
+                    itemName = "Reusable Blade",
+                    looterNid = 1,
+                    rollType = 1,
+                    rollValue = 99,
+                    time = 1700000110,
+                },
+                {
+                    lootNid = 1002,
+                    bossNid = 20,
+                    itemId = 9002,
+                    itemName = "Filtered Wand",
+                    looterNid = 2,
+                    rollType = 2,
+                    rollValue = 88,
+                    time = 1700000210,
+                },
+            },
+            attendance = {
+                { playerNid = 1, segments = { { startTime = 1700000000, endTime = 1700000120 } } },
+            },
+            nextPlayerNid = 3,
+            nextBossNid = 21,
+            nextLootNid = 1003,
+        },
+    })
+    h:load("!KRT/Database/DBRaidQueries.lua")
+    local queries = h.addon.DB.RaidQueries
+    local raid = h.Database.EnsureRaidById(1)
+    local out = {
+        { stale = true },
+        { stale = true },
+        { stale = true },
+    }
+    local firstRow = out[1]
+    local secondRow = out[2]
+
+    queries:GetBossKills(raid, out)
+    assertTrue(out[1] == firstRow, "expected boss query to reuse the first output row")
+    assertTrue(out[2] == secondRow, "expected boss query to reuse the second output row")
+    assertEqual(out[1].stale, nil, "expected reused boss row to clear stale fields")
+    assertEqual(out[3], nil, "expected boss query to clear stale tail rows")
+
+    queries:GetRaidAttendance(raid, out)
+    assertTrue(out[1] == firstRow, "expected raid attendance query to reuse output rows")
+    assertEqual(out[1].seq, nil, "expected raid attendance row to clear boss-only fields")
+    assertEqual(out[2].name, "Bob", "expected second attendance row to be repopulated")
+
+    queries:GetBossAttendance(raid, 20, out)
+    assertTrue(out[1] == firstRow, "expected boss attendance query to reuse output rows")
+    assertEqual(#out, 1, "expected boss attendance query to clear stale rows when result shrinks")
+    assertEqual(out[1].name, "Bob", "expected filtered boss attendee row")
+
+    queries:GetLoot(raid, 10, "Alice", out)
+    assertTrue(out[1] == firstRow, "expected loot query to reuse output rows")
+    assertEqual(#out, 1, "expected loot query to clear stale rows when result shrinks")
+    assertEqual(out[1].itemName, "Reusable Blade", "expected filtered loot row to be repopulated")
+    assertEqual(out[1].class, nil, "expected loot row to clear attendance-only fields")
+end)
+
 test("logger export returns header-only CSV when no rows match", function()
     local _, raid, Export = setupLoggerExportHarness({
         {
@@ -5530,6 +5747,175 @@ test("logger maintenance no boss cleanup does not delete empty raids unless sele
     assertEqual(_G.KRT_Raids[1].raidNid, 10, "expected the remaining raid to be the empty raid")
 end)
 
+test("logger maintenance cleanup removes selected history in chunks", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 10,
+            zone = "Empty Raid",
+            players = {},
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 20,
+            zone = "Cleanup Raid",
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {
+                { bossNid = 1, name = "Boss", time = 1000 },
+            },
+            loot = {
+                { lootNid = 1, itemName = "Green Loot", itemRarity = 2, time = 1001 },
+                { lootNid = 2, itemName = "Epic Loot", itemRarity = 4, time = 1002 },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 2,
+            nextLootNid = 3,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 30,
+            zone = "No Boss",
+            players = {
+                { playerNid = 1, name = "Bob" },
+            },
+            bossKills = {},
+            loot = {
+                { lootNid = 1, itemName = "Bossless Epic", itemRarity = 4, time = 1010 },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 2,
+        },
+    })
+    h.addon.State.currentRaid = 2
+    h.Database.SetCurrentRaid = function(raidId)
+        h.addon.State.currentRaid = raidId
+    end
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local completed
+    local callbackCount = 0
+    local handle = Actions:RequestRemoveRaidHistoryEntries(function(result, ok)
+        callbackCount = callbackCount + 1
+        assertTrue(ok == true, "expected chunked cleanup callback to report success")
+        completed = result
+    end, {
+        emptyRaids = true,
+        nonEpicLoot = true,
+        noBossEncounter = true,
+        chunkSize = 1,
+        delaySeconds = 0,
+    })
+
+    assertEqual(h.timerCount(), 1, "expected chunked cleanup to schedule work instead of completing inline")
+    assertEqual(callbackCount, 0, "expected chunked cleanup callback to wait for scheduled chunks")
+
+    local guard = 0
+    while h.timerCount() > 0 and guard < 20 do
+        h:flushTimers()
+        guard = guard + 1
+    end
+
+    assertEqual(callbackCount, 1, "expected chunked cleanup callback to run once")
+    assertTrue(handle:IsCancelled() == true, "expected completed chunked cleanup handle to become inactive")
+    assertEqual(completed.emptyRaids, 1, "expected cleanup to remove the empty raid")
+    assertEqual(completed.noBossEncounter, 1, "expected cleanup to remove the raid without boss encounters")
+    assertEqual(completed.nonEpicLoot, 1, "expected cleanup to remove one non-epic loot row")
+    assertEqual(completed.raidsRemoved, 2, "expected cleanup to report removed raid logs")
+    assertEqual(completed.lootRemoved, 1, "expected cleanup to report removed loot rows")
+    assertEqual(#_G.KRT_Raids, 1, "expected only the raid with boss encounters to remain")
+    assertEqual(_G.KRT_Raids[1].raidNid, 20, "expected the cleanup raid to remain")
+    assertEqual(#_G.KRT_Raids[1].loot, 1, "expected only epic-or-better loot rows to remain")
+    assertEqual(_G.KRT_Raids[1].loot[1].itemName, "Epic Loot", "expected epic loot to remain")
+    assertEqual(h.Database.GetCurrentRaid(), 1, "expected current raid index to follow the remaining raid nid")
+end)
+
+test("logger maintenance chunked cleanup finalizes cache when cancelled", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 10,
+            zone = "Keep Raid",
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {
+                { bossNid = 1, name = "Boss", time = 1000 },
+            },
+            loot = {
+                { lootNid = 1, itemName = "Epic Loot", itemRarity = 4, time = 1001 },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 2,
+            nextLootNid = 2,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 20,
+            zone = "Remove Current Raid",
+            players = {
+                { playerNid = 1, name = "Bob" },
+            },
+            bossKills = {},
+            loot = {
+                { lootNid = 1, itemName = "Bossless Epic", itemRarity = 4, time = 1010 },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 2,
+        },
+    })
+    h.addon.State.currentRaid = 2
+    h.Database.SetCurrentRaid = function(raidId)
+        h.addon.State.currentRaid = raidId
+    end
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local callbackCount = 0
+    local handle = Actions:RequestRemoveRaidHistoryEntries(function()
+        callbackCount = callbackCount + 1
+    end, {
+        noBossEncounter = true,
+        chunkSize = 1,
+        delaySeconds = 0,
+    })
+
+    h:flushTimers()
+
+    assertEqual(callbackCount, 0, "expected chunked cleanup callback not to run before completion")
+    assertTrue(handle:Cancel() == true, "expected partial cleanup cancel to succeed")
+    assertEqual(h.timerCount(), 0, "expected partial cleanup cancel to remove pending timer work")
+    assertEqual(callbackCount, 0, "expected partial cleanup cancel not to call completion callback")
+    assertEqual(#_G.KRT_Raids, 1, "expected partial cleanup mutation to be finalized")
+    assertEqual(_G.KRT_Raids[1].raidNid, 10, "expected remaining raw raid list to be usable after cancel")
+    assertEqual(h.Database.GetCurrentRaid(), nil, "expected removed current raid selection to be cleared on cancel")
+end)
+
 test("logger maintenance rebuilds missing loot sources from static source data", function()
     local h = newHarness()
     local link = h.registerItem(91730, "Resolver Boss Blade")
@@ -5589,6 +5975,99 @@ test("logger maintenance rebuilds missing loot sources from static source data",
     assertEqual(raid.loot[1].lootSource.sourceName, "Grand Widow Faerlina", "expected rebuilt loot row to store provenance name")
     assertEqual(raid.loot[1].lootSource.sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected rebuilt loot row to store provenance source key")
     assertEqual(raid.bossKills[1].sourceKey, "naxxramas|boss|15953|grand widow faerlina|any", "expected rebuilt static source boss to store source key")
+end)
+
+test("logger maintenance rebuilds missing loot sources in chunks", function()
+    local h = newHarness()
+    local linkA = h.registerItem(91730, "Resolver Boss Blade")
+    local linkB = h.registerItem(91731, "Resolver Noth Ring")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 201,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {},
+            bossKills = {},
+            loot = {
+                {
+                    lootNid = 101,
+                    itemId = 91730,
+                    itemLink = linkA,
+                    itemName = "Resolver Boss Blade",
+                    bossNid = 0,
+                    time = 1100,
+                },
+                {
+                    lootNid = 102,
+                    itemId = 91731,
+                    itemLink = linkB,
+                    itemName = "Resolver Noth Ring",
+                    bossNid = 0,
+                    time = 1110,
+                },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 103,
+        },
+    })
+
+    h:load("!KRT/Modules/LootSources.lua")
+    h.addon.LootSources._SetDataForTests({
+        [91730] = {
+            {
+                npcId = 15953,
+                npcName = "Grand Widow Faerlina",
+                raid = "Naxxramas",
+                kind = "boss",
+            },
+        },
+        [91731] = {
+            {
+                npcId = 15954,
+                npcName = "Noth the Plaguebringer",
+                raid = "Naxxramas",
+                kind = "boss",
+            },
+        },
+    })
+    h.feature.LootSources = h.addon.LootSources
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local completed
+    local callbackCount = 0
+    local handle = Actions:RequestEnsureLootSources(function(result, ok)
+        callbackCount = callbackCount + 1
+        assertTrue(ok == true, "expected chunked loot-source rebuild callback to report success")
+        completed = result
+    end, { chunkSize = 1, delaySeconds = 0 })
+
+    assertEqual(h.timerCount(), 1, "expected chunked loot-source rebuild to schedule work instead of completing inline")
+    assertEqual(callbackCount, 0, "expected chunked loot-source rebuild callback to wait for scheduled chunks")
+
+    local guard = 0
+    while h.timerCount() > 0 and guard < 20 do
+        h:flushTimers()
+        guard = guard + 1
+    end
+
+    local raid = h.Database.EnsureRaidById(1)
+    assertEqual(callbackCount, 1, "expected chunked loot-source rebuild callback to run once")
+    assertTrue(handle:IsCancelled() == true, "expected completed chunked rebuild handle to become inactive")
+    assertEqual(completed.raids, 1, "expected chunked rebuild to scan one raid")
+    assertEqual(completed.scanned, 2, "expected chunked rebuild to scan both loot rows")
+    assertEqual(completed.repaired, 2, "expected chunked rebuild to repair both loot rows")
+    assertEqual(completed.bossesCreated, 2, "expected chunked rebuild to create source boss records")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected first loot row to bind to rebuilt source")
+    assertEqual(raid.loot[2].lootSource.kind, "boss", "expected second source provenance to be rebuilt")
+    assertEqual(raid.loot[2].lootSource.sourceName, "Noth the Plaguebringer", "expected second source display label")
 end)
 
 test("logger maintenance scans history report metrics", function()
@@ -5683,6 +6162,97 @@ test("logger maintenance scans history report metrics", function()
     assertEqual(result.orphanAttendance, 1, "expected scan to count attendance rows pointing at missing players")
     assertEqual(result.playerNameConflicts, 1, "expected scan to count case-only player-name conflicts")
     assertEqual(result.duplicateRaidCandidates, 1, "expected scan to count one nearby duplicate raid candidate")
+end)
+
+test("logger maintenance history scan can run in chunks", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 111,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            startTime = 1700000000,
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {
+                { bossNid = 11, name = "Anub'Rekhan", time = 1700000060 },
+            },
+            loot = {
+                { lootNid = 1, itemId = 90001, itemName = "Valid Loot", bossNid = 11, looterNid = 1, time = 1700000070 },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 12,
+            nextLootNid = 2,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 112,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            startTime = 1700000120,
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {
+                { bossNid = 11, name = "Anub'Rekhan", time = 1700000180 },
+            },
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 12,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 113,
+            zone = "Empty",
+            players = {},
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local expected = Actions:GetRaidHistoryScan()
+    local completed
+    local callbackCount = 0
+    local handle = Actions:RequestRaidHistoryScan(function(result, ok)
+        callbackCount = callbackCount + 1
+        assertTrue(ok == true, "expected chunked scan callback to report success")
+        completed = result
+    end, { chunkSize = 1, delaySeconds = 0 })
+
+    assertEqual(h.timerCount(), 1, "expected chunked history scan to schedule work instead of completing inline")
+    assertEqual(callbackCount, 0, "expected chunked history scan callback to wait for scheduled chunks")
+
+    local guard = 0
+    while h.timerCount() > 0 and guard < 20 do
+        h:flushTimers()
+        guard = guard + 1
+    end
+
+    assertEqual(callbackCount, 1, "expected chunked history scan callback to run once")
+    assertTrue(handle:IsCancelled() == true, "expected completed chunked scan handle to become inactive")
+    assertEqual(completed.raids, expected.raids, "expected chunked scan raid count to match sync scan")
+    assertEqual(completed.emptyRaids, expected.emptyRaids, "expected chunked scan empty raid count to match sync scan")
+    assertEqual(completed.lootRows, expected.lootRows, "expected chunked scan loot count to match sync scan")
+    assertEqual(completed.duplicateRaidCandidates, expected.duplicateRaidCandidates, "expected chunked scan duplicate count to match sync scan")
 end)
 
 test("spammer panel preview reads the saved LFM draft", function()
@@ -9462,6 +10032,7 @@ test("item info request warms uncached items and resolves on retry", function()
         return "Delayed Jewel", "|cffa335ee|Hitem:40123:0:0:0:0:0:0:0|h[Delayed Jewel]|h|r", 4, nil, nil, nil, nil, nil, nil, "icon"
     end
     _G.GameTooltip = nil
+    _G.KRT_ItemTooltip = nil
     _G.CreateFrame = function(_, name)
         local frame = h.makeFrame(true, name)
         frame.SetOwner = function() end
@@ -9494,6 +10065,81 @@ test("item info request warms uncached items and resolves on retry", function()
     assertEqual(received.itemName, "Delayed Jewel", "expected delayed item name")
     assertEqual(handle:IsCancelled(), true, "expected resolved request to become cancelled")
     assertEqual(h.timerCount(), 0, "expected item request poller to stop after resolution")
+end)
+
+test("item info requests for the same uncached item coalesce callbacks", function()
+    local h = newHarness()
+    local calls = 0
+    local warmed = {}
+    local resolved = false
+    local callbacks = {}
+
+    _G.GetItemInfo = function(value)
+        calls = calls + 1
+        if not resolved then
+            return nil
+        end
+        local itemId = tonumber(tostring(value or ""):match("item:(%d+)")) or value
+        if tonumber(itemId) == 40123 then
+            return "Delayed Jewel", "|cffa335ee|Hitem:40123:0:0:0:0:0:0:0|h[Delayed Jewel]|h|r", 4, nil, nil, nil, nil, nil, nil, "icon"
+        end
+        return nil
+    end
+    _G.GameTooltip = nil
+    _G.KRT_ItemTooltip = nil
+    _G.CreateFrame = function(_, name)
+        local frame = h.makeFrame(true, name)
+        frame.SetOwner = function() end
+        frame.ClearLines = function() end
+        frame.Hide = function() end
+        frame.SetHyperlink = function(_, itemLink)
+            warmed[#warmed + 1] = itemLink
+        end
+        if name then
+            _G[name] = frame
+        end
+        return frame
+    end
+
+    h:load("!KRT/Modules/Item.lua")
+
+    local first = h.addon.Item.RequestItemInfo(40123, function(snapshot, ok)
+        callbacks[#callbacks + 1] = { snapshot = snapshot, ok = ok }
+    end)
+    local second = h.addon.Item.RequestItemInfo("|cffa335ee|Hitem:40123:0:0:0:0:0:0:0|h[Delayed Jewel]|h|r", function(snapshot, ok)
+        callbacks[#callbacks + 1] = { snapshot = snapshot, ok = ok }
+    end)
+
+    assertEqual(calls, 2, "expected joined item request to avoid a duplicate GetItemInfo probe")
+    assertEqual(#warmed, 1, "expected joined item request to avoid a duplicate tooltip warm")
+    assertEqual(h.timerCount(), 1, "expected coalesced item request to schedule one poller")
+
+    local metrics = h.addon.Item.GetInfoMetrics()
+    assertEqual(metrics.requestsStarted, 1, "expected one physical item-info request")
+    assertEqual(metrics.requestsJoined, 1, "expected second same-item request to join the pending request")
+    assertEqual(metrics.pendingRequests, 1, "expected one pending item-info request")
+    assertEqual(metrics.pendingCallbacks, 2, "expected both callbacks to wait on the same request")
+    assertEqual(metrics.getItemInfoCalls, 2, "expected metrics to count the initial item-info probes")
+    assertEqual(metrics.tooltipProbes, 1, "expected metrics to count the initial tooltip probe")
+
+    resolved = true
+    h:flushTimers()
+
+    assertEqual(#callbacks, 2, "expected both joined item-info callbacks to run")
+    assertTrue(callbacks[1].ok == true and callbacks[2].ok == true, "expected both joined callbacks to report success")
+    assertEqual(callbacks[1].snapshot.itemId, 40123, "expected first joined callback to receive the resolved item")
+    assertEqual(callbacks[2].snapshot.itemId, 40123, "expected second joined callback to receive the resolved item")
+    assertEqual(first:IsCancelled(), true, "expected first joined handle to be complete")
+    assertEqual(second:IsCancelled(), true, "expected second joined handle to be complete")
+    assertEqual(h.timerCount(), 0, "expected coalesced item request poller to stop after resolution")
+
+    metrics = h.addon.Item.GetInfoMetrics()
+    assertEqual(metrics.requestsCompleted, 1, "expected one coalesced request completion")
+    assertEqual(metrics.callbacks, 2, "expected metrics to count both joined callbacks")
+    assertEqual(metrics.pendingRequests, 0, "expected no pending item-info requests after resolution")
+    assertEqual(metrics.pendingCallbacks, 0, "expected no pending item-info callbacks after resolution")
+    assertEqual(metrics.getItemInfoCalls, 3, "expected metrics to count initial probes and one resolving retry")
+    assertEqual(metrics.tooltipProbes, 1, "expected resolving retry not to warm the tooltip again")
 end)
 
 test("item info request can be cancelled before retry", function()
@@ -12621,6 +13267,85 @@ test("resolved winner uses rollWinner from the raw display model", function()
     assertEqual(Rolls:GetResolvedWinner(model), "Alice", "expected resolved winner to read rollWinner")
 end)
 
+test("roll display model reuses row tables and clears ui decoration fields", function()
+    local h = newHarness()
+    local link = h.registerItem(9306, "Rowreuseblade")
+
+    h.addon.Services.Loot = {
+        GetItem = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return { itemLink = link }
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function(_, playerName)
+            return playerName == "Bob" and "ROGUE" or "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.addon.Deformat = function(msg)
+        local name, roll = string.match(msg or "", "^(%a+)%s+(%d+)$")
+        if not name then
+            return nil
+        end
+        return name, tonumber(roll), 1, 100
+    end
+    _G.RANDOM_ROLL_RESULT = "%s %d"
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.UI = h.addon.UI
+    h:load("!KRT/Services/Rolls/Service.lua")
+
+    local Rolls = h.addon.Services.Rolls
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
+    h.feature.lootState.fromInventory = false
+
+    Rolls:SetRollRecordingEnabled(true)
+    Rolls:CHAT_MSG_SYSTEM("Alice 98")
+    Rolls:CHAT_MSG_SYSTEM("Bob 77")
+    Rolls:SetRollRecordingEnabled(false)
+
+    local firstModel = Rolls:GetDisplayModel()
+    local firstRows = firstModel.rows
+    local firstAlice = firstRows[1]
+    local firstBob = firstRows[2]
+    firstAlice.displayName = "> Alice <"
+    firstAlice.isSelected = true
+    firstAlice.isFocused = true
+    firstAlice.canClick = true
+    firstAlice.showStar = true
+
+    local secondModel = Rolls:GetDisplayModel()
+
+    assertTrue(secondModel == firstModel, "expected roll display model table to be reused")
+    assertTrue(secondModel.rows == firstRows, "expected roll rows list table to be reused")
+    assertTrue(secondModel.rows[1] == firstAlice, "expected Alice row table to be reused")
+    assertTrue(secondModel.rows[2] == firstBob, "expected Bob row table to be reused")
+    assertEqual(secondModel.rows[1].name, "Alice", "expected reused row to refresh Alice data")
+    assertEqual(secondModel.rows[2].class, "ROGUE", "expected reused row to refresh class data")
+    assertTrue(secondModel.rows[1].displayName == nil, "expected pure rolls model to clear UI display-name decoration")
+    assertTrue(secondModel.rows[1].isSelected == nil, "expected pure rolls model to clear UI selection decoration")
+    assertTrue(secondModel.rows[1].isFocused == nil, "expected pure rolls model to clear UI focus decoration")
+    assertTrue(secondModel.rows[1].canClick == nil, "expected pure rolls model to clear UI click decoration")
+    assertTrue(secondModel.rows[1].showStar == nil, "expected pure rolls model to clear UI star decoration")
+end)
+
 test("reserved rolls exclude non-reservers and expose softres context in the display model", function()
     local h = newHarness()
     local link = h.registerItem(9305, "Reservedcontextblade")
@@ -14552,6 +15277,93 @@ test("master roll rows stay clickable through the shared list controller", funct
     assertTrue(h.addon.UI.Selection.IsSelected("MLRollWinners", "Alice"), "expected clicking the rendered row to select the winner")
 end)
 
+test("master add-roll refreshes coalesce duplicate bursts", function()
+    local h = newHarness()
+
+    h.addon.Services.Loot = {
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Rolls = {
+        GetDisplayModel = function()
+            return { rows = {}, resolution = {} }
+        end,
+        GetRollSession = function()
+            return { id = "session-1" }
+        end,
+        GetRollStatus = function()
+            return h.rollTypes.MAINSPEC, true, false, false
+        end,
+        GetResolvedWinner = function()
+            return nil
+        end,
+        ShouldUseTieReroll = function()
+            return false
+        end,
+        SetExpectedWinners = function() end,
+        EnsureLootRollSession = function()
+            return { id = "session-1" }
+        end,
+        SyncSessionState = function() end,
+        IsCountdownRunning = function()
+            return false
+        end,
+        StopCountdown = function() end,
+        StartCountdown = function() end,
+        FinalizeRollSession = function() end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.UI = h.addon.UI
+    h:load("!KRT/Modules/UI/ListController.lua")
+    h.feature.UI = h.addon.UI
+    loadMasterController(h)
+
+    local Master = h.addon.Controllers.Master
+    local refreshCount = 0
+    Master.RequestRefresh = function()
+        refreshCount = refreshCount + 1
+    end
+
+    h.Bus.TriggerEvent(h.addon.Events.Internal.AddRoll, "Alice", 98)
+    h.Bus.TriggerEvent(h.addon.Events.Internal.AddRoll, "Bob", 97)
+
+    assertEqual(refreshCount, 0, "expected add-roll burst to defer Master refresh")
+    h:flushTimers()
+    assertEqual(refreshCount, 1, "expected add-roll burst to request one Master refresh")
+    assertEqual(Master._uiRefreshHandle, nil, "expected coalesced Master refresh handle to clear after firing")
+end)
+
 test("manual exclusion blocks candidate eligibility and roll intake", function()
     local h = newHarness()
     local link = h.registerItem(9305, "Banblade")
@@ -15819,6 +16631,68 @@ test("reserves import query and render hot paths record perf measurements", func
     assertPerf("Reserves.GetReadinessReport", "item=1201")
 end)
 
+test("reserves import applies parsed reserves in chunks", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {}
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    local parsed = {
+        mode = "multi",
+        nPlayers = 3,
+        importStats = { validRows = 3, skippedRows = 0 },
+        reservesData = {
+            alice = {
+                playerNameDisplay = "Alice",
+                reserves = {
+                    { rawID = 1201, quantity = 1, plus = 0 },
+                },
+            },
+            bob = {
+                playerNameDisplay = "Bob",
+                reserves = {
+                    { rawID = 1301, quantity = 1, plus = 0 },
+                },
+            },
+            cara = {
+                playerNameDisplay = "Cara",
+                reserves = {
+                    { rawID = 1401, quantity = 1, plus = 0 },
+                },
+            },
+        },
+    }
+
+    local callbackCount = 0
+    local callbackOk
+    local callbackPlayers
+    local handle = Reserves:RequestApplyImport(parsed, nil, function(ok, nPlayers)
+        callbackCount = callbackCount + 1
+        callbackOk = ok
+        callbackPlayers = nPlayers
+    end, { silentInfo = true, reason = "chunk_import_test", chunkSize = 1, delaySeconds = 0 })
+
+    assertEqual(h.timerCount(), 1, "expected chunked reserves import apply to schedule work")
+    assertEqual(callbackCount, 0, "expected chunked reserves import callback to wait for scheduled chunks")
+    assertTrue(Reserves:HasData() == false, "expected chunked reserves import not to publish data inline")
+
+    local guard = 0
+    while h.timerCount() > 0 and guard < 20 do
+        h:flushTimers()
+        guard = guard + 1
+    end
+
+    assertEqual(callbackCount, 1, "expected chunked reserves import callback to run once")
+    assertTrue(callbackOk == true, "expected chunked reserves import callback to report success")
+    assertEqual(callbackPlayers, 3, "expected chunked reserves import to report imported player count")
+    assertTrue(handle:IsCancelled() == true, "expected completed chunked reserves import handle to become inactive")
+    assertTrue(Reserves:HasData() == true, "expected chunked reserves import to publish reserve data")
+    assertTrue(Reserves:HasItemReserves(1201) == true, "expected chunked reserves import to rebuild item indexes")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].rawID, 1201, "expected chunked reserves import to persist Alice reserve")
+    assertEqual(_G.KRT_Reserves.Bob.reserves[1].rawID, 1301, "expected chunked reserves import to persist Bob reserve")
+    assertEqual(_G.KRT_Reserves.Cara.reserves[1].rawID, 1401, "expected chunked reserves import to persist Cara reserve")
+end)
+
 test("reserves item-info updates coalesce into a single refresh", function()
     local h = newHarness()
     _G.KRT_Reserves = {
@@ -15885,6 +16759,71 @@ test("reserves item-info query refreshes display after async item cache resolves
     local displayList = Service:GetDisplayList()
     assertEqual(displayList[1].itemName, "Async Reserve Blade", "expected display list to use async item metadata")
     assertTrue(type(displayList[1].itemLink) == "string" and displayList[1].itemLink:find("item:1301", 1, true) ~= nil, "expected display list to use async item link")
+end)
+
+test("reserves display rebuild reuses item row tables", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 1 },
+                { rawID = 1301, itemName = "Frost Edge", quantity = 1 },
+            },
+        },
+        Bob = {
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 1 },
+            },
+        },
+    }
+    h:load("!KRT/Services/Reserves.lua")
+
+    local function findDisplayRow(list, itemId)
+        for i = 1, #(list or {}) do
+            if list[i] and list[i].itemId == itemId then
+                return list[i]
+            end
+        end
+        return nil
+    end
+
+    local Service = h.addon.Services.Reserves
+    Service:Load()
+
+    local firstList = Service:GetDisplayList()
+    local firstColdsteel = findDisplayRow(firstList, 1201)
+    local firstFrost = findDisplayRow(firstList, 1301)
+
+    assertTrue(firstColdsteel ~= nil, "expected initial Coldsteel row")
+    assertTrue(firstFrost ~= nil, "expected initial Frost row")
+    local firstColdsteelTooltipLines = firstColdsteel.playersTooltipLines
+
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 2 },
+            },
+        },
+        Cara = {
+            reserves = {
+                { rawID = 1201, itemName = "Coldsteel Dagger", quantity = 1 },
+            },
+        },
+    }
+    Service:Load()
+
+    local secondList = Service:GetDisplayList()
+    local secondColdsteel = findDisplayRow(secondList, 1201)
+    local secondFrost = findDisplayRow(secondList, 1301)
+
+    assertTrue(secondList == firstList, "expected display list table to be reused")
+    assertTrue(secondColdsteel == firstColdsteel, "expected rebuild to reuse the same item row table")
+    assertTrue(secondColdsteel.playersTooltipLines == firstColdsteelTooltipLines, "expected reused row to keep its tooltip line buffer")
+    assertTextContains(secondColdsteel.playersTextFull, "Alice", "expected reused row to keep active reserve player text")
+    assertTextContains(secondColdsteel.playersTextFull, "Cara", "expected reused row to add new reserve player text")
+    assertTextNotContains(secondColdsteel.playersTextFull, "Bob", "expected reused row to clear stale reserve player text")
+    assertTrue(secondFrost == nil, "expected removed item row to be cleared from display list")
+    assertEqual(#secondList, 1, "expected display list tail rows to be cleared")
 end)
 
 test("reserves format supports filtering to current raid players", function()
@@ -16700,6 +17639,41 @@ test("slash perf reports and resets sync payload metrics", function()
     _G.SlashCmdList.KRT("perf reset")
 
     assertTrue(resetCalled, "expected perf reset to clear sync payload metrics")
+end)
+
+test("slash perf reports and resets item request metrics", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+    _G.GetItemInfo = function()
+        return nil
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Item.lua")
+    h.feature.Item = h.addon.Item
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    local handle = h.addon.Item.RequestItemInfo(32001, function() end)
+    handle:Cancel()
+    h:flushTimers()
+
+    _G.SlashCmdList.KRT("perf items")
+
+    assertContains(
+        h.logs.info,
+        "Item performance report: requests=1 started=1 joined=0 immediate=0 pending=0 callbacks=0 completed=0 timeouts=0 cancelled=1 GetItemInfo=2 tooltip=1.",
+        "expected item perf summary"
+    )
+
+    _G.SlashCmdList.KRT("perf reset")
+    _G.SlashCmdList.KRT("perf items")
+
+    assertContains(
+        h.logs.info,
+        "Item performance report: requests=0 started=0 joined=0 immediate=0 pending=0 callbacks=0 completed=0 timeouts=0 cancelled=0 GetItemInfo=0 tooltip=0.",
+        "expected item perf metrics to reset"
+    )
 end)
 
 test("slash bug prints local diagnostic summary", function()

@@ -31,13 +31,38 @@ local BIND_ON_PICKUP = _G.LE_ITEM_BIND_ON_ACQUIRE or 1
 local BIND_ON_EQUIP = _G.LE_ITEM_BIND_ON_EQUIP or 2
 local BIND_ON_USE = _G.LE_ITEM_BIND_ON_USE or 3
 local BIND_QUEST = _G.LE_ITEM_BIND_QUEST or 4
+local ITEM_INFO_METRIC_KEYS = {
+    "requestsStarted",
+    "requestsJoined",
+    "requestsImmediate",
+    "requestsCompleted",
+    "requestTimeouts",
+    "requestCancels",
+    "callbacks",
+    "getItemInfoCalls",
+    "tooltipProbes",
+}
 
 -- ----- Internal state ----- --
 local pendingItemRequests = {}
+local pendingItemRequestsByKey = {}
 local itemRequestTicker
 local itemRequestRepeats = false
+local itemInfoMetrics = {}
 
 -- ----- Private helpers ----- --
+local function resetItemInfoMetrics()
+    for i = 1, #ITEM_INFO_METRIC_KEYS do
+        itemInfoMetrics[ITEM_INFO_METRIC_KEYS[i]] = 0
+    end
+end
+
+resetItemInfoMetrics()
+
+local function incrementItemInfoMetric(key, amount)
+    itemInfoMetrics[key] = (tonumber(itemInfoMetrics[key]) or 0) + (tonumber(amount) or 1)
+end
+
 local function ensureTooltip()
     if tooltip then
         return tooltip
@@ -104,8 +129,10 @@ local function getItemSnapshot(itemRef)
         return nil
     end
 
+    incrementItemInfoMetric("getItemInfoCalls")
     local name, link, rarity, _, _, _, _, _, _, texture = getItemInfo(itemRef)
     if not name and type(itemRef) == "number" then
+        incrementItemInfoMetric("getItemInfoCalls")
         name, link, rarity, _, _, _, _, _, _, texture = getItemInfo(buildItemFallbackLink(itemRef))
     end
     if not name and not link then
@@ -135,6 +162,19 @@ local function warmItemRef(itemRef)
     return false
 end
 
+local function getItemRequestKey(itemRef)
+    local itemId = Item.GetItemIdFromLink(itemRef)
+    if itemId then
+        return "item:" .. tostring(itemId)
+    end
+
+    if type(itemRef) == "string" then
+        local itemString = Item.GetItemStringFromLink(itemRef)
+        return normalizeText(itemString or itemRef)
+    end
+    return normalizeText(itemRef)
+end
+
 local function cancelItemRequestTicker()
     if itemRequestTicker then
         Item:CancelTimer(itemRequestTicker)
@@ -153,6 +193,89 @@ local function ensureItemRequestTicker()
     itemRequestRepeats = true
 end
 
+local function addRequestCallback(request, callback, timeoutSeconds)
+    local listener = {
+        callback = callback,
+        expiresAt = getNow() + normalizeTimeoutSeconds(timeoutSeconds),
+        cancelled = false,
+    }
+    request.callbacks[#request.callbacks + 1] = listener
+    if listener.expiresAt > request.expiresAt then
+        request.expiresAt = listener.expiresAt
+    end
+    return listener
+end
+
+local function dispatchRequestCallback(listener, snapshot, ok, reason)
+    if listener.cancelled then
+        return false
+    end
+    listener.cancelled = true
+    incrementItemInfoMetric("callbacks")
+    safeCallback(listener.callback, snapshot, ok, reason)
+    return true
+end
+
+local function hasActiveRequestCallbacks(request)
+    local callbacks = request.callbacks
+    for i = 1, #callbacks do
+        if not callbacks[i].cancelled then
+            return true
+        end
+    end
+    return false
+end
+
+local function countPendingRequests()
+    local count = 0
+    for i = 1, #pendingItemRequests do
+        local request = pendingItemRequests[i]
+        if request and not request.cancelled and hasActiveRequestCallbacks(request) then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+local function countPendingCallbacks()
+    local count = 0
+    for i = 1, #pendingItemRequests do
+        local request = pendingItemRequests[i]
+        if request and not request.cancelled then
+            local callbacks = request.callbacks
+            for j = 1, #callbacks do
+                if not callbacks[j].cancelled then
+                    count = count + 1
+                end
+            end
+        end
+    end
+    return count
+end
+
+local function removePendingRequest(request)
+    request.cancelled = true
+    if request.key and pendingItemRequestsByKey[request.key] == request then
+        pendingItemRequestsByKey[request.key] = nil
+    end
+end
+
+local function createRequestHandle(listener)
+    local handle = {}
+    function handle:Cancel()
+        if listener.cancelled then
+            return false
+        end
+        listener.cancelled = true
+        incrementItemInfoMetric("requestCancels")
+        return true
+    end
+    function handle:IsCancelled()
+        return listener.cancelled == true
+    end
+    return handle
+end
+
 processItemRequests = function()
     if not itemRequestRepeats then
         itemRequestTicker = nil
@@ -164,18 +287,33 @@ processItemRequests = function()
     for i = 1, #pendingItemRequests do
         local request = pendingItemRequests[i]
         if request.cancelled then
-            -- Dropped below.
+            removePendingRequest(request)
+        elseif not hasActiveRequestCallbacks(request) then
+            removePendingRequest(request)
         else
             local snapshot = getItemSnapshot(request.itemRef)
             if snapshot then
-                request.cancelled = true
-                safeCallback(request.callback, snapshot, true)
-            elseif now >= request.expiresAt then
-                request.cancelled = true
-                safeCallback(request.callback, nil, false, "timeout")
+                removePendingRequest(request)
+                incrementItemInfoMetric("requestsCompleted")
+                local callbacks = request.callbacks
+                for j = 1, #callbacks do
+                    dispatchRequestCallback(callbacks[j], snapshot, true)
+                end
             else
-                warmItemRef(request.itemRef)
-                nextRequests[#nextRequests + 1] = request
+                local callbacks = request.callbacks
+                for j = 1, #callbacks do
+                    local listener = callbacks[j]
+                    if not listener.cancelled and now >= listener.expiresAt then
+                        incrementItemInfoMetric("requestTimeouts")
+                        dispatchRequestCallback(listener, nil, false, "timeout")
+                    end
+                end
+                if hasActiveRequestCallbacks(request) then
+                    warmItemRef(request.itemRef)
+                    nextRequests[#nextRequests + 1] = request
+                else
+                    removePendingRequest(request)
+                end
             end
         end
     end
@@ -305,6 +443,7 @@ function Item.WarmItemCache(itemLink)
     if type(tip.ClearLines) == "function" then
         tip:ClearLines()
     end
+    incrementItemInfoMetric("tooltipProbes")
     local ok = pcall(tip.SetHyperlink, tip, itemLink)
     if type(tip.Hide) == "function" then
         tip:Hide()
@@ -320,8 +459,19 @@ function Item.RequestItemInfo(itemRef, callback, timeoutSeconds)
         return nil, "invalid_item"
     end
 
+    local requestKey = getItemRequestKey(itemRef)
+    local pendingRequest = requestKey and pendingItemRequestsByKey[requestKey] or nil
+    if pendingRequest and not pendingRequest.cancelled then
+        incrementItemInfoMetric("requestsJoined")
+        local listener = addRequestCallback(pendingRequest, callback, timeoutSeconds)
+        ensureItemRequestTicker()
+        return createRequestHandle(listener)
+    end
+
     local snapshot = getItemSnapshot(itemRef)
     if snapshot then
+        incrementItemInfoMetric("requestsImmediate")
+        incrementItemInfoMetric("callbacks")
         safeCallback(callback, snapshot, true)
         return {
             Cancel = function()
@@ -336,26 +486,21 @@ function Item.RequestItemInfo(itemRef, callback, timeoutSeconds)
     warmItemRef(itemRef)
 
     local request = {
+        key = requestKey,
         itemRef = itemRef,
-        callback = callback,
-        expiresAt = getNow() + normalizeTimeoutSeconds(timeoutSeconds),
+        callbacks = {},
+        expiresAt = 0,
         cancelled = false,
     }
+    local listener = addRequestCallback(request, callback, timeoutSeconds)
     pendingItemRequests[#pendingItemRequests + 1] = request
+    if requestKey then
+        pendingItemRequestsByKey[requestKey] = request
+    end
+    incrementItemInfoMetric("requestsStarted")
     ensureItemRequestTicker()
 
-    local handle = {}
-    function handle:Cancel()
-        if request.cancelled then
-            return false
-        end
-        request.cancelled = true
-        return true
-    end
-    function handle:IsCancelled()
-        return request.cancelled == true
-    end
-    return handle
+    return createRequestHandle(listener)
 end
 
 function Item.GetItemBindFromTooltip(itemLink)
@@ -368,6 +513,7 @@ function Item.GetItemBindFromTooltip(itemLink)
     if type(tip.ClearLines) == "function" then
         tip:ClearLines()
     end
+    incrementItemInfoMetric("tooltipProbes")
     local ok = pcall(tip.SetHyperlink, tip, itemLink)
     if not ok then
         if type(tip.Hide) == "function" then
@@ -393,6 +539,7 @@ function Item.IsBagItemSoulbound(bag, slot)
     if type(tip.ClearLines) == "function" then
         tip:ClearLines()
     end
+    incrementItemInfoMetric("tooltipProbes")
     local ok = pcall(tip.SetBagItem, tip, bag, slot)
     if not ok then
         if type(tip.Hide) == "function" then
@@ -406,6 +553,23 @@ function Item.IsBagItemSoulbound(bag, slot)
         tip:Hide()
     end
     return isSoulbound
+end
+
+function Item.GetInfoMetrics(out)
+    out = out or {}
+    for i = 1, #ITEM_INFO_METRIC_KEYS do
+        local key = ITEM_INFO_METRIC_KEYS[i]
+        out[key] = tonumber(itemInfoMetrics[key]) or 0
+    end
+    out.totalRequests = out.requestsStarted + out.requestsJoined + out.requestsImmediate
+    out.pendingRequests = countPendingRequests()
+    out.pendingCallbacks = countPendingCallbacks()
+    return out
+end
+
+function Item.ResetInfoMetrics()
+    resetItemInfoMetrics()
+    return true
 end
 
 do

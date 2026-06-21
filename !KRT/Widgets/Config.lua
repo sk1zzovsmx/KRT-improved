@@ -1205,7 +1205,19 @@ do
         end
 
         local result
-        if actionName == "scan" and actions.GetRaidHistoryScan then
+        if actionName == "scan" and actions.RequestRaidHistoryScan then
+            return actions:RequestRaidHistoryScan(function(scanResult)
+                setText(lootHistoryContentFrameName, "ReportSummary", formatLootHistoryReport(scanResult))
+                addon:info(
+                    L.MsgLoggerHistoryScanned:format(
+                        tonumber(scanResult and scanResult.raids) or 0,
+                        tonumber(scanResult and scanResult.emptyRaids) or 0,
+                        tonumber(scanResult and scanResult.missingSources) or 0,
+                        tonumber(scanResult and scanResult.invalidSources) or 0
+                    )
+                )
+            end)
+        elseif actionName == "scan" and actions.GetRaidHistoryScan then
             result = refreshLootHistoryReport()
             addon:info(
                 L.MsgLoggerHistoryScanned:format(
@@ -1218,6 +1230,18 @@ do
         elseif actionName == "purge" and actions.PurgeRaidHistory then
             result = actions:PurgeRaidHistory()
             addon:info(L.MsgLoggerHistoryPurged:format(tonumber(result and result.removed) or 0))
+        elseif actionName == "rebuildSources" and actions.RequestEnsureLootSources then
+            return actions:RequestEnsureLootSources(function(rebuildResult)
+                addon:info(
+                    L.MsgLoggerLootSourcesRebuilt:format(
+                        tonumber(rebuildResult and rebuildResult.repaired) or 0,
+                        tonumber(rebuildResult and rebuildResult.bossesCreated) or 0,
+                        tonumber(rebuildResult and rebuildResult.unresolved) or 0
+                    )
+                )
+                refreshLootHistoryReport()
+                refreshLoggerAfterMaintenance()
+            end)
         elseif actionName == "rebuildSources" and actions.EnsureLootSources then
             result = actions:EnsureLootSources()
             addon:info(
@@ -1227,6 +1251,17 @@ do
                     tonumber(result and result.unresolved) or 0
                 )
             )
+        elseif actionName == "cleanUp" and actions.RequestRemoveRaidHistoryEntries then
+            options = options or {}
+            if options.emptyRaids ~= true and options.nonEpicLoot ~= true and options.noBossEncounter ~= true then
+                addon:warn(L.MsgLoggerCleanupNoSelection)
+                return nil
+            end
+            return actions:RequestRemoveRaidHistoryEntries(function(cleanupResult)
+                addon:info(L.MsgLoggerCleanupDone:format(tonumber(cleanupResult and cleanupResult.raidsRemoved) or 0, tonumber(cleanupResult and cleanupResult.lootRemoved) or 0))
+                refreshLootHistoryReport()
+                refreshLoggerAfterMaintenance()
+            end, options)
         elseif actionName == "cleanUp" and actions.RemoveRaidHistoryEntries then
             options = options or {}
             if options.emptyRaids ~= true and options.nonEpicLoot ~= true and options.noBossEncounter ~= true then

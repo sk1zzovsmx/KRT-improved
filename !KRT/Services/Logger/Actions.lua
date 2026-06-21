@@ -13,6 +13,7 @@ local Base64 = feature.Base64
 local Database = feature.Database
 local Services = feature.Services
 local LootSourceCandidates = feature.LootSourceCandidates
+local Timer = feature.Timer
 
 local tinsert = table.insert
 local tremove = table.remove
@@ -35,6 +36,12 @@ local ITEM_LINK_RARITIES = {
     ffe6cc80 = 6,
     ffe5cc80 = 6,
 }
+local HISTORY_SCAN_CHUNK_SIZE = 25
+local HISTORY_SCAN_DELAY_SECONDS = 0.01
+local LOOT_SOURCE_REBUILD_CHUNK_SIZE = 25
+local LOOT_SOURCE_REBUILD_DELAY_SECONDS = 0.01
+local HISTORY_CLEANUP_CHUNK_SIZE = 25
+local HISTORY_CLEANUP_DELAY_SECONDS = 0.01
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "Actions")
@@ -43,6 +50,7 @@ local Actions = Logger.Actions
 local Store = Logger.Store
 local Helpers = Logger.Helpers
 local LootSources = feature.LootSources
+Timer.BindMixin(Actions, "Logger.Actions")
 
 local commitRaidSelections
 local resolveLoggerLootEntry
@@ -61,6 +69,9 @@ local findOrCreateStaticSourceBoss
 local applyStaticLootSource
 local playerExists
 local scanRaidHistory
+local activeHistoryScan
+local activeHistoryCleanup
+local activeLootSourceRebuild
 
 -- ----- Private helpers ----- --
 
@@ -442,36 +453,8 @@ local function scanRaidAttendance(raid, result)
     end
 end
 
-local function countDuplicateRaidCandidates(raids)
-    local count = 0
-    for i = 1, #raids do
-        local left = raids[i]
-        if hasRaidData(left) then
-            local leftTime = getRaidFirstTime(left)
-            for j = i + 1, #raids do
-                local right = raids[j]
-                if
-                    hasRaidData(right)
-                    and trimText(left.zone) == trimText(right.zone)
-                    and (tonumber(left.size) or 0) == (tonumber(right.size) or 0)
-                    and (tonumber(left.difficulty) or 0) == (tonumber(right.difficulty) or 0)
-                then
-                    local rightTime = getRaidFirstTime(right)
-                    if leftTime <= 0 or rightTime <= 0 or abs(leftTime - rightTime) <= 1800 then
-                        count = count + 1
-                    end
-                end
-            end
-        end
-    end
-    return count
-end
-
-scanRaidHistory = function()
-    local requiredMethods = { "GetRawRaids" }
-    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.GetRaidHistoryScan", requiredMethods) or nil
-    local raids = raidStore and raidStore:GetRawRaids() or nil
-    local result = {
+local function newHistoryScanResult()
+    return {
         raids = 0,
         emptyRaids = 0,
         raidsWithoutBosses = 0,
@@ -486,25 +469,245 @@ scanRaidHistory = function()
         playerNameConflicts = 0,
         duplicateRaidCandidates = 0,
     }
+end
+
+local function scanRaidHistoryRow(raid, result)
+    if type(raid) ~= "table" then
+        return
+    end
+    if not hasRaidData(raid) then
+        result.emptyRaids = result.emptyRaids + 1
+    end
+    if isRaidWithoutBossEncounter(raid) then
+        result.raidsWithoutBosses = result.raidsWithoutBosses + 1
+    end
+    scanRaidPlayers(raid, result)
+    scanRaidBosses(raid, result)
+    scanRaidLoot(raid, result)
+    scanRaidAttendance(raid, result)
+end
+
+local function countDuplicateRaidCandidatesForIndex(raids, index)
+    local count = 0
+    local left = raids[index]
+    if hasRaidData(left) then
+        local leftTime = getRaidFirstTime(left)
+        for j = index + 1, #raids do
+            local right = raids[j]
+            if
+                hasRaidData(right)
+                and trimText(left.zone) == trimText(right.zone)
+                and (tonumber(left.size) or 0) == (tonumber(right.size) or 0)
+                and (tonumber(left.difficulty) or 0) == (tonumber(right.difficulty) or 0)
+            then
+                local rightTime = getRaidFirstTime(right)
+                if leftTime <= 0 or rightTime <= 0 or abs(leftTime - rightTime) <= 1800 then
+                    count = count + 1
+                end
+            end
+        end
+    end
+    return count
+end
+
+local function countDuplicateRaidCandidates(raids)
+    local count = 0
+    for i = 1, #raids do
+        count = count + countDuplicateRaidCandidatesForIndex(raids, i)
+    end
+    return count
+end
+
+local function getRaidHistoryScanRaids()
+    local requiredMethods = { "GetRawRaids" }
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.GetRaidHistoryScan", requiredMethods) or nil
+    return raidStore and raidStore:GetRawRaids() or nil
+end
+
+local function normalizeHistoryScanChunkSize(value)
+    local chunkSize = tonumber(value) or HISTORY_SCAN_CHUNK_SIZE
+    if chunkSize < 1 then
+        return HISTORY_SCAN_CHUNK_SIZE
+    end
+    return chunkSize
+end
+
+local function normalizeHistoryScanDelay(value)
+    local delay = tonumber(value) or HISTORY_SCAN_DELAY_SECONDS
+    if delay < 0 then
+        return HISTORY_SCAN_DELAY_SECONDS
+    end
+    return delay
+end
+
+local function normalizeLootSourceRebuildChunkSize(value)
+    local chunkSize = tonumber(value) or LOOT_SOURCE_REBUILD_CHUNK_SIZE
+    if chunkSize < 1 then
+        return LOOT_SOURCE_REBUILD_CHUNK_SIZE
+    end
+    return chunkSize
+end
+
+local function normalizeLootSourceRebuildDelay(value)
+    local delay = tonumber(value) or LOOT_SOURCE_REBUILD_DELAY_SECONDS
+    if delay < 0 then
+        return LOOT_SOURCE_REBUILD_DELAY_SECONDS
+    end
+    return delay
+end
+
+local function normalizeHistoryCleanupChunkSize(value)
+    local chunkSize = tonumber(value) or HISTORY_CLEANUP_CHUNK_SIZE
+    if chunkSize < 1 then
+        return HISTORY_CLEANUP_CHUNK_SIZE
+    end
+    return chunkSize
+end
+
+local function normalizeHistoryCleanupDelay(value)
+    local delay = tonumber(value) or HISTORY_CLEANUP_DELAY_SECONDS
+    if delay < 0 then
+        return HISTORY_CLEANUP_DELAY_SECONDS
+    end
+    return delay
+end
+
+local function cancelHistoryScan(state)
+    if state and state.handle then
+        Actions:CancelTimer(state.handle)
+        state.handle = nil
+    end
+    if activeHistoryScan == state then
+        activeHistoryScan = nil
+    end
+end
+
+local function finalizeHistoryCleanupState(state)
+    if not (state and state.raidStore) or state.finalized then
+        return
+    end
+    state.finalized = true
+    state.raidStore:GetAllRaids()
+    restoreCurrentRaidIndex(state.raidStore, state.currentRaidNid)
+end
+
+local function cancelHistoryCleanup(state)
+    if state and state.handle then
+        Actions:CancelTimer(state.handle)
+        state.handle = nil
+    end
+    finalizeHistoryCleanupState(state)
+    if activeHistoryCleanup == state then
+        activeHistoryCleanup = nil
+    end
+end
+
+local function cancelLootSourceRebuild(state)
+    if state and state.handle then
+        Actions:CancelTimer(state.handle)
+        state.handle = nil
+    end
+    if activeLootSourceRebuild == state then
+        activeLootSourceRebuild = nil
+    end
+end
+
+local function scheduleChunkedAction(state, callback)
+    if state.cancelled then
+        return
+    end
+    state.handle = Actions:ScheduleTimer(callback, state.delay)
+end
+
+local function newHistoryCleanupResult()
+    return {
+        emptyRaids = 0,
+        nonEpicLoot = 0,
+        noBossEncounter = 0,
+        raidsRemoved = 0,
+        lootRemoved = 0,
+    }
+end
+
+local function getHistoryCleanupContext()
+    local requiredMethods = { "GetRawRaids", "GetAllRaids" }
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.RemoveRaidHistoryEntries", requiredMethods) or nil
+    local raids = raidStore and raidStore:GetRawRaids() or nil
+    return raidStore, raids
+end
+
+local function removeRaidForHistoryCleanup(raids, index, result, key)
+    tremove(raids, index)
+    result[key] = result[key] + 1
+    result.raidsRemoved = result.raidsRemoved + 1
+end
+
+local function removeNonEpicLootAt(lootRows, index, result)
+    local loot = lootRows and lootRows[index] or nil
+    if isNonEpicLoot(loot) then
+        tremove(lootRows, index)
+        result.nonEpicLoot = result.nonEpicLoot + 1
+        result.lootRemoved = result.lootRemoved + 1
+        return true
+    end
+    return false
+end
+
+local function newLootSourceRebuildResult()
+    return {
+        raids = 0,
+        scanned = 0,
+        repaired = 0,
+        bossesCreated = 0,
+        unresolved = 0,
+    }
+end
+
+local function getLootSourceRebuildRaids()
+    local requiredMethods = { "GetAllRaids" }
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.EnsureLootSources", requiredMethods) or nil
+    return raidStore and raidStore:GetAllRaids() or nil
+end
+
+local function applyLootSourceRebuildChange(raid)
+    if Database.EnsureRaidSchema then
+        Database.EnsureRaidSchema(raid)
+    end
+    Store._InvalidateIndexes(raid)
+end
+
+local function rebuildLootSourceRow(raid, raidIndex, loot, result)
+    if type(loot) ~= "table" then
+        return false
+    end
+
+    result.scanned = result.scanned + 1
+    if shouldRebuildLootSource(raid, loot) then
+        local source = resolveLootSource(raid, loot)
+        local bossNid, created = findOrCreateStaticSourceBoss(raid, raidIndex, source, loot.time)
+        if bossNid > 0 then
+            applyStaticLootSource(loot, source, bossNid)
+            result.repaired = result.repaired + 1
+            if created then
+                result.bossesCreated = result.bossesCreated + 1
+            end
+            return true
+        end
+        result.unresolved = result.unresolved + 1
+    end
+    return false
+end
+
+scanRaidHistory = function()
+    local raids = getRaidHistoryScanRaids()
+    local result = newHistoryScanResult()
     if type(raids) ~= "table" then
         return result
     end
 
     result.raids = #raids
     for i = 1, #raids do
-        local raid = raids[i]
-        if type(raid) == "table" then
-            if not hasRaidData(raid) then
-                result.emptyRaids = result.emptyRaids + 1
-            end
-            if isRaidWithoutBossEncounter(raid) then
-                result.raidsWithoutBosses = result.raidsWithoutBosses + 1
-            end
-            scanRaidPlayers(raid, result)
-            scanRaidBosses(raid, result)
-            scanRaidLoot(raid, result)
-            scanRaidAttendance(raid, result)
-        end
+        scanRaidHistoryRow(raids[i], result)
     end
     result.duplicateRaidCandidates = countDuplicateRaidCandidates(raids)
     return result
@@ -845,6 +1048,7 @@ function Actions:DeleteBossAttendee(rID, bossNid, playerNid)
         return false
     end
     removeFromList(bossKill.players, queryNid)
+    Store._InvalidateIndexes(raid)
     return true
 end
 
@@ -1023,16 +1227,8 @@ end
 
 function Actions:RemoveRaidHistoryEntries(options)
     options = (type(options) == "table") and options or {}
-    local requiredMethods = { "GetRawRaids", "GetAllRaids" }
-    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.RemoveRaidHistoryEntries", requiredMethods) or nil
-    local raids = raidStore and raidStore:GetRawRaids() or nil
-    local result = {
-        emptyRaids = 0,
-        nonEpicLoot = 0,
-        noBossEncounter = 0,
-        raidsRemoved = 0,
-        lootRemoved = 0,
-    }
+    local raidStore, raids = getHistoryCleanupContext()
+    local result = newHistoryCleanupResult()
     if type(raids) ~= "table" then
         return result
     end
@@ -1044,13 +1240,9 @@ function Actions:RemoveRaidHistoryEntries(options)
     for i = #raids, 1, -1 do
         local raid = raids[i]
         if cleanEmptyRaids and not hasRaidData(raid) then
-            tremove(raids, i)
-            result.emptyRaids = result.emptyRaids + 1
-            result.raidsRemoved = result.raidsRemoved + 1
+            removeRaidForHistoryCleanup(raids, i, result, "emptyRaids")
         elseif cleanNoBossEncounter and isRaidWithoutBossEncounter(raid) then
-            tremove(raids, i)
-            result.noBossEncounter = result.noBossEncounter + 1
-            result.raidsRemoved = result.raidsRemoved + 1
+            removeRaidForHistoryCleanup(raids, i, result, "noBossEncounter")
         elseif cleanNonEpicLoot then
             local removedLoot = removeNonEpicLoot(raid)
             result.nonEpicLoot = result.nonEpicLoot + removedLoot
@@ -1064,17 +1256,129 @@ function Actions:RemoveRaidHistoryEntries(options)
     return result
 end
 
-function Actions:EnsureLootSources()
-    local requiredMethods = { "GetAllRaids" }
-    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.EnsureLootSources", requiredMethods) or nil
-    local raids = raidStore and raidStore:GetAllRaids() or nil
-    local result = {
-        raids = 0,
-        scanned = 0,
-        repaired = 0,
-        bossesCreated = 0,
-        unresolved = 0,
+function Actions:RequestRemoveRaidHistoryEntries(callback, opts)
+    opts = (type(opts) == "table") and opts or {}
+    if activeHistoryCleanup then
+        activeHistoryCleanup.cancelled = true
+        cancelHistoryCleanup(activeHistoryCleanup)
+    end
+
+    local raidStore, raids = getHistoryCleanupContext()
+    local result = newHistoryCleanupResult()
+    if type(raids) ~= "table" then
+        if type(callback) == "function" then
+            callback(result, true)
+        end
+        return {
+            Cancel = function()
+                return false
+            end,
+            IsCancelled = function()
+                return true
+            end,
+        }
+    end
+
+    local state = {
+        raidStore = raidStore,
+        raids = raids,
+        result = result,
+        callback = callback,
+        currentRaidNid = getCurrentRaidNid(raidStore),
+        cleanEmptyRaids = opts.emptyRaids == true,
+        cleanNonEpicLoot = opts.nonEpicLoot == true,
+        cleanNoBossEncounter = opts.noBossEncounter == true,
+        chunkSize = normalizeHistoryCleanupChunkSize(opts.chunkSize),
+        delay = normalizeHistoryCleanupDelay(opts.delaySeconds),
+        raidIndex = #raids,
+        lootIndex = nil,
+        cancelled = false,
     }
+    activeHistoryCleanup = state
+
+    local function completeCleanup()
+        if activeHistoryCleanup == state then
+            activeHistoryCleanup = nil
+        end
+        finalizeHistoryCleanupState(state)
+        if type(state.callback) == "function" then
+            state.callback(state.result, true)
+        end
+    end
+
+    local runChunk
+
+    runChunk = function()
+        state.handle = nil
+        if state.cancelled then
+            return
+        end
+
+        local processed = 0
+        while processed < state.chunkSize and state.raidIndex >= 1 do
+            local raid = state.raids[state.raidIndex]
+            if type(raid) ~= "table" then
+                state.raidIndex = state.raidIndex - 1
+                state.lootIndex = nil
+                processed = processed + 1
+            elseif state.cleanEmptyRaids and not hasRaidData(raid) then
+                removeRaidForHistoryCleanup(state.raids, state.raidIndex, state.result, "emptyRaids")
+                state.raidIndex = state.raidIndex - 1
+                state.lootIndex = nil
+                processed = processed + 1
+            elseif state.cleanNoBossEncounter and isRaidWithoutBossEncounter(raid) then
+                removeRaidForHistoryCleanup(state.raids, state.raidIndex, state.result, "noBossEncounter")
+                state.raidIndex = state.raidIndex - 1
+                state.lootIndex = nil
+                processed = processed + 1
+            elseif state.cleanNonEpicLoot then
+                local lootRows = raid.loot or {}
+                if state.lootIndex == nil then
+                    state.lootIndex = #lootRows
+                end
+                if state.lootIndex >= 1 then
+                    removeNonEpicLootAt(lootRows, state.lootIndex, state.result)
+                    state.lootIndex = state.lootIndex - 1
+                    processed = processed + 1
+                else
+                    state.raidIndex = state.raidIndex - 1
+                    state.lootIndex = nil
+                    processed = processed + 1
+                end
+            else
+                state.raidIndex = state.raidIndex - 1
+                state.lootIndex = nil
+                processed = processed + 1
+            end
+        end
+
+        if state.raidIndex < 1 then
+            completeCleanup()
+            return
+        end
+        scheduleChunkedAction(state, runChunk)
+    end
+
+    scheduleChunkedAction(state, runChunk)
+
+    local handle = {}
+    function handle:Cancel()
+        if state.cancelled then
+            return false
+        end
+        state.cancelled = true
+        cancelHistoryCleanup(state)
+        return true
+    end
+    function handle:IsCancelled()
+        return state.cancelled == true or activeHistoryCleanup ~= state
+    end
+    return handle
+end
+
+function Actions:EnsureLootSources()
+    local raids = getLootSourceRebuildRaids()
+    local result = newLootSourceRebuildResult()
     if type(raids) ~= "table" then
         return result
     end
@@ -1087,29 +1391,10 @@ function Actions:EnsureLootSources()
             local lootRows = raid.loot or {}
             for lootIndex = 1, #lootRows do
                 local loot = lootRows[lootIndex]
-                if type(loot) == "table" then
-                    result.scanned = result.scanned + 1
-                    if shouldRebuildLootSource(raid, loot) then
-                        local source = resolveLootSource(raid, loot)
-                        local bossNid, created = findOrCreateStaticSourceBoss(raid, raidIndex, source, loot.time)
-                        if bossNid > 0 then
-                            applyStaticLootSource(loot, source, bossNid)
-                            result.repaired = result.repaired + 1
-                            if created then
-                                result.bossesCreated = result.bossesCreated + 1
-                            end
-                            changed = true
-                        else
-                            result.unresolved = result.unresolved + 1
-                        end
-                    end
-                end
+                changed = rebuildLootSourceRow(raid, raidIndex, loot, result) or changed
             end
             if changed then
-                if Database.EnsureRaidSchema then
-                    Database.EnsureRaidSchema(raid)
-                end
-                Store._InvalidateIndexes(raid)
+                applyLootSourceRebuildChange(raid)
             end
         end
     end
@@ -1117,8 +1402,222 @@ function Actions:EnsureLootSources()
     return result
 end
 
+function Actions:RequestEnsureLootSources(callback, opts)
+    opts = opts or {}
+    if activeLootSourceRebuild then
+        activeLootSourceRebuild.cancelled = true
+        cancelLootSourceRebuild(activeLootSourceRebuild)
+    end
+
+    local raids = getLootSourceRebuildRaids()
+    local result = newLootSourceRebuildResult()
+    if type(raids) ~= "table" then
+        if type(callback) == "function" then
+            callback(result, true)
+        end
+        return {
+            Cancel = function()
+                return false
+            end,
+            IsCancelled = function()
+                return true
+            end,
+        }
+    end
+
+    local state = {
+        raids = raids,
+        result = result,
+        callback = callback,
+        chunkSize = normalizeLootSourceRebuildChunkSize(opts.chunkSize),
+        delay = normalizeLootSourceRebuildDelay(opts.delaySeconds),
+        raidIndex = 1,
+        lootIndex = 1,
+        raidStarted = false,
+        raidChanged = false,
+        cancelled = false,
+    }
+    activeLootSourceRebuild = state
+
+    local function completeRebuild()
+        if activeLootSourceRebuild == state then
+            activeLootSourceRebuild = nil
+        end
+        if type(state.callback) == "function" then
+            state.callback(state.result, true)
+        end
+    end
+
+    local function finishCurrentRaid(raid)
+        if state.raidStarted and state.raidChanged then
+            applyLootSourceRebuildChange(raid)
+        end
+        state.raidStarted = false
+        state.raidChanged = false
+        state.lootIndex = 1
+        state.raidIndex = state.raidIndex + 1
+    end
+
+    local runChunk
+
+    runChunk = function()
+        state.handle = nil
+        if state.cancelled then
+            return
+        end
+
+        local processed = 0
+        while processed < state.chunkSize and state.raidIndex <= #state.raids do
+            local raid = state.raids[state.raidIndex]
+            if type(raid) ~= "table" then
+                state.raidIndex = state.raidIndex + 1
+                state.lootIndex = 1
+                processed = processed + 1
+            else
+                if not state.raidStarted then
+                    state.result.raids = state.result.raids + 1
+                    state.raidStarted = true
+                    state.raidChanged = false
+                    state.lootIndex = 1
+                end
+
+                local lootRows = raid.loot or {}
+                if state.lootIndex <= #lootRows then
+                    state.raidChanged = rebuildLootSourceRow(raid, state.raidIndex, lootRows[state.lootIndex], state.result) or state.raidChanged
+                    state.lootIndex = state.lootIndex + 1
+                    processed = processed + 1
+                else
+                    finishCurrentRaid(raid)
+                    processed = processed + 1
+                end
+            end
+        end
+
+        if state.raidIndex > #state.raids then
+            completeRebuild()
+            return
+        end
+        scheduleChunkedAction(state, runChunk)
+    end
+
+    scheduleChunkedAction(state, runChunk)
+
+    local handle = {}
+    function handle:Cancel()
+        if state.cancelled then
+            return false
+        end
+        state.cancelled = true
+        cancelLootSourceRebuild(state)
+        return true
+    end
+    function handle:IsCancelled()
+        return state.cancelled == true or activeLootSourceRebuild ~= state
+    end
+    return handle
+end
+
 function Actions:GetRaidHistoryScan()
     return scanRaidHistory()
+end
+
+function Actions:RequestRaidHistoryScan(callback, opts)
+    opts = opts or {}
+    if activeHistoryScan then
+        activeHistoryScan.cancelled = true
+        cancelHistoryScan(activeHistoryScan)
+    end
+
+    local raids = getRaidHistoryScanRaids()
+    local result = newHistoryScanResult()
+    if type(raids) ~= "table" then
+        if type(callback) == "function" then
+            callback(result, true)
+        end
+        return {
+            Cancel = function()
+                return false
+            end,
+            IsCancelled = function()
+                return true
+            end,
+        }
+    end
+
+    result.raids = #raids
+    local state = {
+        raids = raids,
+        result = result,
+        callback = callback,
+        chunkSize = normalizeHistoryScanChunkSize(opts.chunkSize),
+        delay = normalizeHistoryScanDelay(opts.delaySeconds),
+        phase = "raids",
+        index = 1,
+        cancelled = false,
+    }
+    activeHistoryScan = state
+
+    local function completeScan()
+        if activeHistoryScan == state then
+            activeHistoryScan = nil
+        end
+        if type(state.callback) == "function" then
+            state.callback(state.result, true)
+        end
+    end
+
+    local runChunk
+
+    runChunk = function()
+        state.handle = nil
+        if state.cancelled then
+            return
+        end
+
+        local processed = 0
+        if state.phase == "raids" then
+            while processed < state.chunkSize and state.index <= #state.raids do
+                scanRaidHistoryRow(state.raids[state.index], state.result)
+                state.index = state.index + 1
+                processed = processed + 1
+            end
+            if state.index > #state.raids then
+                state.phase = "duplicates"
+                state.index = 1
+            end
+        end
+
+        processed = 0
+        if state.phase == "duplicates" then
+            while processed < state.chunkSize and state.index <= #state.raids do
+                state.result.duplicateRaidCandidates = state.result.duplicateRaidCandidates + countDuplicateRaidCandidatesForIndex(state.raids, state.index)
+                state.index = state.index + 1
+                processed = processed + 1
+            end
+            if state.index > #state.raids then
+                completeScan()
+                return
+            end
+        end
+
+        scheduleChunkedAction(state, runChunk)
+    end
+
+    scheduleChunkedAction(state, runChunk)
+
+    local handle = {}
+    function handle:Cancel()
+        if state.cancelled then
+            return false
+        end
+        state.cancelled = true
+        cancelHistoryScan(state)
+        return true
+    end
+    function handle:IsCancelled()
+        return state.cancelled == true or activeHistoryScan ~= state
+    end
+    return handle
 end
 
 function Actions:SetCurrentRaid(rID)
@@ -1271,6 +1770,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Modules/Timer",
             "Modules/Strings",
             "Modules/Base64",
             "Database/DBRaidQueries",

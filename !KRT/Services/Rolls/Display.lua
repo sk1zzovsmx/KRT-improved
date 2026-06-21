@@ -13,6 +13,7 @@ local Services = feature.Services
 local rollTypes = feature.rollTypes
 
 local sort = table.sort
+local twipe = table.wipe
 local pairs = pairs
 local tostring, tonumber = tostring, tonumber
 
@@ -128,6 +129,52 @@ local function buildLootCopyText(ctx)
     return L.StrRollLootCopies:format(count)
 end
 
+local function acquireDisplayTable(ctx, key)
+    local value = ctx[key]
+    if type(value) ~= "table" then
+        value = {}
+        ctx[key] = value
+    else
+        twipe(value)
+    end
+    return value
+end
+
+local function acquireKeyedTable(ctx, key, rowKey)
+    local cache = ctx[key]
+    local row
+
+    if type(cache) ~= "table" then
+        cache = {}
+        ctx[key] = cache
+    end
+
+    row = cache[rowKey]
+    if type(row) ~= "table" then
+        row = {}
+        cache[rowKey] = row
+    else
+        twipe(row)
+    end
+
+    return row, cache
+end
+
+local function pruneInactiveKeyedTables(cache, activeKeys)
+    if type(cache) ~= "table" or type(activeKeys) ~= "table" then
+        return
+    end
+
+    for key, row in pairs(cache) do
+        if activeKeys[key] ~= true then
+            if type(row) == "table" then
+                twipe(row)
+            end
+            cache[key] = nil
+        end
+    end
+end
+
 -- ----- Public methods ----- --
 function Display.BuildModel(ctx)
     local _, state, lootState = assertContext(ctx)
@@ -138,8 +185,11 @@ function Display.BuildModel(ctx)
     local resolutionContext = getResolutionContext(ctx)
     local isSR = currentRollType == rollTypes.RESERVED
     local wantLow = ctx.isSortAscending and ctx.isSortAscending() or false
-    local display = {}
-    local rows = {}
+    local display = acquireDisplayTable(ctx, "_displaySortRows")
+    local displayActiveKeys = acquireDisplayTable(ctx, "_displaySortActiveKeys")
+    local rows = acquireDisplayTable(ctx, "_displayRows")
+    local rowActiveKeys = acquireDisplayTable(ctx, "_displayRowActiveKeys")
+    local model = ctx._displayModel
     local resolvedEntries
     local strategy
     local usePlus
@@ -151,6 +201,13 @@ function Display.BuildModel(ctx)
     local raid = ctx.getRaidService and ctx.getRaidService() or nil
     local srContext = buildSrContext(ctx, itemId, currentRollType)
     local outOfFlowCount = 0
+
+    if type(model) ~= "table" then
+        model = {}
+        ctx._displayModel = model
+    else
+        twipe(model)
+    end
 
     if ctx.prepareResponseState then
         ctx.prepareResponseState(context, {
@@ -172,18 +229,21 @@ function Display.BuildModel(ctx)
     lootState.rollWinner = resolution.topRollName
 
     for name, response in pairs(state.responsesByPlayer) do
-        display[#display + 1] = {
-            name = name,
-            response = response,
-            bucket = response.bucket,
-            bucketPriority = Resolution.GetBucketPriority(strategy, response.bucket, currentRollType),
-            plus = getResponsePlus(strategy, itemId, response, plusGetter),
-            roll = tonumber(response.bestRoll),
-            isTied = tieGroups[name] ~= nil,
-            tieGroup = tieGroups[name],
-            displayTier = Resolution.GetDisplayTier(resolutionContext, response),
-        }
+        local entry = acquireKeyedTable(ctx, "_displaySortRowsByName", name)
+
+        displayActiveKeys[name] = true
+        entry.name = name
+        entry.response = response
+        entry.bucket = response.bucket
+        entry.bucketPriority = Resolution.GetBucketPriority(strategy, response.bucket, currentRollType)
+        entry.plus = getResponsePlus(strategy, itemId, response, plusGetter)
+        entry.roll = tonumber(response.bestRoll)
+        entry.isTied = tieGroups[name] ~= nil
+        entry.tieGroup = tieGroups[name]
+        entry.displayTier = Resolution.GetDisplayTier(resolutionContext, response)
+        display[#display + 1] = entry
     end
+    pruneInactiveKeyedTables(ctx._displaySortRowsByName, displayActiveKeys)
 
     sort(display, function(a, b)
         if a.displayTier ~= b.displayTier then
@@ -221,47 +281,49 @@ function Display.BuildModel(ctx)
         local name = entry.name
         local roll = entry.roll
 
-        rows[i] = {
-            id = i,
-            name = name,
-            roll = roll,
-            class = (raid and raid.GetPlayerClass and raid:GetPlayerClass(name) or "UNKNOWN"):upper(),
-            isReserved = response.bucket == "SR",
-            counterText = Resolution.BuildRowCounterText(resolutionContext, itemId, response, currentRollType, plusGetter),
-            infoText = Resolution.BuildRowInfoText(resolutionContext, response, entry.isTied),
-            status = response.status,
-            explicitStatus = response.explicitStatus,
-            hasExplicitResponse = Responses.IsExplicitResponseStatus(response.explicitStatus),
-            bucket = response.bucket,
-            reason = response.reason,
-            outOfFlowReason = response.outOfFlowReason,
-            outOfFlowCount = tonumber(response.outOfFlowCount) or 0,
-            outOfFlowLastRoll = tonumber(response.outOfFlowLastRoll),
-            outOfFlowLastReason = response.outOfFlowLastReason,
-            outOfFlowLastSource = response.outOfFlowLastSource,
-            isEligible = response.isEligible == true,
-            isTied = entry.isTied and true or false,
-            tieGroup = entry.tieGroup,
-            selectionAllowed = Responses.IsSelectableRollResponse(response),
-        }
+        local row = acquireKeyedTable(ctx, "_displayRowsByName", name)
+
+        rowActiveKeys[name] = true
+        row.id = i
+        row.name = name
+        row.roll = roll
+        row.class = (raid and raid.GetPlayerClass and raid:GetPlayerClass(name) or "UNKNOWN"):upper()
+        row.isReserved = response.bucket == "SR"
+        row.counterText = Resolution.BuildRowCounterText(resolutionContext, itemId, response, currentRollType, plusGetter)
+        row.infoText = Resolution.BuildRowInfoText(resolutionContext, response, entry.isTied)
+        row.status = response.status
+        row.explicitStatus = response.explicitStatus
+        row.hasExplicitResponse = Responses.IsExplicitResponseStatus(response.explicitStatus)
+        row.bucket = response.bucket
+        row.reason = response.reason
+        row.outOfFlowReason = response.outOfFlowReason
+        row.outOfFlowCount = tonumber(response.outOfFlowCount) or 0
+        row.outOfFlowLastRoll = tonumber(response.outOfFlowLastRoll)
+        row.outOfFlowLastReason = response.outOfFlowLastReason
+        row.outOfFlowLastSource = response.outOfFlowLastSource
+        row.isEligible = response.isEligible == true
+        row.isTied = entry.isTied and true or false
+        row.tieGroup = entry.tieGroup
+        row.selectionAllowed = Responses.IsSelectableRollResponse(response)
+        rows[i] = row
         outOfFlowCount = outOfFlowCount + (tonumber(response.outOfFlowCount) or 0)
     end
+    pruneInactiveKeyedTables(ctx._displayRowsByName, rowActiveKeys)
 
-    return {
-        itemId = itemId,
-        isSR = isSR and true or false,
-        rows = rows,
-        selectionAllowed = selectionAllowed and true or false,
-        rollWinner = lootState.rollWinner,
-        resolution = resolution,
-        requiredWinnerCount = ctx.getExpectedWinnerCount and ctx.getExpectedWinnerCount() or 1,
-        winnerSuggestions = resolution.autoWinners,
-        countdownExpired = state.countdownExpired == true,
-        srContext = srContext,
-        srSummaryText = buildSrSummaryText(srContext),
-        lootCopyText = buildLootCopyText(ctx),
-        outOfFlowCount = outOfFlowCount,
-    }
+    model.itemId = itemId
+    model.isSR = isSR and true or false
+    model.rows = rows
+    model.selectionAllowed = selectionAllowed and true or false
+    model.rollWinner = lootState.rollWinner
+    model.resolution = resolution
+    model.requiredWinnerCount = ctx.getExpectedWinnerCount and ctx.getExpectedWinnerCount() or 1
+    model.winnerSuggestions = resolution.autoWinners
+    model.countdownExpired = state.countdownExpired == true
+    model.srContext = srContext
+    model.srSummaryText = buildSrSummaryText(srContext)
+    model.lootCopyText = buildLootCopyText(ctx)
+    model.outOfFlowCount = outOfFlowCount
+    return model
 end
 
 function Display.GetResolvedWinner(ctx, model)

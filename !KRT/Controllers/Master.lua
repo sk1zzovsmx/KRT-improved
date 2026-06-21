@@ -1057,6 +1057,29 @@ do
         module:RequestRefresh()
     end
 
+    local function requestCoalescedUiRefresh(reason)
+        if module._uiRefreshHandle then
+            if reason ~= nil then
+                module._uiRefreshReason = reason
+            end
+            return
+        end
+
+        module._uiRefreshReason = reason
+        module._uiRefreshHandle = module:ScheduleTimer(function()
+            local refreshReason = module._uiRefreshReason
+            module._uiRefreshHandle = nil
+            module._uiRefreshReason = nil
+            module:RequestRefresh(refreshReason)
+        end, 0)
+
+        if not module._uiRefreshHandle then
+            local refreshReason = module._uiRefreshReason
+            module._uiRefreshReason = nil
+            module:RequestRefresh(refreshReason)
+        end
+    end
+
     local function updateMasterButtonsIfChanged(state)
         local buttons = module._lastUIState.buttons
         local texts = module._lastUIState.texts
@@ -4041,13 +4064,13 @@ do
         end
 
         refreshCandidateUiState()
-        module:RequestRefresh()
+        requestCoalescedUiRefresh("raid-roster")
     end)
 
     -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
     Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
         UI.Widgets.Call("LootHints", "ApplyLootFrameReserveHints")
-        module:RequestRefresh()
+        requestCoalescedUiRefresh("reserves")
     end)
 
     Bus.RegisterCallback(InternalEvents.AddRoll, function(_, name, roll)
@@ -4055,16 +4078,16 @@ do
             addon:warn(Diag.W.LogMLAddRollPayloadInvalid:format(tostring(name), tostring(roll)))
             return
         end
-        module:RequestRefresh()
+        requestCoalescedUiRefresh("roll")
     end)
 
     Bus.RegisterCallback(InternalEvents.ConfigSortAscending, function()
-        module:RequestRefresh()
+        requestCoalescedUiRefresh("sort")
     end)
 
-    -- Immediate redraw when toggling the optional +N column in MS roll list.
+    -- Redraw after toggling the optional +N column in the MS roll list.
     Bus.RegisterCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
-        module:RequestRefresh()
+        requestCoalescedUiRefresh("roll-counter")
     end)
 end
 

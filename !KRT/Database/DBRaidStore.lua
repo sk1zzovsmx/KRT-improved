@@ -112,11 +112,18 @@ do
     local function isRuntimeIndexReady(runtime)
         return type(runtime) == "table"
             and type(runtime.playersByName) == "table"
+            and type(runtime.playerByNid) == "table"
+            and type(runtime.playerNidByName) == "table"
             and type(runtime.playerIdxByNid) == "table"
             and type(runtime.bossIdxByNid) == "table"
             and type(runtime.bossByNid) == "table"
+            and type(runtime.bossPlayerSetByBossNid) == "table"
             and type(runtime.lootIdxByNid) == "table"
             and type(runtime.lootByNid) == "table"
+            and type(runtime.lootIdxByBossNid) == "table"
+            and type(runtime.lootIdxByLooterNid) == "table"
+            and type(runtime.attendanceIdxByPlayerNid) == "table"
+            and type(runtime.attendanceByPlayerNid) == "table"
     end
 
     local function ensureRuntimeTable(raid)
@@ -134,12 +141,46 @@ do
         return map
     end
 
-    local function buildRuntimeSignature(raid, players, bosses, lootRows)
+    local function appendRuntimeIndexList(indexMap, key, value)
+        if key == nil or value == nil then
+            return
+        end
+        local list = indexMap[key]
+        if type(list) ~= "table" then
+            list = {}
+            indexMap[key] = list
+        end
+        for i = 1, #list do
+            if list[i] == value then
+                return
+            end
+        end
+        list[#list + 1] = value
+    end
+
+    local function removeRuntimeIndexListValue(indexMap, value)
+        if type(indexMap) ~= "table" or value == nil then
+            return
+        end
+        for _, list in pairs(indexMap) do
+            if type(list) == "table" then
+                for i = #list, 1, -1 do
+                    if list[i] == value then
+                        tremove(list, i)
+                    end
+                end
+            end
+        end
+    end
+
+    local function buildRuntimeSignature(raid, players, bosses, lootRows, attendance)
         return tostring(#players)
             .. "|"
             .. tostring(#bosses)
             .. "|"
             .. tostring(#lootRows)
+            .. "|"
+            .. tostring(#attendance)
             .. "|"
             .. tostring(tonumber(raid.nextPlayerNid) or 1)
             .. "|"
@@ -315,11 +356,18 @@ do
 
         local runtime = ensureRuntimeTable(raid)
         local playersByName = acquireRuntimeIndexMap(runtime, "playersByName")
+        local playerByNid = acquireRuntimeIndexMap(runtime, "playerByNid")
+        local playerNidByName = acquireRuntimeIndexMap(runtime, "playerNidByName")
         local playerIdxByNid = acquireRuntimeIndexMap(runtime, "playerIdxByNid")
         local bossIdxByNid = acquireRuntimeIndexMap(runtime, "bossIdxByNid")
         local bossByNid = acquireRuntimeIndexMap(runtime, "bossByNid")
+        local bossPlayerSetByBossNid = acquireRuntimeIndexMap(runtime, "bossPlayerSetByBossNid")
         local lootIdxByNid = acquireRuntimeIndexMap(runtime, "lootIdxByNid")
         local lootByNid = acquireRuntimeIndexMap(runtime, "lootByNid")
+        local lootIdxByBossNid = acquireRuntimeIndexMap(runtime, "lootIdxByBossNid")
+        local lootIdxByLooterNid = acquireRuntimeIndexMap(runtime, "lootIdxByLooterNid")
+        local attendanceIdxByPlayerNid = acquireRuntimeIndexMap(runtime, "attendanceIdxByPlayerNid")
+        local attendanceByPlayerNid = acquireRuntimeIndexMap(runtime, "attendanceByPlayerNid")
 
         local players = raid.players or {}
         for i = 1, #players do
@@ -330,8 +378,22 @@ do
                 end
                 local playerNid = tonumber(player.playerNid)
                 if playerNid then
+                    playerByNid[playerNid] = player
+                    if player.name then
+                        playerNidByName[player.name] = playerNid
+                    end
                     playerIdxByNid[playerNid] = i
                 end
+            end
+        end
+
+        local attendance = raid.attendance or {}
+        for i = 1, #attendance do
+            local entry = attendance[i]
+            local playerNid = type(entry) == "table" and tonumber(entry.playerNid) or nil
+            if playerNid then
+                attendanceIdxByPlayerNid[playerNid] = i
+                attendanceByPlayerNid[playerNid] = entry
             end
         end
 
@@ -343,6 +405,17 @@ do
                 if bossNid then
                     bossIdxByNid[bossNid] = i
                     bossByNid[bossNid] = boss
+                    local attendeeSet = {}
+                    local attendees = boss.players
+                    if type(attendees) == "table" then
+                        for j = 1, #attendees do
+                            local playerNid = tonumber(attendees[j])
+                            if playerNid and playerNid > 0 then
+                                attendeeSet[playerNid] = true
+                            end
+                        end
+                    end
+                    bossPlayerSetByBossNid[bossNid] = attendeeSet
                 end
             end
         end
@@ -356,10 +429,18 @@ do
                     lootIdxByNid[lootNid] = i
                     lootByNid[lootNid] = loot
                 end
+                local bossNid = tonumber(loot.bossNid)
+                if bossNid and bossNid > 0 then
+                    appendRuntimeIndexList(lootIdxByBossNid, bossNid, i)
+                end
+                local looterNid = tonumber(loot.looterNid)
+                if looterNid and looterNid > 0 then
+                    appendRuntimeIndexList(lootIdxByLooterNid, looterNid, i)
+                end
             end
         end
 
-        runtime.signature = buildRuntimeSignature(raid, players, bosses, lootRows)
+        runtime.signature = buildRuntimeSignature(raid, players, bosses, lootRows, attendance)
 
         return runtime
     end
@@ -597,7 +678,8 @@ do
         local players = raid.players or {}
         local bosses = raid.bossKills or {}
         local lootRows = raid.loot or {}
-        local signature = buildRuntimeSignature(raid, players, bosses, lootRows)
+        local attendance = raid.attendance or {}
+        local signature = buildRuntimeSignature(raid, players, bosses, lootRows, attendance)
         if isRuntimeIndexReady(runtime) and runtime.signature == signature then
             return runtime
         end
@@ -625,7 +707,17 @@ do
 
         runtime.lootIdxByNid[lootNid] = resolvedIndex
         runtime.lootByNid[lootNid] = row
-        runtime.signature = buildRuntimeSignature(raid, raid.players or {}, raid.bossKills or {}, lootRows)
+        removeRuntimeIndexListValue(runtime.lootIdxByBossNid, resolvedIndex)
+        removeRuntimeIndexListValue(runtime.lootIdxByLooterNid, resolvedIndex)
+        local bossNid = tonumber(row.bossNid)
+        if bossNid and bossNid > 0 then
+            appendRuntimeIndexList(runtime.lootIdxByBossNid, bossNid, resolvedIndex)
+        end
+        local looterNid = tonumber(row.looterNid)
+        if looterNid and looterNid > 0 then
+            appendRuntimeIndexList(runtime.lootIdxByLooterNid, looterNid, resolvedIndex)
+        end
+        runtime.signature = buildRuntimeSignature(raid, raid.players or {}, raid.bossKills or {}, lootRows, raid.attendance or {})
         return runtime
     end
 

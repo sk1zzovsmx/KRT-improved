@@ -26,6 +26,8 @@ local format = string.format
 local tostring, tonumber = tostring, tonumber
 
 local InternalEvents = Events.Internal
+local IMPORT_APPLY_CHUNK_SIZE = 25
+local IMPORT_APPLY_DELAY_SECONDS = 0.01
 
 -- =========== Reserves Module  =========== --
 -- Manages item reserves, import, and display.
@@ -61,6 +63,8 @@ do
     local reservesByItemPlayer = {}
     local playerItemsByName = {}
     local reservesDisplayList = {}
+    local reservesDisplayRowsByKey = {}
+    local reservesDisplayActiveKeys = {}
     local reservesDirty = false
     local importMode = nil -- 'multi' or 'plus'
     local pendingItemInfo = {}
@@ -75,6 +79,7 @@ do
     local aliasState = nil
     local RebuildIndex
     local hasPendingItem
+    local activeImportApply
 
     -- ----- Private helpers ----- --
 
@@ -219,44 +224,49 @@ do
         return dst
     end
 
+    local function appendRuntimeReservePlayer(target, rawPlayerKey, player)
+        if type(player) ~= "table" then
+            return false
+        end
+        local displayName = resolvePlayerNameDisplay(rawPlayerKey, player, rawPlayerKey)
+        local playerKey = Strings.NormalizeLower(displayName, true) or Strings.NormalizeLower(rawPlayerKey, true) or rawPlayerKey
+        if type(playerKey) ~= "string" then
+            playerKey = tostring(rawPlayerKey or "")
+        end
+        if playerKey == "" then
+            playerKey = "?"
+        end
+
+        local container = target[playerKey]
+        if not container then
+            container = {
+                playerNameDisplay = displayName,
+                reserves = {},
+            }
+            target[playerKey] = container
+        elseif not container.playerNameDisplay or container.playerNameDisplay == "?" then
+            container.playerNameDisplay = displayName
+        end
+
+        local rows = player.reserves
+        if type(rows) == "table" then
+            for i = 1, #rows do
+                local row = rows[i]
+                local copied = copyReserveEntryForSave(row)
+                if copied then
+                    container.reserves[#container.reserves + 1] = copied
+                end
+            end
+        end
+        return true
+    end
+
     local function buildRuntimeReservesData(sourceData, phaseTag)
         local normalized = {}
 
         for rawPlayerKey, player in pairs(sourceData or {}) do
-            if type(player) == "table" then
-                local displayName = resolvePlayerNameDisplay(rawPlayerKey, player, rawPlayerKey)
-                local playerKey = Strings.NormalizeLower(displayName, true) or Strings.NormalizeLower(rawPlayerKey, true) or rawPlayerKey
-                if type(playerKey) ~= "string" then
-                    playerKey = tostring(rawPlayerKey or "")
-                end
-                if playerKey == "" then
-                    playerKey = "?"
-                end
-
-                local container = normalized[playerKey]
-                if not container then
-                    container = {
-                        playerNameDisplay = displayName,
-                        reserves = {},
-                    }
-                    normalized[playerKey] = container
-                elseif not container.playerNameDisplay or container.playerNameDisplay == "?" then
-                    container.playerNameDisplay = displayName
-                end
-
-                local rows = player.reserves
-                if type(rows) == "table" then
-                    for i = 1, #rows do
-                        local row = rows[i]
-                        local copied = copyReserveEntryForSave(row)
-                        if copied then
-                            container.reserves[#container.reserves + 1] = copied
-                        end
-                    end
-                end
-            end
+            appendRuntimeReservePlayer(normalized, rawPlayerKey, player)
         end
-
         return normalized
     end
 
@@ -383,6 +393,32 @@ do
         return value and "1" or "0"
     end
 
+    local function normalizeImportApplyChunkSize(value)
+        local chunkSize = tonumber(value) or IMPORT_APPLY_CHUNK_SIZE
+        if chunkSize < 1 then
+            return IMPORT_APPLY_CHUNK_SIZE
+        end
+        return chunkSize
+    end
+
+    local function normalizeImportApplyDelay(value)
+        local delay = tonumber(value) or IMPORT_APPLY_DELAY_SECONDS
+        if delay < 0 then
+            return IMPORT_APPLY_DELAY_SECONDS
+        end
+        return delay
+    end
+
+    local function cancelImportApply(state)
+        if state and state.handle then
+            module:CancelTimer(state.handle)
+            state.handle = nil
+        end
+        if activeImportApply == state then
+            activeImportApply = nil
+        end
+    end
+
     local function buildReservesChecksum(sourceData, mode)
         local parts = { normalizeImportMode(mode) }
         for playerKey, player in pairs(sourceData or {}) do
@@ -434,6 +470,14 @@ do
         return true
     end
 
+    local function saveCanonicalReservesData(canonical)
+        rebuildReserveIndexes()
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
+        end
+        KRT_Reserves = buildSavedReservesData(canonical)
+    end
+
     local function clearDisplayRefreshQueue()
         if pendingDisplayRefreshHandle then
             module:CancelTimer(pendingDisplayRefreshHandle)
@@ -467,6 +511,46 @@ do
             flushDisplayRefresh()
         end, pendingDisplayRefreshDelaySeconds)
         return false
+    end
+
+    local function finishApplyImport(parsed, raidId, opts, normalized, perfLabel, perfStart, extraDetails)
+        clearDisplayRefreshQueue()
+        local mode = (parsed.mode == "plus" or parsed.mode == "multi") and parsed.mode or Service:GetImportMode()
+        copyReservesData(normalized, persistedReservesData)
+        copyReservesData(persistedReservesData, reservesData)
+        syncedCacheMeta = nil
+        syncedCacheActive = false
+        setImportMode(mode, true)
+        saveCanonicalReservesData(normalized)
+
+        local nPlayers = tonumber(parsed.nPlayers) or addon.tLength(reservesData)
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
+        end
+        if not (opts and opts.silentInfo) then
+            addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
+            local stats = parsed.importStats or {}
+            addon:info(L.MsgReservesImportRows:format(tonumber(stats.validRows) or 0, tonumber(stats.skippedRows) or 0))
+        end
+
+        local reason = (opts and opts.reason) or "import"
+        Bus.TriggerEvent(InternalEvents.ReservesDataChanged, reason, raidId, mode, nPlayers)
+        local players, entries = countReserves(reservesData)
+        finishPerf(
+            perfLabel,
+            perfStart,
+            "mode="
+                .. tostring(mode)
+                .. " players="
+                .. tostring(players)
+                .. " entries="
+                .. tostring(entries)
+                .. " nPlayers="
+                .. tostring(nPlayers)
+                .. " ok=1"
+                .. tostring(extraDetails or "")
+        )
+        return true, nPlayers
     end
 
     local function completePendingItem(itemId)
@@ -531,6 +615,8 @@ do
             reservesByItemPlayer = reservesByItemPlayer,
             playerItemsByName = playerItemsByName,
             reservesDisplayList = reservesDisplayList,
+            reservesDisplayRowsByKey = reservesDisplayRowsByKey,
+            reservesDisplayActiveKeys = reservesDisplayActiveKeys,
             grouped = grouped,
             collapsedBossGroups = collapsedBossGroups,
             resolvePlayerNameDisplay = resolvePlayerNameDisplay,
@@ -576,11 +662,7 @@ do
         if not syncedCacheActive then
             copyReservesData(canonical, reservesData)
         end
-        rebuildReserveIndexes()
-        if isDebugEnabled() then
-            addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
-        end
-        KRT_Reserves = buildSavedReservesData(canonical)
+        saveCanonicalReservesData(canonical)
     end
 
     function Service:Load()
@@ -840,34 +922,113 @@ do
             return false, "INVALID_PARSED"
         end
 
-        clearDisplayRefreshQueue()
-        local mode = (parsed.mode == "plus" or parsed.mode == "multi") and parsed.mode or self:GetImportMode()
-        applyRuntimeReservesData(parsed.reservesData, "import", persistedReservesData)
-        copyReservesData(persistedReservesData, reservesData)
-        syncedCacheMeta = nil
-        syncedCacheActive = false
-        setImportMode(mode, true)
-        self:Save()
+        local normalized = buildRuntimeReservesData(parsed.reservesData, "import")
+        return finishApplyImport(parsed, raidId, opts, normalized, "Reserves.ApplyImport", perfStart)
+    end
 
-        local nPlayers = tonumber(parsed.nPlayers) or addon.tLength(reservesData)
-        if isDebugEnabled() then
-            addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
-        end
-        if not (opts and opts.silentInfo) then
-            addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
-            local stats = parsed.importStats or {}
-            addon:info(L.MsgReservesImportRows:format(tonumber(stats.validRows) or 0, tonumber(stats.skippedRows) or 0))
+    function Service:RequestApplyImport(parsed, raidId, callback, opts)
+        opts = (type(opts) == "table") and opts or {}
+        local perfStart = startPerf()
+        if type(parsed) ~= "table" or type(parsed.reservesData) ~= "table" then
+            finishPerf("Reserves.RequestApplyImport", perfStart, "ok=0 reason=INVALID_PARSED")
+            if type(callback) == "function" then
+                callback(false, "INVALID_PARSED")
+            end
+            return {
+                Cancel = function()
+                    return false
+                end,
+                IsCancelled = function()
+                    return true
+                end,
+            }
         end
 
-        local reason = (opts and opts.reason) or "import"
-        Bus.TriggerEvent(InternalEvents.ReservesDataChanged, reason, raidId, mode, nPlayers)
-        local players, entries = countReserves(reservesData)
-        finishPerf(
-            "Reserves.ApplyImport",
-            perfStart,
-            "mode=" .. tostring(mode) .. " players=" .. tostring(players) .. " entries=" .. tostring(entries) .. " nPlayers=" .. tostring(nPlayers) .. " ok=1"
-        )
-        return true, nPlayers
+        if activeImportApply then
+            activeImportApply.cancelled = true
+            cancelImportApply(activeImportApply)
+        end
+
+        local state = {
+            parsed = parsed,
+            raidId = raidId,
+            callback = callback,
+            opts = opts,
+            normalized = {},
+            sourceData = parsed.reservesData,
+            nextKey = nil,
+            chunkSize = normalizeImportApplyChunkSize(opts.chunkSize),
+            delay = normalizeImportApplyDelay(opts.delaySeconds),
+            processed = 0,
+            chunks = 0,
+            perfStart = perfStart,
+            cancelled = false,
+        }
+        activeImportApply = state
+
+        local function completeImportApply()
+            if activeImportApply == state then
+                activeImportApply = nil
+            end
+            local ok, nPlayers = finishApplyImport(
+                state.parsed,
+                state.raidId,
+                state.opts,
+                state.normalized,
+                "Reserves.RequestApplyImport",
+                state.perfStart,
+                " chunks=" .. tostring(state.chunks) .. " processed=" .. tostring(state.processed)
+            )
+            if type(state.callback) == "function" then
+                state.callback(ok, nPlayers)
+            end
+        end
+
+        local runChunk
+
+        runChunk = function()
+            state.handle = nil
+            if state.cancelled then
+                return
+            end
+
+            local processed = 0
+            while processed < state.chunkSize do
+                local key, player = next(state.sourceData, state.nextKey)
+                state.nextKey = key
+                if key == nil then
+                    completeImportApply()
+                    return
+                end
+                appendRuntimeReservePlayer(state.normalized, key, player)
+                processed = processed + 1
+                state.processed = state.processed + 1
+            end
+
+            state.chunks = state.chunks + 1
+            if next(state.sourceData, state.nextKey) == nil then
+                completeImportApply()
+                return
+            end
+            state.handle = module:ScheduleTimer(runChunk, state.delay)
+        end
+
+        state.handle = module:ScheduleTimer(runChunk, state.delay)
+
+        local handle = {}
+        function handle:Cancel()
+            if state.cancelled then
+                return false
+            end
+            state.cancelled = true
+            cancelImportApply(state)
+            finishPerf("Reserves.RequestApplyImport", state.perfStart, "ok=0 reason=CANCELLED chunks=" .. tostring(state.chunks) .. " processed=" .. tostring(state.processed))
+            return true
+        end
+        function handle:IsCancelled()
+            return state.cancelled == true or activeImportApply ~= state
+        end
+        return handle
     end
 
     -- ----- Item Info Querying ----- --

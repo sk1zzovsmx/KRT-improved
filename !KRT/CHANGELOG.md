@@ -39,6 +39,38 @@ Release-Version: 0.8.0-beta.1
   hot paths to Logger view/filter list builders, CSV exports, and Reserves
   import, item-query, readiness, display-list paths, and sync payload
   byte/chunk counters exposed through `/krt perf sync`.
+- **Logger history indexes** - Extended raid runtime indexes for Logger
+  history queries so attendance, boss attendee, and loot boss/player filters
+  can reuse derived runtime lookups instead of rebuilding temporary maps on
+  every refresh/export pass.
+- **Logger history row allocation** - Reduced temporary row allocation in
+  Logger history query refreshes by filling caller-provided output buffers
+  directly and reusing row tables while clearing stale fields and tail rows.
+- **Logger history maintenance chunking** - Added a chunked Loot History scan
+  path for the config maintenance action so large history reports can advance
+  through scheduled timer slices instead of one synchronous scan.
+- **Logger cleanup maintenance chunking** - Added a chunked Loot History cleanup
+  path for the config maintenance action so selected raid and low-value loot
+  cleanup can advance through scheduled timer slices.
+- **Logger loot-source maintenance chunking** - Added a chunked loot-source
+  rebuild path for the config maintenance action so large Logger datasets can
+  repair missing source links through scheduled timer slices.
+- **Item info request coalescing** - Coalesced concurrent item-info cache
+  requests for the same item across runtime consumers, retained all waiting
+  callbacks, and added `/krt perf items` counters for GetItemInfo calls,
+  tooltip probes, request joins, completions, timeouts, and cancellations.
+- **Reserves import chunking** - Added a scheduled import-apply path for the
+  Reserves import window so parsed SoftRes data can normalize and publish in
+  timer slices instead of one synchronous application pass.
+- **Reserves display row allocation** - Reduced temporary row and tooltip-list
+  allocation in SoftRes display rebuilds by reusing item row tables and
+  clearing stale display fields between refreshes.
+- **Master roll model allocation** - Reduced temporary table allocation in
+  Loot Master roll display refreshes by reusing the roll model, row list, and
+  per-player row tables while clearing UI decoration fields between rebuilds.
+- **Master refresh coalescing** - Coalesced Loot Master Bus-driven refresh
+  bursts for roll, roster, reserve, and roll-list option updates so repeated
+  events in the same slice schedule one controller refresh request.
 - **Raid query ownership** - Removed fallback boss and looter lookup copies from
   Logger, Raid, and sync services so raid-domain reads delegate to the shared
   raid query facade instead of maintaining parallel lookup logic.

@@ -233,8 +233,9 @@ local function formatReservePlayerNameBase(ctx, itemId, name, metaByName)
     return colorizeReserveName(ctx, itemId, name, meta and meta.class)
 end
 
-local function buildPlayersTooltipLines(ctx, itemId, players, counts, metaByName, shownCount, hiddenCount)
-    local lines = {}
+local function buildPlayersTooltipLines(ctx, itemId, players, counts, metaByName, shownCount, hiddenCount, out)
+    local lines = out or {}
+    twipe(lines)
     local total = players and #players or 0
 
     lines[#lines + 1] = format(L.StrReservesTooltipTotal, total)
@@ -296,9 +297,11 @@ local function buildPlayersTooltipLines(ctx, itemId, players, counts, metaByName
     return lines
 end
 
-local function buildPlayersText(ctx, itemId, players, counts, metaByName)
+local function buildPlayersText(ctx, itemId, players, counts, metaByName, tooltipLinesOut)
     if not players then
-        return "", {}, ""
+        local tooltipLines = tooltipLinesOut or {}
+        twipe(tooltipLines)
+        return "", tooltipLines, ""
     end
 
     buildPlayerTokens(ctx, itemId, players, counts, metaByName)
@@ -315,8 +318,86 @@ local function buildPlayersText(ctx, itemId, players, counts, metaByName)
     end
 
     local fullText = tconcat(playerTextTemp, ", ")
-    local tooltipLines = buildPlayersTooltipLines(ctx, itemId, players, counts, metaByName, shown, hidden)
+    local tooltipLines = buildPlayersTooltipLines(ctx, itemId, players, counts, metaByName, shown, hidden, tooltipLinesOut)
     return shortText, tooltipLines, fullText
+end
+
+local function getDisplayRowKey(source, itemId)
+    return tostring(source or "") .. "\t" .. tostring(itemId or "")
+end
+
+local function resetReserveDisplayRow(row)
+    if type(row) ~= "table" then
+        return
+    end
+
+    local players = row._players
+    local playerCounts = row._playerCounts
+    local playerMeta = row._playerMeta
+    local tooltipLines = row._playersTooltipLines or row.playersTooltipLines
+
+    if type(players) == "table" then
+        twipe(players)
+    end
+    if type(playerCounts) == "table" then
+        twipe(playerCounts)
+    end
+    if type(playerMeta) == "table" then
+        twipe(playerMeta)
+    end
+    if type(tooltipLines) == "table" then
+        twipe(tooltipLines)
+    end
+
+    twipe(row)
+
+    if type(players) == "table" then
+        row._players = players
+    end
+    if type(playerCounts) == "table" then
+        row._playerCounts = playerCounts
+    end
+    if type(playerMeta) == "table" then
+        row._playerMeta = playerMeta
+    end
+    if type(tooltipLines) == "table" then
+        row._playersTooltipLines = tooltipLines
+    end
+end
+
+local function prepareReserveDisplayRow(row, itemId, reserveEntry, source)
+    resetReserveDisplayRow(row)
+
+    local players = row._players or {}
+    local playerCounts = row._playerCounts or {}
+    local playerMeta = row._playerMeta or {}
+    local tooltipLines = row._playersTooltipLines or {}
+
+    row.itemId = itemId
+    row.itemLink = reserveEntry.itemLink
+    row.itemName = reserveEntry.itemName
+    row.itemIcon = reserveEntry.itemIcon
+    row.source = source
+    row.players = players
+    row.playerCounts = playerCounts
+    row.playerMeta = playerMeta
+    row.playersTooltipLines = tooltipLines
+    row._players = players
+    row._playerCounts = playerCounts
+    row._playerMeta = playerMeta
+    row._playersTooltipLines = tooltipLines
+
+    return row
+end
+
+local function releaseReserveDisplayScratch(row)
+    if type(row) ~= "table" then
+        return
+    end
+
+    row.players = nil
+    row.playerCounts = nil
+    row.playerMeta = nil
 end
 
 local function getReserveSource(source)
@@ -787,6 +868,9 @@ function Display.RebuildIndex(ctx)
 
     twipe(ctx.reservesDisplayList)
     twipe(ctx.grouped)
+    if ctx.reservesDisplayActiveKeys then
+        twipe(ctx.reservesDisplayActiveKeys)
+    end
     for itemId, list in pairs(ctx.reservesByItemID) do
         if type(list) == "table" then
             for i = 1, #list do
@@ -805,16 +889,20 @@ function Display.RebuildIndex(ctx)
 
                     local data = bySource[itemId]
                     if not data then
-                        data = {
-                            itemId = itemId,
-                            itemLink = reserveEntry.itemLink,
-                            itemName = reserveEntry.itemName,
-                            itemIcon = reserveEntry.itemIcon,
-                            source = source,
-                            players = {},
-                            playerCounts = {},
-                            playerMeta = {},
-                        }
+                        local rowKey = getDisplayRowKey(source, itemId)
+                        if ctx.reservesDisplayActiveKeys then
+                            ctx.reservesDisplayActiveKeys[rowKey] = true
+                        end
+                        if ctx.reservesDisplayRowsByKey then
+                            data = ctx.reservesDisplayRowsByKey[rowKey]
+                            if not data then
+                                data = {}
+                                ctx.reservesDisplayRowsByKey[rowKey] = data
+                            end
+                        else
+                            data = {}
+                        end
+                        prepareReserveDisplayRow(data, itemId, reserveEntry, source)
                         bySource[itemId] = data
                     end
 
@@ -826,11 +914,19 @@ function Display.RebuildIndex(ctx)
 
     for _, byItem in pairs(ctx.grouped) do
         for _, data in pairs(byItem) do
-            data.playersText, data.playersTooltipLines, data.playersTextFull = buildPlayersText(ctx, data.itemId, data.players, data.playerCounts, data.playerMeta)
-            data.players = nil
-            data.playerCounts = nil
-            data.playerMeta = nil
+            data.playersText, data.playersTooltipLines, data.playersTextFull =
+                buildPlayersText(ctx, data.itemId, data.players, data.playerCounts, data.playerMeta, data.playersTooltipLines)
+            releaseReserveDisplayScratch(data)
             ctx.reservesDisplayList[#ctx.reservesDisplayList + 1] = data
+        end
+    end
+
+    if ctx.reservesDisplayRowsByKey and ctx.reservesDisplayActiveKeys then
+        for rowKey, row in pairs(ctx.reservesDisplayRowsByKey) do
+            if ctx.reservesDisplayActiveKeys[rowKey] ~= true then
+                resetReserveDisplayRow(row)
+                ctx.reservesDisplayRowsByKey[rowKey] = nil
+            end
         end
     end
 end

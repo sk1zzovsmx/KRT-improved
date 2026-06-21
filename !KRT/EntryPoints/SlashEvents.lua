@@ -661,6 +661,31 @@ local function printPerfSyncReport()
     end
 end
 
+local function getItemModule()
+    return Item
+end
+
+local function printPerfItemReport()
+    local itemModule = getItemModule()
+    local getter = itemModule and itemModule.GetInfoMetrics
+    local metrics = type(getter) == "function" and getter() or {}
+    addon:info(
+        L.MsgPerfItemReport:format(
+            tonumber(metrics.totalRequests) or 0,
+            tonumber(metrics.requestsStarted) or 0,
+            tonumber(metrics.requestsJoined) or 0,
+            tonumber(metrics.requestsImmediate) or 0,
+            tonumber(metrics.pendingRequests) or 0,
+            tonumber(metrics.callbacks) or 0,
+            tonumber(metrics.requestsCompleted) or 0,
+            tonumber(metrics.requestTimeouts) or 0,
+            tonumber(metrics.requestCancels) or 0,
+            tonumber(metrics.getItemInfoCalls) or 0,
+            tonumber(metrics.tooltipProbes) or 0
+        )
+    )
+end
+
 local function resetPerfReport()
     local resetter = addon._PerfResetStats
     if type(resetter) == "function" then
@@ -670,6 +695,11 @@ local function resetPerfReport()
     local resetSyncMetrics = syncer and syncer.ResetSyncMetrics
     if type(resetSyncMetrics) == "function" then
         resetSyncMetrics(syncer)
+    end
+    local itemModule = getItemModule()
+    local resetItemMetrics = itemModule and itemModule.ResetInfoMetrics
+    if type(resetItemMetrics) == "function" then
+        resetItemMetrics()
     end
     addon:info(L.MsgPerfReportReset)
 end
@@ -739,6 +769,11 @@ local function handlePerfCommand(rest)
         return
     end
 
+    if subCmd == "items" or subCmd == "item" or subCmd == "tooltip" then
+        printPerfItemReport()
+        return
+    end
+
     if subCmd == "reset" or subCmd == "clear" then
         resetPerfReport()
         return
@@ -756,6 +791,7 @@ local function handlePerfCommand(rest)
     printHelp("threshold <ms>", L.StrCmdPerfThreshold)
     printHelp("report", L.StrCmdPerfReport)
     printHelp("sync", L.StrCmdPerfSync)
+    printHelp("items", L.StrCmdPerfItems)
     printHelp("reset", L.StrCmdPerfReset)
 end
 

@@ -710,6 +710,28 @@ do
         end
     end
 
+    local function applyParsedImport(parsed)
+        local function onImportApplied(ok, nPlayersOrErr, applyErrData)
+            if not ok then
+                setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+                return false, 0, nPlayersOrErr, applyErrData
+            end
+
+            setImportStatus(format(L.SuccessReservesParsed, tostring(nPlayersOrErr)), 0.2, 1, 0.2)
+            showReservesListAfterImport()
+            return true, nPlayersOrErr
+        end
+
+        if Reserves and Reserves.RequestApplyImport then
+            return Reserves:RequestApplyImport(parsed, nil, function(ok, nPlayersOrErr, applyErrData)
+                onImportApplied(ok, nPlayersOrErr, applyErrData)
+            end, { reason = "import" })
+        end
+
+        local ok, nPlayersOrErr, applyErrData = Reserves:ApplyImport(parsed, nil, { reason = "import" })
+        return onImportApplied(ok, nPlayersOrErr, applyErrData)
+    end
+
     local function ensureWrongCSVPopup()
         if not StaticPopupDialogs then
             return
@@ -747,14 +769,7 @@ do
                     return
                 end
 
-                local ok, nPlayers = Reserves:ApplyImport(parsed, nil, { reason = "import" })
-                if not ok then
-                    setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
-                    return
-                end
-
-                setImportStatus(format(L.SuccessReservesParsed, tostring(nPlayers)), 0.2, 1, 0.2)
-                showReservesListAfterImport()
+                applyParsedImport(parsed)
             end,
         }
     end
@@ -1036,15 +1051,7 @@ do
             return false, 0, errCode, errData
         end
 
-        local ok, nPlayersOrErr, applyErrData = Reserves:ApplyImport(parsed, nil, { reason = "import" })
-        if not ok then
-            setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
-            return false, 0, nPlayersOrErr, applyErrData
-        end
-
-        setImportStatus(format(L.SuccessReservesParsed, tostring(nPlayersOrErr)), 0.2, 1, 0.2)
-        showReservesListAfterImport()
-        return true, nPlayersOrErr
+        return applyParsedImport(parsed)
     end
 
     UIWidgets.Register(
