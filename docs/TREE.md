@@ -215,7 +215,8 @@
 |-- .codex
 |   |-- agents
 |   |   |-- code-mapper.toml
-|   |   \\-- spark-implementer.toml
+|   |   |-- spark-implementer.toml
+|   |   \\-- tooling-worker.toml
 |   |-- hooks
 |   |   |-- stop_workflow_enforcer.py
 |   |   |-- subagent_start_context.py
