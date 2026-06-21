@@ -153,13 +153,8 @@ local function showHelp()
     printHelp("bug", L.StrCmdBug)
 end
 
-local function showLootHelp()
-    addon:info(format(L.StrCmdCommands, "krt ml"), "KRT")
-    printHelp("toggle", L.StrCmdToggle)
-end
-
-local function showCounterHelp()
-    addon:info(format(L.StrCmdCommands, "krt counter"), "KRT")
+local function showToggleHelp(commandRoot)
+    addon:info(format(L.StrCmdCommands, commandRoot), "KRT")
     printHelp("toggle", L.StrCmdToggle)
 end
 
@@ -1292,9 +1287,9 @@ local function handleHelpCommand(rest)
     elseif topic == "res" or topic == "reserve" or topic == "reserves" then
         handleReservesCommand("help")
     elseif topic == "ml" or topic == "loot" or topic == "master" then
-        showLootHelp()
+        showToggleHelp("krt ml")
     elseif topic == "counter" or topic == "counters" or topic == "counts" then
-        showCounterHelp()
+        showToggleHelp("krt counter")
     elseif topic == "debug" or topic == "dbg" or topic == "debugger" then
         addon:info(format(L.StrCmdCommands, "krt debug"), "KRT")
         printHelp("on", L.StrCmdToggle)

@@ -87,13 +87,6 @@ do
         return false
     end
 
-    local function startPerf()
-        if addon.hasPerf and addon._PerfStart then
-            return addon:_PerfStart()
-        end
-        return nil
-    end
-
     local function normalizeImportMode(mode)
         return (mode == "plus") and "plus" or "multi"
     end
@@ -903,7 +896,7 @@ do
     end
 
     function Service:ParseImport(text, mode, opts)
-        local perfStart = startPerf()
+        local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local parsed, errCode, errData = importParser.ParseImport(self, text, mode, opts)
         local players, entries = getParsedReserveCounts(parsed)
         finishPerf(
@@ -926,7 +919,7 @@ do
     end
 
     function Service:ApplyImport(parsed, raidId, opts)
-        local perfStart = startPerf()
+        local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         if type(parsed) ~= "table" or type(parsed.reservesData) ~= "table" then
             finishPerf("Reserves.ApplyImport", perfStart, "ok=0 reason=INVALID_PARSED")
             return false, "INVALID_PARSED"
@@ -938,7 +931,7 @@ do
 
     function Service:RequestApplyImport(parsed, raidId, callback, opts)
         opts = (type(opts) == "table") and opts or {}
-        local perfStart = startPerf()
+        local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         if type(parsed) ~= "table" or type(parsed.reservesData) ~= "table" then
             finishPerf("Reserves.RequestApplyImport", perfStart, "ok=0 reason=INVALID_PARSED")
             if type(callback) == "function" then
@@ -1043,7 +1036,7 @@ do
 
     -- ----- Item Info Querying ----- --
     function Service:QueryItemInfo(itemId)
-        local perfStart = startPerf()
+        local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         if not itemId then
             finishPerf("Reserves.QueryItemInfo", perfStart, "item=? ready=0 pending=" .. tostring(pendingItemCount))
             return
@@ -1102,7 +1095,7 @@ do
 
     -- Query all missing items for reserves
     function Service:QueryMissingItems(silent, primeFn)
-        local perfStart = startPerf()
+        local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local seen = {}
         local count = 0
         local updated = false
@@ -1197,7 +1190,7 @@ do
     end
 
     function Service:GetReadinessReport(itemId, raidNum)
-        local perfStart = startPerf()
+        local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local report = DisplayHelpers.GetReadinessReport(getDisplayContext(), itemId, raidNum)
         local rosterReport = report and report.rosterReport or {}
         finishPerf(
@@ -1252,7 +1245,7 @@ do
     end
 
     function Service:GetDisplayList()
-        local perfStart = startPerf()
+        local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local wasDirty = reservesDirty == true
         local list = DisplayHelpers.GetDisplayList(getDisplayContext())
         finishPerf("Reserves.GetDisplayList", perfStart, "rows=" .. tostring(type(list) == "table" and #list or 0) .. " dirty=" .. perfBool(wasDirty))

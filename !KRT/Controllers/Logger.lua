@@ -3716,6 +3716,11 @@ local function ensurePopupRefs(box)
     return box.refs
 end
 
+local function resetPopupNameEditBox(box)
+    local refs = ensurePopupRefs(box)
+    UI.EditBoxes.Reset(refs and refs.name)
+end
+
 local function makePopupBox(moduleName, frameName, cfg)
     local Box = module[moduleName] or {}
     module[moduleName] = Box
@@ -3964,14 +3969,8 @@ do
             addBtn = L.BtnAdd,
             cancelBtn = L.BtnCancel,
         },
-        onShow = function(b)
-            local refs = ensurePopupRefs(b)
-            UI.EditBoxes.Reset(refs and refs.name)
-        end,
-        onHide = function(b)
-            local refs = ensurePopupRefs(b)
-            UI.EditBoxes.Reset(refs and refs.name)
-        end,
+        onShow = resetPopupNameEditBox,
+        onHide = resetPopupNameEditBox,
     })
 
     Box._doSave = function()

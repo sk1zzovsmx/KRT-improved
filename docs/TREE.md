@@ -245,6 +245,7 @@
 |   |   |   |-- 2026-06-07-runtime-cleanup-followup.md
 |   |   |   |-- 2026-06-12-controller-service-duplication-reduction.md
 |   |   |   |-- 2026-06-12-master-controller-service-reduction.md
+|   |   |   |-- 2026-06-13-audit-cleanup-wave-2.md
 |   |   |   \\-- 2026-06-13-spec-role-inspector.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
@@ -278,6 +279,7 @@
 |   |-- fixtures
 |   |   \\-- sv
 |   |       \\-- canonical-minimal-01.lua
+|   |-- audit_cleanup_wave2_spec.lua
 |   |-- config_interface_options_spec.lua
 |   |-- controllers_cleanup_spec.lua
 |   |-- controller_chunk_budget_spec.lua

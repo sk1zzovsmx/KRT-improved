@@ -73,13 +73,6 @@ local function normalizeContext(context)
     return type(context) == "table" and context or {}
 end
 
-local function startPerf()
-    if addon.hasPerf and addon._PerfStart then
-        return addon:_PerfStart()
-    end
-    return nil
-end
-
 local function formatTimestamp(timestamp)
     local resolvedTimestamp = tonumber(timestamp) or 0
     if resolvedTimestamp <= 0 then
@@ -185,7 +178,7 @@ function Export:GetCSV(mode, raid, context)
 end
 
 function Export:GetLootCSV(raid, context)
-    local perfStart = startPerf()
+    local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     context = normalizeContext(context)
     local queries = getRaidQueries()
     local playerName = getSelectedPlayerName(raid, context)
@@ -223,7 +216,7 @@ function Export:GetLootCSV(raid, context)
 end
 
 function Export:GetRaidAttendanceCSV(raid)
-    local perfStart = startPerf()
+    local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     local queries = getRaidQueries()
     local attendanceRows = queries and queries.GetRaidAttendance and queries:GetRaidAttendance(raid) or {}
     local rows = {}

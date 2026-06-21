@@ -33,13 +33,6 @@ local function getRaidQueries()
     return nil
 end
 
-local function startPerf()
-    if addon.hasPerf and addon._PerfStart then
-        return addon:_PerfStart()
-    end
-    return nil
-end
-
 local function getOutputCount(out)
     if type(out) ~= "table" then
         return 0
@@ -113,7 +106,7 @@ buildRows = function(out, list, pred, map)
 end
 
 function View:FillBossList(out, raid)
-    local perfStart = startPerf()
+    local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     local queries = getRaidQueries()
     if queries and queries.GetBossKills then
         local result = queries:GetBossKills(raid, out)
@@ -134,7 +127,7 @@ function View:FillBossList(out, raid)
 end
 
 function View:FillRaidAttendeesList(out, raid)
-    local perfStart = startPerf()
+    local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     local queries = getRaidQueries()
     if queries and queries.GetRaidAttendance then
         local result = queries:GetRaidAttendance(raid, out)
@@ -156,7 +149,7 @@ function View:FillRaidAttendeesList(out, raid)
 end
 
 function View:FillBossAttendeesList(out, raid, bossNid)
-    local perfStart = startPerf()
+    local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     local queries = getRaidQueries()
     if queries and queries.GetBossAttendance then
         local result = queries:GetBossAttendance(raid, bossNid, out)
@@ -203,7 +196,7 @@ function View:FillBossAttendeesList(out, raid, bossNid)
 end
 
 function View:GetPlayerBossParticipationList(out, raid, playerNid)
-    local perfStart = startPerf()
+    local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     if not out then
         finishPerf("Logger.View.GetPlayerBossParticipationList", perfStart, raid, out, "player=" .. tostring(playerNid or "?"))
         return
@@ -242,7 +235,7 @@ function View:GetPlayerBossParticipationList(out, raid, playerNid)
 end
 
 function View:FillLootList(out, raid, bossNid, playerName)
-    local perfStart = startPerf()
+    local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     local queries = getRaidQueries()
     if queries and queries.GetLoot then
         local result = queries:GetLoot(raid, bossNid, playerName, out)
