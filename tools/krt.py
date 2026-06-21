@@ -914,7 +914,7 @@ def resolve_release_note_context(
     current_ref: str,
     previous_tag: str | None,
 ) -> dict[str, Any]:
-    range_ref = current_tag
+    range_ref = current_ref or current_tag
     commit_entries: list[dict[str, str]] = []
     if previous_tag:
         commit_entries = git_commit_entries(f"{previous_tag}..{range_ref}")

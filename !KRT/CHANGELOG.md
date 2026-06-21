@@ -4,7 +4,9 @@ All notable changes to !KRT will be documented in this file.
 
 ## Unreleased
 
-Release-Version: 0.8.0-beta.1
+Release-Version: 0.9.0-beta.1
+
+## [0.9.0-beta.1] - 2026-06-21
 
 ### Tooling
 
