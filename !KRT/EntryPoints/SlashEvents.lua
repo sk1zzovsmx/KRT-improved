@@ -615,10 +615,74 @@ local function printPerfReport()
     end
 end
 
-local function printPerfSyncReport()
+local function formatPerfAverageBytes(bytes, chunks)
+    bytes = tonumber(bytes) or 0
+    chunks = tonumber(chunks) or 0
+    if chunks <= 0 then
+        return "0"
+    end
+    return tostring(floor((bytes / chunks) + 0.5))
+end
+
+local function getPerfSyncMetrics()
     local syncer = getDatabaseService("GetSyncer")
     local getter = syncer and syncer.GetSyncMetrics
-    local metrics = type(getter) == "function" and getter(syncer) or nil
+    return type(getter) == "function" and getter(syncer) or {}
+end
+
+local function getItemModule()
+    return Item
+end
+
+local function printPerfAudit()
+    local getter = addon._PerfGetStats
+    local rows = type(getter) == "function" and getter(addon) or nil
+    local rowCount = rows and #rows or 0
+    local runtimeTotal = 0
+    local topRow = rows and rows[1] or nil
+
+    for i = 1, rowCount do
+        runtimeTotal = runtimeTotal + (tonumber(rows[i] and rows[i].totalMs) or 0)
+    end
+
+    addon:info(
+        L.MsgPerfAuditRuntime:format(
+            rowCount,
+            formatPerfThreshold(runtimeTotal),
+            tostring((topRow and topRow.label) or L.StrUnknown),
+            formatPerfThreshold(topRow and topRow.totalMs),
+            formatPerfThreshold(topRow and topRow.maxMs)
+        )
+    )
+
+    local syncMetrics = getPerfSyncMetrics()
+    addon:info(
+        L.MsgPerfAuditSync:format(
+            tonumber(syncMetrics.outgoingBytes) or 0,
+            tonumber(syncMetrics.outgoingChunks) or 0,
+            formatPerfAverageBytes(syncMetrics.outgoingBytes, syncMetrics.outgoingChunks),
+            tonumber(syncMetrics.incomingBytes) or 0,
+            tonumber(syncMetrics.incomingChunks) or 0,
+            formatPerfAverageBytes(syncMetrics.incomingBytes, syncMetrics.incomingChunks)
+        )
+    )
+
+    local itemModule = getItemModule()
+    local itemGetter = itemModule and itemModule.GetInfoMetrics
+    local itemMetrics = type(itemGetter) == "function" and itemGetter() or {}
+    addon:info(
+        L.MsgPerfAuditItems:format(
+            tonumber(itemMetrics.totalRequests) or 0,
+            tonumber(itemMetrics.requestsJoined) or 0,
+            tonumber(itemMetrics.pendingRequests) or 0,
+            tonumber(itemMetrics.getItemInfoCalls) or 0,
+            tonumber(itemMetrics.tooltipProbes) or 0
+        )
+    )
+end
+
+local function printPerfSyncReport()
+    local metrics = getPerfSyncMetrics()
     local totalMessages = (tonumber(metrics and metrics.outgoingMessages) or 0) + (tonumber(metrics and metrics.incomingMessages) or 0)
     if totalMessages <= 0 then
         addon:info(L.MsgPerfSyncReportEmpty)
@@ -659,10 +723,6 @@ local function printPerfSyncReport()
             )
         )
     end
-end
-
-local function getItemModule()
-    return Item
 end
 
 local function printPerfItemReport()
@@ -764,6 +824,11 @@ local function handlePerfCommand(rest)
         return
     end
 
+    if subCmd == "audit" or subCmd == "summary" then
+        printPerfAudit()
+        return
+    end
+
     if subCmd == "sync" or subCmd == "payload" or subCmd == "payloads" then
         printPerfSyncReport()
         return
@@ -790,6 +855,7 @@ local function handlePerfCommand(rest)
     printHelp("off", L.StrCmdPerfOff)
     printHelp("threshold <ms>", L.StrCmdPerfThreshold)
     printHelp("report", L.StrCmdPerfReport)
+    printHelp("audit", L.StrCmdPerfAudit)
     printHelp("sync", L.StrCmdPerfSync)
     printHelp("items", L.StrCmdPerfItems)
     printHelp("reset", L.StrCmdPerfReset)

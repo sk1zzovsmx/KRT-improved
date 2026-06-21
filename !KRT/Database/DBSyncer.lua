@@ -322,7 +322,7 @@ do
         return byNid, byNameLower, validNids
     end
 
-    local function joinBossAttendeeNameList(players, playerNameByNid)
+    local function joinBossAttendeeRefList(players, validPlayerNids)
         if type(players) ~= "table" or #players == 0 then
             return ""
         end
@@ -330,16 +330,21 @@ do
         local seen = {}
         for i = 1, #players do
             local raw = players[i]
-            local playerName = nil
             local playerNid = tonumber(raw)
             if playerNid and playerNid > 0 then
-                playerName = playerNameByNid and playerNameByNid[playerNid] or nil
+                if (not validPlayerNids) or validPlayerNids[playerNid] then
+                    local key = tostring(playerNid)
+                    if not seen[key] then
+                        seen[key] = true
+                        out[#out + 1] = key
+                    end
+                end
             elseif type(raw) == "string" then
-                playerName = NormalizeName(raw, true) or raw
-            end
-            if playerName and playerName ~= "" and not seen[playerName] then
-                seen[playerName] = true
-                out[#out + 1] = tostring(playerName)
+                local playerName = NormalizeName(raw, true) or raw
+                if playerName and playerName ~= "" and not seen[playerName] then
+                    seen[playerName] = true
+                    out[#out + 1] = tostring(playerName)
+                end
             end
         end
         return tconcat(out, LIST_SEP)
@@ -369,6 +374,14 @@ do
             return queries:ResolveLootLooterNameFromMap(loot, playerNameByNid)
         end
         return ""
+    end
+
+    local function resolveLootLooterRef(loot, playerNameByNid, validPlayerNids)
+        local looterNid = tonumber(loot and loot.looterNid)
+        if looterNid and looterNid > 0 and ((not validPlayerNids) or validPlayerNids[looterNid]) then
+            return tostring(looterNid)
+        end
+        return resolveLootLooterNameFromMap(loot, playerNameByNid)
     end
 
     local function cleanupExpiredState()
@@ -576,10 +589,12 @@ do
 
         local players = sortedByNid(raid.players, "playerNid", "name")
         local playerNameByNid = {}
+        local validPlayerNids = {}
         for i = 1, #players do
             local p = players[i]
             local playerNid = tonumber(p and p.playerNid)
             if playerNid and playerNid > 0 and p and p.name then
+                validPlayerNids[playerNid] = true
                 playerNameByNid[playerNid] = p.name
             end
         end
@@ -634,7 +649,7 @@ do
                 tonumber(b.difficulty) or 0,
                 tonumber(b.time) or 0,
                 encodeText(b.hash),
-                encodeText(joinBossAttendeeNameList(b.players, playerNameByNid))
+                encodeText(joinBossAttendeeRefList(b.players, validPlayerNids))
             )
         end
 
@@ -652,7 +667,7 @@ do
                 tonumber(loot.itemRarity) or 0,
                 encodeText(loot.itemTexture),
                 tonumber(loot.itemCount) or 1,
-                encodeText(resolveLootLooterNameFromMap(loot, playerNameByNid)),
+                encodeText(resolveLootLooterRef(loot, playerNameByNid, validPlayerNids)),
                 tonumber(loot.rollType) or 0,
                 tonumber(loot.rollValue) or 0,
                 tonumber(loot.bossNid) or 0,

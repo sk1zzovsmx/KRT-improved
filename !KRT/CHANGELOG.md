@@ -38,7 +38,9 @@ Release-Version: 0.8.0-beta.1
   cleared from chat without enabling extra frame work, and extended measured
   hot paths to Logger view/filter list builders, CSV exports, and Reserves
   import, item-query, readiness, display-list paths, and sync payload
-  byte/chunk counters exposed through `/krt perf sync`.
+  byte/chunk counters exposed through `/krt perf sync`; `/krt perf audit`
+  now combines runtime, sync, and item-info counters into a compact operational
+  summary for post-raid optimization decisions.
 - **Logger history indexes** - Extended raid runtime indexes for Logger
   history queries so attendance, boss attendee, and loot boss/player filters
   can reuse derived runtime lookups instead of rebuilding temporary maps on
@@ -65,6 +67,12 @@ Release-Version: 0.8.0-beta.1
 - **Reserves display row allocation** - Reduced temporary row and tooltip-list
   allocation in SoftRes display rebuilds by reusing item row tables and
   clearing stale display fields between refreshes.
+- **Reserves sync payload optimization** - Added a negotiated compact runtime
+  SoftRes sync payload format for clients that support it, reducing repeated
+  player-name bytes while keeping legacy data requests on the existing format.
+- **Logger sync payload optimization** - Reduced repeated player-name bytes in
+  Logger DB sync snapshots by sending player NID references for boss attendees
+  and loot winners when the canonical raid player rows are available.
 - **Master roll model allocation** - Reduced temporary table allocation in
   Loot Master roll display refreshes by reusing the roll model, row list, and
   per-player row tables while clearing UI decoration fields between rebuilds.

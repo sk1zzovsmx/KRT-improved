@@ -79,6 +79,11 @@ smoke checks.
 | `/krt perf on` | Enable slow-block performance logging. |
 | `/krt perf off` | Disable slow-block performance logging. |
 | `/krt perf threshold <ms>` | Set the slow-block threshold in milliseconds. |
+| `/krt perf report` | Print runtime performance aggregate rows sorted by total time. |
+| `/krt perf audit` | Print combined runtime, sync payload, and item-info performance summaries. |
+| `/krt perf sync` | Print sync payload message, chunk, and byte counters. |
+| `/krt perf items` | Print item-info and tooltip request counters. |
+| `/krt perf reset` | Clear runtime, sync payload, and item-info performance counters. |
 | `/krt bug` | Print a local support summary: version, schema, log state, raid, reserves, and role. |
 | `/krt version` | Print local version details and request grouped KRT client versions. |
 | `/krt version local` | Print local version details without requesting group versions. |
@@ -160,6 +165,8 @@ winner set so the tie-resolution path can be checked quickly.
 /krt perf threshold 3
 /krt perf on
 /krt debug timers dur
+/krt perf audit
+/krt perf report
 ```
 
 Disable performance logging after the test:

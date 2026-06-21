@@ -38,6 +38,7 @@ local MSG_DATA_REQ = "DATA_REQ"
 local MSG_DATA_CHUNK = "DATA_CHUNK"
 local MSG_DATA_DONE = "DATA_DONE"
 local MSG_DATA_ERR = "DATA_ERR"
+local FORMAT_COMPACT = "C1"
 local MAX_CHUNK_SIZE = 180
 
 Sync._incoming = Sync._incoming or {}
@@ -101,12 +102,16 @@ local function shouldRequestRemoteData(remoteChecksum)
     return not (localMeta and localMeta.checksum == checksum)
 end
 
-local function requestDataFrom(target, requestId, checksum)
+local function requestDataFrom(target, requestId, checksum, remoteFormat)
     if target == "" then
         return false
     end
     local payload = requirePayload()
-    sendAddonWhisper(PREFIX, target, payload.PackFields(FIELD_SEP, MSG_DATA_REQ, requestId, checksum or ""))
+    if remoteFormat == FORMAT_COMPACT then
+        sendAddonWhisper(PREFIX, target, payload.PackFields(FIELD_SEP, MSG_DATA_REQ, requestId, checksum or "", FORMAT_COMPACT))
+    else
+        sendAddonWhisper(PREFIX, target, payload.PackFields(FIELD_SEP, MSG_DATA_REQ, requestId, checksum or ""))
+    end
     addon:info(L.MsgReservesSyncDataRequested)
     return true
 end
@@ -120,9 +125,10 @@ local function sortedPlayerKeys(data)
     return keys
 end
 
-local function buildPayload(data, mode)
+local function buildPayload(data, mode, format)
     local payload = requirePayload()
-    local lines = { payload.PackFields(FIELD_SEP, "H", mode or "multi") }
+    local useCompact = format == FORMAT_COMPACT
+    local lines = { payload.PackFields(FIELD_SEP, "H", mode or "multi", useCompact and FORMAT_COMPACT or "") }
     local keys = sortedPlayerKeys(data)
 
     for i = 1, #keys do
@@ -130,21 +136,39 @@ local function buildPayload(data, mode)
         local player = data[playerKey]
         if type(player) == "table" and type(player.reserves) == "table" then
             local playerName = player.playerNameDisplay or player.original or playerKey
+            if useCompact then
+                lines[#lines + 1] = payload.PackFields(FIELD_SEP, "P", i, payload.EncodeText(playerName))
+            end
             for j = 1, #player.reserves do
                 local row = player.reserves[j]
                 if type(row) == "table" and row.rawID then
-                    lines[#lines + 1] = payload.PackFields(
-                        FIELD_SEP,
-                        "R",
-                        payload.EncodeText(playerName),
-                        tonumber(row.rawID) or 0,
-                        tonumber(row.quantity) or 1,
-                        tonumber(row.plus) or 0,
-                        payload.EncodeText(row.class),
-                        payload.EncodeText(row.spec),
-                        payload.EncodeText(row.note),
-                        payload.EncodeText(row.source)
-                    )
+                    if useCompact then
+                        lines[#lines + 1] = payload.PackFields(
+                            FIELD_SEP,
+                            "R",
+                            i,
+                            tonumber(row.rawID) or 0,
+                            tonumber(row.quantity) or 1,
+                            tonumber(row.plus) or 0,
+                            payload.EncodeText(row.class),
+                            payload.EncodeText(row.spec),
+                            payload.EncodeText(row.note),
+                            payload.EncodeText(row.source)
+                        )
+                    else
+                        lines[#lines + 1] = payload.PackFields(
+                            FIELD_SEP,
+                            "R",
+                            payload.EncodeText(playerName),
+                            tonumber(row.rawID) or 0,
+                            tonumber(row.quantity) or 1,
+                            tonumber(row.plus) or 0,
+                            payload.EncodeText(row.class),
+                            payload.EncodeText(row.spec),
+                            payload.EncodeText(row.note),
+                            payload.EncodeText(row.source)
+                        )
+                    end
                 end
             end
         end
@@ -158,14 +182,30 @@ local function parsePayload(payload)
     local reserves = {}
     local mode = "multi"
     local fields = {}
+    local compact = false
+    local playerNamesByIndex = {}
 
     for line in tostring(payload or ""):gmatch("[^\n]+") do
         payloadCodec.SplitFields(line, FIELD_SEP, fields)
         if fields[1] == "H" then
             mode = (fields[2] == "plus") and "plus" or "multi"
+            compact = fields[3] == FORMAT_COMPACT
+        elseif fields[1] == "P" and compact then
+            local playerIndex = tonumber(fields[2])
+            local playerName = payloadCodec.DecodeText(fields[3])
+            if playerIndex and playerIndex > 0 and playerName and playerName ~= "" then
+                playerNamesByIndex[playerIndex] = playerName
+            end
         elseif fields[1] == "R" then
-            local playerName = payloadCodec.DecodeText(fields[2])
-            local itemId = tonumber(fields[3])
+            local playerName
+            local itemId
+            if compact then
+                playerName = playerNamesByIndex[tonumber(fields[2]) or 0]
+                itemId = tonumber(fields[3])
+            else
+                playerName = payloadCodec.DecodeText(fields[2])
+                itemId = tonumber(fields[3])
+            end
             if playerName and playerName ~= "" and itemId and itemId > 0 then
                 local playerKey = Strings and Strings.NormalizeLower and Strings.NormalizeLower(playerName, true) or playerName
                 local container = reserves[playerKey]
@@ -192,12 +232,6 @@ local function parsePayload(payload)
     return reserves, mode
 end
 
-local function getLocalPayload()
-    local data, meta = Sync:GetPayload()
-    local payload = buildPayload(data, meta and meta.mode or "multi")
-    return payload, meta
-end
-
 local function sendMetadata(target, requestId)
     local payload = requirePayload()
     if not canProvideReserves() then
@@ -205,7 +239,7 @@ local function sendMetadata(target, requestId)
         return false
     end
 
-    local _, meta = getLocalPayload()
+    local _, meta = Sync:GetPayload()
     sendAddonWhisper(
         PREFIX,
         target,
@@ -217,20 +251,22 @@ local function sendMetadata(target, requestId)
             meta and meta.mode or "multi",
             meta and meta.players or 0,
             meta and meta.entries or 0,
-            normalizeSender(UnitName and UnitName("player") or "")
+            normalizeSender(UnitName and UnitName("player") or ""),
+            FORMAT_COMPACT
         )
     )
     return true
 end
 
-local function sendData(target, requestId)
+local function sendData(target, requestId, format)
     local payloadCodec = requirePayload()
     if not canProvideReserves() then
         sendError(target, "no_data")
         return false
     end
 
-    local payload, meta = getLocalPayload()
+    local data, meta = Sync:GetPayload()
+    local payload = buildPayload(data, meta and meta.mode or "multi", format == FORMAT_COMPACT and FORMAT_COMPACT or nil)
     local encoded = payloadCodec.EncodeText(payload)
     local payloadLen = #encoded
     local totalChunks = floor((payloadLen + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE)
@@ -311,7 +347,7 @@ function Sync:HandleMessage(prefix, msg, channel, sender)
     end
 
     if kind == MSG_DATA_REQ then
-        sendData(source, requestId)
+        sendData(source, requestId, fields[4])
         return true
     end
 
@@ -319,7 +355,7 @@ function Sync:HandleMessage(prefix, msg, channel, sender)
         local checksum = tostring(fields[3] or "")
         addon:info(L.MsgReservesSyncMeta:format(source, checksum, tostring(fields[4] or ""), tonumber(fields[5]) or 0, tonumber(fields[6]) or 0))
         if shouldRequestRemoteData(checksum) then
-            requestDataFrom(source, requestId, checksum)
+            requestDataFrom(source, requestId, checksum, fields[8])
         end
         return true
     end

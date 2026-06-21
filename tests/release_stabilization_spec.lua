@@ -4695,6 +4695,104 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     assertTrue(syncTarget.addon.DB.Syncer._pendingRequests[syncRequestId] == nil, "expected successful sync merge to complete the pending request")
 end)
 
+test("db syncer snapshot payload uses nid references for repeated player fields", function()
+    local source = newHarness()
+    local itemLink = source.registerItem(9002, "Compact Sync Blade")
+    local itemString = source.addon.Item.GetItemStringFromLink(itemLink)
+    source:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 78,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            players = {
+                { playerNid = 1, name = "Longplayernameone", rank = 1, subgroup = 2, class = "MAGE", join = 1000, countMS = 3 },
+                { playerNid = 2, name = "Longplayernametwo", rank = 1, subgroup = 3, class = "PRIEST", join = 1000, countMS = 2 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", mode = "n", difficulty = 4, time = 1010, hash = "patchwerk-1010", players = { 1, 2 } },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    itemId = 9002,
+                    itemName = "Compact Sync Blade",
+                    itemString = itemString,
+                    itemLink = itemLink,
+                    itemRarity = 4,
+                    itemTexture = "Icon9002",
+                    itemCount = 1,
+                    looterNid = 1,
+                    rollType = source.rollTypes.MAINSPEC,
+                    rollValue = 98,
+                    bossNid = 10,
+                    time = 1015,
+                },
+            },
+            nextPlayerNid = 3,
+            nextBossNid = 11,
+            nextLootNid = 102,
+        },
+    })
+
+    local snapshotMessages = {}
+    source.addon.IsInGroup = function()
+        return true
+    end
+    source.addon.IsInRaid = function()
+        return false
+    end
+    source.addon.Strings.TrimText = function(value)
+        return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    _G.SendAddonMessage = function(prefix, payload, channel, target)
+        snapshotMessages[#snapshotMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+            channel = channel,
+            target = target,
+        }
+    end
+
+    source:load("!KRT/Modules/Comms.lua")
+    source:load("!KRT/Modules/Base64.lua")
+    source:load("!KRT/Database/DBSyncer.lua")
+
+    assertTrue(source.addon.DB.Syncer:BroadcastLoggerPush(78, "Bob") == true, "expected source push snapshot to send")
+
+    local encodedParts = {}
+    for i = 1, #snapshotMessages do
+        local fields = {}
+        for field in snapshotMessages[i].payload:gmatch("[^\t]+") do
+            fields[#fields + 1] = field
+        end
+        encodedParts[tonumber(fields[6]) or i] = fields[8] or ""
+    end
+
+    local snapshotPayload = source.addon.Base64.Decode(table.concat(encodedParts, ""))
+    assertTrue(type(snapshotPayload) == "string" and snapshotPayload ~= "", "expected decoded snapshot payload")
+
+    local bossPlayers = nil
+    local lootLooter = nil
+    for line in snapshotPayload:gmatch("[^\n]+") do
+        local fields = {}
+        for field in line:gmatch("[^\t]+") do
+            fields[#fields + 1] = field
+        end
+        if fields[1] == "B" then
+            bossPlayers = source.addon.Base64.Decode(fields[8] or "")
+        elseif fields[1] == "L" then
+            lootLooter = source.addon.Base64.Decode(fields[10] or "")
+        end
+    end
+
+    assertEqual(bossPlayers, table.concat({ "1", "2" }, string.char(31)), "expected boss attendee payload to use playerNid references")
+    assertEqual(lootLooter, "1", "expected loot looter payload to use playerNid reference")
+end)
+
 test("db syncer records sync payload byte chunk metrics", function()
     local source = newHarness()
     source.addon.State.perfEnabled = true
@@ -17559,6 +17657,57 @@ test("slash perf reports and resets runtime performance aggregates", function()
     assertContains(h.logs.info, "Performance report: no measured blocks.", "expected empty perf report after reset")
 end)
 
+test("slash perf audit reports actionable runtime sync and item summaries", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+
+    function h.addon:_PerfGetStats()
+        return {
+            { label = "Logger.View.FillLootList", count = 4, totalMs = 40, avgMs = 10, maxMs = 20 },
+            { label = "Reserves.GetDisplayList", count = 2, totalMs = 6, avgMs = 3, maxMs = 4 },
+        }
+    end
+
+    h.Database.GetSyncer = function()
+        return {
+            GetSyncMetrics = function()
+                return {
+                    outgoingMessages = 3,
+                    outgoingChunks = 2,
+                    outgoingBytes = 600,
+                    outgoingRequests = 1,
+                    outgoingSnapshots = 1,
+                    incomingMessages = 2,
+                    incomingChunks = 1,
+                    incomingBytes = 200,
+                    incomingRequests = 1,
+                    incomingSnapshots = 0,
+                }
+            end,
+        }
+    end
+
+    h.addon.Item.GetInfoMetrics = function()
+        return {
+            totalRequests = 5,
+            requestsJoined = 2,
+            pendingRequests = 1,
+            getItemInfoCalls = 6,
+            tooltipProbes = 3,
+        }
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("perf audit")
+
+    assertContains(h.logs.info, "Performance audit: runtime blocks=2 total=46ms top=Logger.View.FillLootList total=40ms max=20ms.", "expected runtime perf audit summary")
+    assertContains(h.logs.info, "Performance audit sync: out bytes=600 chunks=2 avg=300B/chunk; in bytes=200 chunks=1 avg=200B/chunk.", "expected sync perf audit summary")
+    assertContains(h.logs.info, "Performance audit items: requests=5 joined=2 pending=1 GetItemInfo=6 tooltip=3.", "expected item perf audit summary")
+end)
+
 test("slash perf reports and resets sync payload metrics", function()
     local h = newHarness()
     local resetCalled = false
@@ -18528,6 +18677,73 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
     assertEqual(requester.addon.Services.Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice", "expected chunked sync payload to populate requester runtime cache")
     requester.addon.Services.Reserves:Save("test")
     assertEqual(_G.KRT_Reserves.Alice, nil, "expected chunked sync payload to remain non-persistent")
+end)
+
+test("reserves sync compact payload reduces repeated player names and imports", function()
+    local provider = newHarness()
+    local requester = newHarness()
+    local sent = {}
+    _G.SendAddonMessage = function(prefix, msg, channel, target)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+            channel = channel,
+            target = target,
+        }
+    end
+
+    _G.KRT_Reserves = {
+        ["Longplayername"] = {
+            playerNameDisplay = "Longplayername",
+            reserves = {
+                { rawID = 1001, quantity = 1, plus = 2, class = "MAGE" },
+                { rawID = 1002, quantity = 1, plus = 3, class = "MAGE" },
+                { rawID = 1003, quantity = 1, plus = 4, class = "MAGE" },
+            },
+        },
+    }
+    provider:load("!KRT/Localization/localization.en.lua")
+    provider:load("!KRT/Modules/Comms.lua")
+    provider:load("!KRT/Services/Reserves.lua")
+    provider.addon.Services.Reserves:Load()
+    provider:setRaidRoleState({ inRaid = true, isLeader = true, isMasterLooter = true })
+
+    provider.addon.Services.Reserves:HandleSyncMessage("KRTResSync", "DATA_REQ|legacy|checksum", "WHISPER", "Requester")
+    local legacyBytes = 0
+    for i = 1, #sent do
+        if sent[i].msg:match("^DATA_CHUNK|") then
+            legacyBytes = legacyBytes + string.len(sent[i].msg)
+        end
+    end
+
+    sent = {}
+    provider.addon.Services.Reserves:HandleSyncMessage("KRTResSync", "DATA_REQ|compact|checksum|C1", "WHISPER", "Requester")
+    local compactBytes = 0
+    local compactMessages = {}
+    for i = 1, #sent do
+        if sent[i].msg:match("^DATA_CHUNK|") then
+            compactBytes = compactBytes + string.len(sent[i].msg)
+        end
+        compactMessages[#compactMessages + 1] = sent[i]
+    end
+
+    assertTrue(compactBytes < legacyBytes, "expected compact reserve sync payload to reduce repeated player-name bytes")
+
+    _G.KRT_Reserves = {}
+    requester:load("!KRT/Localization/localization.en.lua")
+    requester:load("!KRT/Modules/Comms.lua")
+    requester:load("!KRT/Services/Reserves.lua")
+    requester.addon.Services.Reserves:Load()
+
+    for i = 1, #compactMessages do
+        requester.addon.Services.Reserves:HandleSyncMessage(compactMessages[i].prefix, compactMessages[i].msg, compactMessages[i].channel, "Master")
+    end
+
+    assertEqual(
+        requester.addon.Services.Reserves:FormatReservedPlayersLine(1002, false, true, true),
+        "Longplayername",
+        "expected compact reserve sync payload to import runtime cache"
+    )
 end)
 
 local failures = 0
