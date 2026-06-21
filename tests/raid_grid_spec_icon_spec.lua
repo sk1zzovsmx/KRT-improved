@@ -155,6 +155,7 @@ local function seedRaidGridFrame()
     local childNames = {
         "KRTRaidGridFrameIcon",
         "KRTRaidGridFrameTitle",
+        "KRTRaidGridFrameContextTitle",
         "KRTRaidGridFrameCount",
         "KRTRaidGridFrameDivider",
         "KRTRaidGridFrameEmpty",
@@ -263,6 +264,7 @@ feature = {
     },
     L = {
         StrRaidGridTitle = "Raid Grid",
+        StrRaidGridSelectorTitle = "Grid Selector",
         StrRaidGridEmpty = "No targets.",
         TipRaidGridClickTarget = "Click to select this target.",
         TipRaidGridClickAward = "Click to award this loot.",

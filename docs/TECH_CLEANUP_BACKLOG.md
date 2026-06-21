@@ -437,7 +437,7 @@ What this means:
 
 ### 2.6 XML
 
-- `!KRT/UI/Logger.xml`: closed for structural cleanup
+- `!KRT/UI/Logger.xml`, `!KRT/UI/LootHistory.xml`, `!KRT/UI/RaidAttendance.xml`: closed for structural cleanup
 - `!KRT/UI/Master.xml`: closed for structural cleanup
 - `!KRT/UI/Config.xml`: closed for structural cleanup
 - `!KRT/UI/LootCounter.xml`: closed for structural cleanup
@@ -445,7 +445,7 @@ What this means:
 - `!KRT/UI/Warnings.xml`: closed for structural cleanup
 - `!KRT/UI/Spammer.xml`: closed for structural cleanup
 - `!KRT/UI/Minimap.xml`: hold, low priority
-- `!KRT/UI/ReservesTemplates.xml`: hold, low priority
+- `!KRT/UI/Reserves.xml`: reserve templates are now feature-local in the concrete XML file
 
 ## 3. Priority Order
 
@@ -852,7 +852,7 @@ These are not strong cleanup candidates right now.
 - `!KRT/Services/Debug.lua`: useful as synthetic tooling, keep as-is unless it
   blocks testability
 - `!KRT/UI/Minimap.xml`: only structural cleanup if paired with `Minimap.lua`
-- `!KRT/UI/ReservesTemplates.xml`: cleanup only if a template-owner issue shows up
+- `!KRT/UI/Reserves.xml`: reserve template cleanup stays with the concrete reserves XML
 
 ## 6. Guardrails for This Backlog
 

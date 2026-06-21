@@ -152,38 +152,36 @@
 			<Color r="1" g="1" b="1" a="0.08" />
 		</PushedTexture>
 	</Button>
-	<Button name="KRTLoggerInspectItemIconButtonTemplate" enableMouse="true" hidden="true" virtual="true">
-		<Size>
-			<AbsDimension x="16" y="16" />
-		</Size>
-		<Layers>
-			<Layer level="ARTWORK">
-				<Texture name="$parentTexture">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
-				</Texture>
-			</Layer>
-		</Layers>
-	</Button>
 	<Button name="KRTRaidGridButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="150" y="28" />
 		</Size>
+		<PushedTexture file="Interface\Buttons\UI-SILVER-BUTTON-DOWN">
+			<Anchors>
+				<Anchor point="TOPLEFT" />
+				<Anchor point="BOTTOMRIGHT" />
+			</Anchors>
+			<TexCoords left="0" right="0.625" top="0" bottom="0.8125" />
+		</PushedTexture>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentBg" file="Interface\Buttons\WHITE8x8">
+				<Texture file="Interface\Buttons\UI-SILVER-BUTTON-UP">
 					<Anchors>
 						<Anchor point="TOPLEFT" />
 						<Anchor point="BOTTOMRIGHT" />
 					</Anchors>
-					<Color r="0" g="0" b="0" a="0.42" />
+					<TexCoords left="0" right="0.625" top="0" bottom="0.8125" />
 				</Texture>
 			</Layer>
-			<Layer level="BORDER">
-				<Texture name="$parentTopLine" file="Interface\Buttons\WHITE8x8">
+			<Layer level="ARTWORK">
+				<Texture name="$parentBg" file="Interface\Buttons\WHITE8x8" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.16" />
+				</Texture>
+				<Texture name="$parentTopLine" file="Interface\Buttons\WHITE8x8" hidden="true">
 					<Size>
 						<AbsDimension y="1" />
 					</Size>
@@ -193,7 +191,7 @@
 					</Anchors>
 					<Color r="1" g="1" b="1" a="0.08" />
 				</Texture>
-				<Texture name="$parentBottomLine" file="Interface\Buttons\WHITE8x8">
+				<Texture name="$parentBottomLine" file="Interface\Buttons\WHITE8x8" hidden="true">
 					<Size>
 						<AbsDimension y="1" />
 					</Size>
@@ -201,10 +199,8 @@
 						<Anchor point="BOTTOMLEFT" />
 						<Anchor point="BOTTOMRIGHT" />
 					</Anchors>
-					<Color r="0" g="0" b="0" a="0.9" />
+					<Color r="0" g="0" b="0" a="0.35" />
 				</Texture>
-			</Layer>
-			<Layer level="ARTWORK">
 				<Texture name="$parentSpecIcon" hidden="true">
 					<Size>
 						<AbsDimension x="16" y="16" />
@@ -229,11 +225,12 @@
 				</FontString>
 			</Layer>
 		</Layers>
-		<HighlightTexture name="$parentHighlight" file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD">
+		<HighlightTexture name="$parentHighlight" file="Interface\Buttons\UI-Panel-Button-Highlight2" alphaMode="ADD">
 			<Anchors>
 				<Anchor point="TOPLEFT" />
 				<Anchor point="BOTTOMRIGHT" />
 			</Anchors>
+			<TexCoords left="0" right="0.625" top="0" bottom="0.8125" />
 		</HighlightTexture>
 	</Button>
 	<!-- Item icon button template -->

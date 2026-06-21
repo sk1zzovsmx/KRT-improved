@@ -2649,6 +2649,7 @@ local function loadRaidGridWidget(h)
         local childNames = {
             "KRTRaidGridFrameIcon",
             "KRTRaidGridFrameTitle",
+            "KRTRaidGridFrameContextTitle",
             "KRTRaidGridFrameCount",
             "KRTRaidGridFrameDivider",
             "KRTRaidGridFrameEmpty",
@@ -5595,7 +5596,7 @@ test("db query and logger view share loot source model for shared legacy source"
 end)
 
 test("logger loot XML exposes layout-only source column hitbox", function()
-    local xml = readText("!KRT/UI/Logger.xml")
+    local xml = readText("!KRT/UI/LootHistory.xml")
 
     assertTextContains(xml, 'name="$parentSourceHitBox"', "expected loot row XML to expose a source-column hitbox")
     assertTextNotContains(xml, "<Scripts>", "Logger XML must stay layout-only")
@@ -18675,7 +18676,6 @@ test("runtime cleanup consumers use canonical public helper owners", function()
 
     assertTextContains(listsSource, "function Lists.MakeIndexedRowName", "UI.Lists must expose the indexed row-name factory")
     assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("RaidBtn")', "Logger raid lists should use shared row-name factory")
-    assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("BossBtn")', "Logger boss lists should use shared row-name factory")
     assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("PlayerBtn")', "Logger player lists should use shared row-name factory")
     assertTextContains(loggerSource, 'UI.Lists.MakeIndexedRowName("ItemBtn")', "Logger loot lists should use shared row-name factory")
     assertTextContains(masterSource, 'UI.Lists.MakeIndexedRowName("PlayerBtn")', "Master roll list should use shared row-name factory")

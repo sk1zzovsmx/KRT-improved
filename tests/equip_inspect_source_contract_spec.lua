@@ -28,7 +28,7 @@ local attendance = read("!KRT/Services/Raid/Attendance.lua")
 local raidState = read("!KRT/Services/Raid/State.lua")
 local view = read("!KRT/Services/Logger/View.lua")
 local logger = read("!KRT/Controllers/Logger.lua")
-local xml = read("!KRT/UI/Logger.xml")
+local xml = read("!KRT/UI/RaidAttendance.xml")
 
 assertContains(toc, "Services\\EquipInspect.lua", "TOC must load EquipInspect")
 assertBefore(toc, "Services\\SpecInspect.lua", "Services\\EquipInspect.lua", "EquipInspect load order")
@@ -90,7 +90,8 @@ assertContains(logger, "Services.EquipInspect:ForcePlayer", "Logger must allow m
 assertContains(logger, "InternalEvents.EquipInspectUpdated", "Logger must refresh on inspect update")
 assertNotContains(logger, "Services.RaidInspect", "Logger must not call RaidInspect service")
 assertNotContains(logger, "InternalEvents.RaidInspectUpdated", "Logger must not refresh on retired RaidInspect events")
-assertContains(logger, "setAttendancePanelVisible(refs.bosses, false)", "Attendance layout must hide bosses panel")
+assertNotContains(logger, "refs.bosses", "Attendance layout must not keep a legacy bosses panel reference")
+assertNotContains(xml, "KRTRaidAttendanceBosses", "Attendance XML must not keep a legacy bosses panel")
 assertNotContains(logger, "StartRaidSnapshot", "Logger controller must not start raid inspect")
 
 print("equip inspect source contract passed")

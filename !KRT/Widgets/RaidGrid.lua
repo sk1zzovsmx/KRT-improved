@@ -10,6 +10,7 @@ local feature = addon.Database.GetFeatureShared()
 
 local Widgets = feature.Widgets
 local UI = feature.UI
+local Frames = UI.Frames
 local UIWidgets = UI.Widgets
 local Primitives = UI.Primitives
 local Services = feature.Services
@@ -58,11 +59,11 @@ do
         gapX = 5,
         gapY = 4,
         padding = 22,
-        headerHeight = 62,
+        headerHeight = 80,
         footerPadding = 18,
         maxNameLen = 15,
-        buttonAlpha = 0.42,
-        buttonHoverAlpha = 0.85,
+        buttonAlpha = 0.16,
+        buttonHoverAlpha = 0.35,
         specIconSize = 16,
         specIconGap = 4,
     }
@@ -148,7 +149,7 @@ do
             return
         end
         if hovered then
-            setTextureColor(button.bg, 0.05, 0.32, 0.65, CFG.buttonHoverAlpha)
+            setTextureColor(button.bg, 0.02, 0.25, 0.55, CFG.buttonHoverAlpha)
         else
             setTextureColor(button.bg, 0, 0, 0, CFG.buttonAlpha)
         end
@@ -276,12 +277,12 @@ do
         frame.buttons = buttons
 
         frame.icon = _G.KRTRaidGridFrameIcon
-        frame.title = _G.KRTRaidGridFrameTitle
+        frame.contextTitle = _G.KRTRaidGridFrameContextTitle
         frame.count = _G.KRTRaidGridFrameCount
         frame.divider = _G.KRTRaidGridFrameDivider
         frame.empty = _G.KRTRaidGridFrameEmpty
         frame.closeButton = _G.KRTRaidGridFrameCloseButton
-        if not frame.icon or not frame.title or not frame.count or not frame.divider or not frame.empty or not frame.closeButton then
+        if not frame.icon or not frame.contextTitle or not frame.count or not frame.divider or not frame.empty or not frame.closeButton then
             frame = nil
             return nil
         end
@@ -308,6 +309,11 @@ do
                 module.Hide()
             end)
         end
+        if Frames and Frames.SetFrameTitle then
+            Frames.SetFrameTitle(frame, L.StrRaidGridSelectorTitle or "Grid Selector")
+        else
+            safeCall(_G.KRTRaidGridFrameTitle, "SetText", L.StrRaidGridSelectorTitle or "Grid Selector")
+        end
         setTextureColor(frame.divider, 1, 0.82, 0, 0.35)
 
         if type(_G.UISpecialFrames) == "table" then
@@ -325,17 +331,17 @@ do
         if texture then
             safeCall(frame.icon, "SetTexture", texture)
             safeCall(frame.icon, "Show")
-            safeCall(frame.title, "ClearAllPoints")
-            safeCall(frame.title, "SetPoint", "LEFT", frame.icon, "RIGHT", 8, 0)
-            safeCall(frame.title, "SetWidth", max(100, width - 120))
+            safeCall(frame.contextTitle, "ClearAllPoints")
+            safeCall(frame.contextTitle, "SetPoint", "LEFT", frame.icon, "RIGHT", 8, 0)
+            safeCall(frame.contextTitle, "SetWidth", max(100, width - 120))
         else
             safeCall(frame.icon, "Hide")
-            safeCall(frame.title, "ClearAllPoints")
-            safeCall(frame.title, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -22)
-            safeCall(frame.title, "SetWidth", max(100, width - 70))
+            safeCall(frame.contextTitle, "ClearAllPoints")
+            safeCall(frame.contextTitle, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -38)
+            safeCall(frame.contextTitle, "SetWidth", max(100, width - 70))
         end
 
-        safeCall(frame.title, "SetText", title or L.StrRaidGridTitle)
+        safeCall(frame.contextTitle, "SetText", title or L.StrRaidGridTitle)
         if count and count > 1 then
             safeCall(frame.count, "SetText", "x" .. tostring(count))
             safeCall(frame.count, "Show")

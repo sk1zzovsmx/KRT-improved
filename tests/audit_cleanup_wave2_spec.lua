@@ -34,13 +34,4 @@ assertNotContains(slashEvents, "local function showCounterHelp()", "SlashEvents 
 assertContains(slashEvents, 'showToggleHelp("krt ml")', "Master loot help should use shared toggle help")
 assertContains(slashEvents, 'showToggleHelp("krt counter")', "Counter help should use shared toggle help")
 
-assertContains(logger, "local function resetPopupNameEditBox(box)")
-assertContains(logger, "onShow = resetPopupNameEditBox")
-assertContains(logger, "onHide = resetPopupNameEditBox")
-assertNotContains(
-    logger,
-    "onShow = function(b)\n" .. "            local refs = ensurePopupRefs(b)\n" .. "            UI.EditBoxes.Reset(refs and refs.name)",
-    "Attendee popup should use shared reset callback"
-)
-
 print("audit cleanup wave2 source contract passed")

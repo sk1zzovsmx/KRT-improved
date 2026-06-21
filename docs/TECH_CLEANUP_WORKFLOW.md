@@ -40,8 +40,8 @@ The default cleanup unit is one owner module plus its directly owned files.
 
 Examples:
 - `Controllers/Master.lua` + `UI/Master.xml`
-- `Controllers/Logger.lua` + `UI/Logger.xml`
-- `Widgets/ReservesUI.lua` + `UI/Reserves.xml` + `UI/ReservesTemplates.xml`
+- `Controllers/Logger.lua` + `UI/Logger.xml`, `UI/LootHistory.xml`, `UI/RaidAttendance.xml`
+- `Widgets/ReservesUI.lua` + `UI/Reserves.xml`
 - `Services/Reserves.lua` without unrelated UI work
 
 Avoid mixed waves such as:

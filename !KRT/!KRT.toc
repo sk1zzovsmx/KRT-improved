@@ -127,6 +127,7 @@ Services\Master\RollAnnouncements.lua
 Services\Master\Service.lua
 Widgets\RaidGrid.lua
 Widgets\LootHints.lua
+UI\Master.xml
 Controllers\Master.lua
 Widgets\LootCounter.lua
 Services\Reserves\Import.lua
@@ -135,6 +136,7 @@ Services\Reserves\Display.lua
 Services\Reserves\Sync.lua
 Services\Reserves.lua
 Services\Reserves\Chat.lua
+UI\Reserves.xml
 Widgets\ReservesUI.lua
 Services\Logger\Store.lua
 Services\Logger\Helpers.lua
@@ -143,6 +145,9 @@ Services\Logger\Export.lua
 Services\Logger\Actions.lua
 Services\Spammer\Draft.lua
 Services\Warnings\Store.lua
+UI\Logger.xml
+UI\LootHistory.xml
+UI\RaidAttendance.xml
 Controllers\Logger.lua
 Widgets\Config.lua
 Controllers\Warnings.lua
@@ -152,8 +157,5 @@ Controllers\Spammer.lua
 UI\Minimap.xml
 UI\Spammer.xml
 UI\Warnings.xml
-UI\Master.xml
-UI\Logger.xml
 UI\Config.xml
 UI\LootCounter.xml
-UI\Reserves.xml

@@ -167,12 +167,13 @@
 |   |   |-- Config.xml
 |   |   |-- Logger.xml
 |   |   |-- LootCounter.xml
+|   |   |-- LootHistory.xml
 |   |   |-- Master.xml
 |   |   |-- Minimap.xml
+|   |   |-- RaidAttendance.xml
 |   |   |-- RaidGrid.xml
 |   |   |-- README.md
 |   |   |-- Reserves.xml
-|   |   |-- ReservesTemplates.xml
 |   |   |-- ScreenNotice.xml
 |   |   |-- Spammer.xml
 |   |   \\-- Warnings.xml
@@ -273,6 +274,7 @@
 |   |   |   |-- 2026-06-16-equipinspect-specinspect-canonicalization.md
 |   |   |   |-- 2026-06-16-krt-dead-ui-fallback-removal.md
 |   |   |   |-- 2026-06-16-krt-ui-xml-lua-homogenization.md
+|   |   |   |-- 2026-06-17-krt-logger-ui-semantic-split.md
 |   |   |   \\-- 2026-06-17-krt-xml-visual-simplification.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
