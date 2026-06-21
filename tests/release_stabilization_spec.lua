@@ -10788,18 +10788,35 @@ test("loot selection refreshes current item when async item cache resolves", fun
     assertEqual(views[2].itemRarity, 4, "expected refreshed current item rarity")
 end)
 
-test("reserve list action button opens import when reserves are empty", function()
+test("reserve list clear edit and spam actions follow state contract", function()
     local h = newHarness()
     local hasData = false
     local clearCount = 0
+    local raidMemberCount = 0
     local uiCalls = {}
+    local announcements = {}
+    local popupCalls = {}
     local registeredApis = {}
 
+    h.addon.L.BtnClear = "Clear"
+    h.addon.L.BtnEdit = "Edit"
     h.addon.L.BtnImport = "Import"
-    h.addon.L.BtnClearReserves = "Clear Loot Reserve"
     h.addon.L.BtnQueryItem = "Query Item"
     h.addon.L.BtnClose = "Close"
+    h.addon.L.BtnSpamSoftResWhisper = "Spam SR"
+    h.addon.L.ChatSoftResWhisperHelpQuery = "SoftRes: To see your reserves /w %s +sr or /w %s +softres"
+    h.addon.L.ChatSoftResWhisperHelpAdd = "SoftRes: To add one with /w %s +sr [item link] or /w %s +softres [item link]"
+    h.addon.L.StrConfirmClearReserves = "Clear all saved loot reserve data?"
     h.addon.L.StrRaidReserves = "KRT : Loot Reserve"
+    _G.UnitName = function(unit)
+        return unit == "player" and "Masterlooter" or nil
+    end
+    _G.GetNumRaidMembers = function()
+        return raidMemberCount
+    end
+    _G.UnitInRaid = function()
+        return nil
+    end
 
     h.addon.Services.Reserves = {
         HasData = function()
@@ -10817,6 +10834,15 @@ test("reserve list action button opens import when reserves are empty", function
         end,
         QueryMissingItems = function()
             return false, 0
+        end,
+    }
+    h.addon.Services.Chat = {
+        Announce = function(_, message, channel)
+            announcements[#announcements + 1] = {
+                message = message,
+                channel = channel,
+            }
+            return true
         end,
     }
 
@@ -10838,6 +10864,16 @@ test("reserve list action button opens import when reserves are empty", function
             return api[methodName](...)
         end
         return nil
+    end
+    h.addon.UI.Popups.ShowConfirm = function(key, text, onAccept, cancels, options)
+        popupCalls[#popupCalls + 1] = {
+            key = key,
+            text = text,
+            onAccept = onAccept,
+            cancels = cancels,
+            options = options,
+        }
+        return true
     end
 
     h.addon.UI.Scaffold.DefineModule = function(cfg)
@@ -10908,9 +10944,10 @@ test("reserve list action button opens import when reserves are empty", function
     local frame = h.makeFrame(true, "KRTReserveListFrame")
     local scrollFrame = h.makeFrame(true, "KRTReserveListFrameScrollFrame")
     local scrollChild = h.makeFrame(true, "KRTReserveListFrameScrollChild")
-    local clearButton = h.makeFrame(true, "KRTReserveListFrameClearButton")
+    local clearButton = h.makeFrame(true, "KRTReserveListFrameClearBtn")
+    local editButton = h.makeFrame(true, "KRTReserveListFrameEditButton")
     local queryButton = h.makeFrame(true, "KRTReserveListFrameQueryButton")
-    local closeButton = h.makeFrame(true, "KRTReserveListFrameCloseButton")
+    local whisperHelpButton = h.makeFrame(true, "KRTReserveListFrameWhisperHelpButton")
 
     scrollFrame.ScrollChild = scrollChild
     scrollFrame.SetVerticalScroll = function(self, value)
@@ -10920,37 +10957,69 @@ test("reserve list action button opens import when reserves are empty", function
     _G.KRTReserveListFrame = frame
     _G.KRTReserveListFrameScrollFrame = scrollFrame
     _G.KRTReserveListFrameScrollChild = scrollChild
-    _G.KRTReserveListFrameClearButton = clearButton
+    _G.KRTReserveListFrameClearBtn = clearButton
+    _G.KRTReserveListFrameEditButton = editButton
     _G.KRTReserveListFrameQueryButton = queryButton
-    _G.KRTReserveListFrameCloseButton = closeButton
+    _G.KRTReserveListFrameWhisperHelpButton = whisperHelpButton
 
     h:load("!KRT/Widgets/ReservesUI.lua")
     local module = h.addon.Widgets.ReservesUI
 
     module:RequestRefresh("empty")
 
-    assertEqual(clearButton:GetText(), "Import", "expected empty reserves action to become Import")
-    assertTrue(clearButton:IsShown(), "expected empty reserves action button to stay visible")
-    assertTrue(clearButton:IsEnabled(), "expected empty reserves import action to stay enabled")
+    assertEqual(clearButton:GetText(), "Clear", "expected clear action label when no data")
+    assertTrue(clearButton:IsEnabled() == false or clearButton:IsShown() == false, "expected clear action hidden or disabled with no data")
+    assertEqual(editButton:GetText(), "Edit", "expected edit action to be labeled Edit")
+    assertEqual(editButton:IsEnabled(), false, "expected edit action to stay disabled with no data")
+    assertEqual(whisperHelpButton:GetText(), "Spam SR", "expected footer action to advertise SoftRes whispers")
 
     clearButton.OnClick(clearButton)
+    whisperHelpButton.OnClick(whisperHelpButton)
+    if editButton.OnClick then
+        editButton.OnClick(editButton)
+    end
 
-    assertEqual(#uiCalls, 1, "expected empty reserves action to route through the import widget")
-    assertEqual(uiCalls[1].name, "Reserves", "expected reserves widget call")
-    assertEqual(uiCalls[1].methodName, "ToggleImport", "expected empty reserves action to open import")
+    assertEqual(#uiCalls, 0, "expected no import action with clear/edit controls")
+    assertEqual(#announcements, 0, "expected SoftRes whisper help button to stay silent outside raid")
+
+    raidMemberCount = 10
+    whisperHelpButton.OnClick(whisperHelpButton)
+
+    assertEqual(#announcements, 2, "expected SoftRes whisper help button to announce two lines")
+    assertEqual(announcements[1].channel, "RAID", "expected SoftRes whisper help to use raid chat")
+    assertEqual(announcements[2].channel, "RAID", "expected SoftRes add help to use raid chat")
+    local expectedSoftResQuery = "SoftRes: To see your reserves /w Masterlooter +sr or /w Masterlooter +softres"
+    local expectedSoftResAdd = "SoftRes: To add one with /w Masterlooter +sr [item link] or /w Masterlooter +softres [item link]"
+    assertEqual(announcements[1].message, expectedSoftResQuery, "expected SoftRes help to include reserve query commands")
+    assertEqual(announcements[2].message, expectedSoftResAdd, "expected SoftRes help to include reserve add commands")
     assertEqual(clearCount, 0, "expected empty reserves action not to clear saved data")
+    assertEqual(editButton:IsEnabled(), false, "expected edit action to remain disabled with no data")
 
     hasData = true
     uiCalls = {}
     module:RequestRefresh("has_data")
 
-    assertEqual(clearButton:GetText(), "Clear Loot Reserve", "expected data reserves action to clear reserves")
+    assertEqual(clearButton:GetText(), "Clear", "expected data reserves action to clear reserves")
     assertTrue(clearButton:IsShown(), "expected clear reserves button to stay visible when data exists")
+    assertTrue(clearButton:IsEnabled(), "expected clear action to be enabled with data")
+    assertEqual(editButton:GetText(), "Edit", "expected edit action label to stay Edit with data")
+    assertEqual(editButton:IsEnabled(), false, "expected edit action to stay disabled with data")
 
     clearButton.OnClick(clearButton)
 
-    assertEqual(clearCount, 1, "expected data reserves action to clear saved data")
+    assertEqual(#popupCalls, 1, "expected clear action to request confirmation when data exists")
+    assertEqual(popupCalls[1].key, "KRT_RESERVES_CLEAR_SAVED", "expected clear confirmation popup key")
+    assertEqual(popupCalls[1].text, h.addon.L.StrConfirmClearReserves, "expected clear confirmation popup text")
+    assertEqual(popupCalls[1].options.button1, h.addon.L.BtnClear, "expected confirmation button to stay clear")
+    assertEqual(popupCalls[1].options.button2, h.addon.L.BtnCancel, "expected confirmation cancel button to be present")
+    assertEqual(clearCount, 0, "expected data reserves action to wait for confirmation")
+    assertEqual(type(popupCalls[1].onAccept), "function", "expected confirm callback to be a function")
+    if type(popupCalls[1].onAccept) == "function" then
+        popupCalls[1].onAccept()
+    end
+    assertEqual(clearCount, 1, "expected data reserves action to clear saved data after confirmation")
     assertEqual(#uiCalls, 0, "expected data reserves action not to open import")
+    assertEqual(editButton:IsEnabled(), false, "expected edit action to remain disabled after clearing")
 end)
 
 test("reserves import window uses compact mode and format buttons", function()
@@ -19078,7 +19147,7 @@ test("reserves whisper softres ignores requests while disabled", function()
     h:load("!KRT/Services/Reserves/Chat.lua")
     h.addon.Services.Reserves:Load()
 
-    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("!sr", "Alice")
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr", "Alice")
 
     assertTrue(handled == true, "expected SoftRes request command to be recognized")
     assertEqual(#sent, 0, "expected disabled whisper replies to stay silent")
@@ -19107,22 +19176,53 @@ test("reserves whisper softres replies with player reserves for authorized holde
     h:load("!KRT/Services/Reserves/Chat.lua")
     h.addon.Services.Reserves:Load()
 
-    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("!softres", "Alice")
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+softres", "Alice")
 
-    assertTrue(handled == true, "expected !softres command to be recognized")
+    assertTrue(handled == true, "expected +softres command to be recognized")
     assertTrue(#sent >= 3, "expected header and reserve lines")
     assertEqual(sent[1].target, "Alice", "expected reply target to be the requester")
-    assertTrue(string.find(sent[1].msg, "Your SoftRes", 1, true) ~= nil, "expected player-facing SoftRes header")
+    assertEqual(sent[1].msg, "Your SoftRes reserves:", "expected concise player-facing SoftRes header")
+    assertTextNotContains(sent[2].msg, "KRT SoftRes:", "expected reserve line to omit addon prefix")
     assertTrue(string.find(sent[2].msg, "Coldsteel Dagger", 1, true) ~= nil, "expected first reserve item in reply")
     assertTrue(string.find(sent[2].msg, "x2", 1, true) ~= nil, "expected multi-reserve quantity in reply")
     assertTrue(string.find(sent[3].msg, "Frost Edge", 1, true) ~= nil, "expected second reserve item in reply")
-    assertTrue(string.find(sent[3].msg, "P+4", 1, true) ~= nil, "expected plus value in reply")
+    assertTextNotContains(sent[3].msg, "P+4", "expected plus value to be omitted in multi-mode reply")
     for i = 1, #sent do
         assertTrue(string.len(sent[i].msg) <= 255, "expected whisper line to stay chat-safe")
     end
 end)
 
-test("reserves whisper softres accepts private-server-safe aliases", function()
+test("reserves whisper softres replies with plus suffix in plus mode", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, itemName = "Coldsteel Dagger", itemLink = "|cff0070dd|Hitem:1001:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r", plus = 4 },
+            },
+        },
+    }
+    setHarnessOption(h, "Reserves", "srImportMode", 1, { srImportMode = 0 })
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr", "Alice")
+
+    assertTrue(handled == true, "expected +sr command to be recognized")
+    assertTrue(#sent >= 2, "expected header and reserve line")
+    assertTrue(string.find(sent[2].msg, "P+4", 1, true) ~= nil, "expected plus value in plus-mode reply")
+end)
+
+test("reserves whisper softres accepts advertised aliases", function()
     local h = newHarness()
     local sent = {}
     _G.KRT_Reserves = {
@@ -19145,7 +19245,7 @@ test("reserves whisper softres accepts private-server-safe aliases", function()
     h:load("!KRT/Services/Reserves/Chat.lua")
     h.addon.Services.Reserves:Load()
 
-    local aliases = { "sr", "softres", "krt sr", "krt softres" }
+    local aliases = { "+sr", "+softres" }
     for i = 1, #aliases do
         sent = {}
         local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply(aliases[i], "Alice")
@@ -19155,8 +19255,122 @@ test("reserves whisper softres accepts private-server-safe aliases", function()
     end
 
     sent = {}
-    h.Bus.TriggerEvent("wow.CHAT_MSG_WHISPER", "sr", "Alice")
+    h.Bus.TriggerEvent("wow.CHAT_MSG_WHISPER", "+sr", "Alice")
     assertTrue(#sent >= 2, "expected whisper bus event to route to the reserve reply handler")
+
+    local legacyAliases = { "!sr", "!softres", "sr", "softres", "krt sr", "krt softres" }
+    for i = 1, #legacyAliases do
+        sent = {}
+        local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply(legacyAliases[i], "Alice")
+        assertTrue(handled ~= true, "expected non-advertised SoftRes whisper alias to be ignored")
+        assertEqual(#sent, 0, "expected ignored SoftRes whisper alias to stay silent")
+    end
+end)
+
+test("reserves whisper softres adds an item reserve and replies with success", function()
+    local h = newHarness()
+    local sent = {}
+    local changed = {}
+    local itemLink = h.registerItem(39717, "Inexorable Sabatons", 4, "Icon39717")
+    _G.KRT_Reserves = {}
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/LootSources.lua")
+    h.addon.LootSources._SetDataForTests({
+        [39717] = {
+            {
+                npcId = 37813,
+                npcName = "Deathbringer Saurfang",
+                raid = "Icecrown Citadel",
+                kind = "boss",
+            },
+        },
+    })
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+    h.Bus.RegisterCallback(h.addon.Events.Internal.ReservesDataChanged, function(_, reason)
+        changed[#changed + 1] = reason
+    end)
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+SOFTRES   " .. itemLink, "Alice")
+    local entries = h.addon.Services.Reserves:GetPlayerReserveEntries("Alice")
+
+    assertTrue(handled == true, "expected +softres item command to be recognized")
+    assertEqual(#sent, 1, "expected one confirmation whisper")
+    assertEqual(sent[1].target, "Alice", "expected confirmation to target the requester")
+    assertEqual(sent[1].msg, "Your " .. itemLink .. " reserve is added!", "expected item reserve confirmation")
+    assertEqual(#entries, 1, "expected one reserve entry for the whisper sender")
+    assertEqual(entries[1].rawID, 39717, "expected added reserve item id")
+    assertEqual(entries[1].itemLink, itemLink, "expected added reserve to keep the item link")
+    assertEqual(entries[1].source, "Deathbringer Saurfang", "expected added reserve to resolve the item source")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].rawID, 39717, "expected added reserve to persist")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].source, "Deathbringer Saurfang", "expected persisted source to avoid whisper grouping")
+    assertEqual(changed[1], "whisper-reserve", "expected reserve views to refresh after whisper add")
+end)
+
+test("reserves whisper softres stores shared source for ambiguous item reserves", function()
+    local h = newHarness()
+    local sent = {}
+    local itemLink = h.registerItem(39717, "Inexorable Sabatons", 4, "Icon39717")
+    _G.KRT_Reserves = {}
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/LootSources.lua")
+    h.addon.LootSources._SetDataForTests({
+        [39717] = {
+            { npcId = 15956, npcName = "Anub'Rekhan", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15932, npcName = "Gluth", raid = "Naxxramas", kind = "boss" },
+        },
+    })
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+SR   " .. itemLink, "Alice")
+    local entries = h.addon.Services.Reserves:GetPlayerReserveEntries("Alice")
+
+    assertTrue(handled == true, "expected +sr item command to be recognized")
+    assertEqual(#sent, 1, "expected one confirmation whisper for shared-source item")
+    assertEqual(#entries, 1, "expected one shared-source reserve entry")
+    assertEqual(entries[1].source, "Shared", "expected ambiguous item source to avoid a fake whisper group")
+    assertEqual(_G.KRT_Reserves.Alice.reserves[1].source, "Shared", "expected shared source to persist")
+end)
+
+test("reserves whisper softres reports invalid item links for add requests", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {}
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+SOFTRES   [Unknown Item]", "Alice")
+
+    assertTrue(handled == true, "expected invalid add request to be handled")
+    assertEqual(#sent, 1, "expected invalid add request to reply once")
+    assertEqual(sent[1].msg, "Shift-click an item link after +sr or +softres to add a reserve.", "expected item-link help")
+    assertEqual(h.addon.Services.Reserves:HasData(), false, "expected invalid add request to avoid creating reserves")
 end)
 
 test("reserves whisper softres denies normal raiders even with reserve data", function()
@@ -19181,13 +19395,13 @@ test("reserves whisper softres denies normal raiders even with reserve data", fu
     h:load("!KRT/Services/Reserves/Chat.lua")
     h.addon.Services.Reserves:Load()
 
-    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("softres", "Alice")
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr", "Alice")
 
     assertTrue(handled == true, "expected SoftRes request command to be recognized")
     assertEqual(#sent, 0, "expected normal raiders to stay silent even with reserve data")
 end)
 
-test("reserves whisper softres stays silent without reserve data", function()
+test("reserves whisper softres replies no reserves without reserve data", function()
     local h = newHarness()
     local sent = {}
     _G.KRT_Reserves = {}
@@ -19196,17 +19410,19 @@ test("reserves whisper softres stays silent without reserve data", function()
         sent[#sent + 1] = { target = target, msg = msg }
         return true
     end
-    h:setRaidRoleState({ inRaid = true, rank = 0, isMasterLooter = false })
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
 
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Services/Reserves.lua")
     h:load("!KRT/Services/Reserves/Chat.lua")
     h.addon.Services.Reserves:Load()
 
-    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("!SR", "Alice")
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+SR", "Alice")
 
     assertTrue(handled == true, "expected case-insensitive command to be recognized")
-    assertEqual(#sent, 0, "expected clients without reserve data to stay silent")
+    assertEqual(#sent, 1, "expected clients without reserve data to send an empty result")
+    assertEqual(sent[1].target, "Alice", "expected empty result to target the requester")
+    assertEqual(sent[1].msg, "No reserves found for Alice.", "expected no-reserves feedback")
 end)
 
 test("reserves sync helper requests metadata and imports chunked runtime data", function()

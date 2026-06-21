@@ -18,6 +18,7 @@ local Strings = feature.Strings
 local format = string.format
 local len = string.len
 local lower = string.lower
+local strsub = string.sub
 local tostring = tostring
 local tonumber = tonumber
 local type = type
@@ -31,21 +32,38 @@ module._Chat = module._Chat or {}
 local Chat = module._Chat
 
 local MAX_WHISPER_LEN = 255
+local REQUEST_COMMANDS = {
+    "+softres",
+    "+sr",
+}
 local REQUESTS = {
-    ["!sr"] = true,
-    ["!softres"] = true,
-    ["sr"] = true,
-    ["softres"] = true,
-    ["krt sr"] = true,
-    ["krt softres"] = true,
+    ["+sr"] = true,
+    ["+softres"] = true,
 }
 
 -- ----- Private helpers ----- --
 local trimText = Strings.TrimText
 
-local function isRequest(text)
-    local normalized = lower(trimText(text or ""))
-    return REQUESTS[normalized] == true
+local function parseRequest(text)
+    local raw = trimText(text or "")
+    if raw == "" then
+        return nil
+    end
+
+    local normalized = lower(raw)
+    if REQUESTS[normalized] == true then
+        return normalized, nil
+    end
+
+    for i = 1, #REQUEST_COMMANDS do
+        local command = REQUEST_COMMANDS[i]
+        local commandLen = len(command)
+        if strsub(normalized, 1, commandLen + 1) == command .. " " then
+            return command, trimText(strsub(raw, commandLen + 2))
+        end
+    end
+
+    return nil
 end
 
 local function canReplyFromCurrentClient()
@@ -92,7 +110,7 @@ local function buildItemText(entry)
 
     local suffix = ""
     local quantity = tonumber(entry.quantity) or 1
-    local plus = tonumber(entry.plus) or 0
+    local plus = module.IsPlusSystem and module:IsPlusSystem() and (tonumber(entry.plus) or 0) or 0
     if quantity > 1 then
         suffix = suffix .. " x" .. tostring(quantity)
     end
@@ -125,6 +143,15 @@ local function sendReserveMessages(target, entries)
     end
 end
 
+local function buildReserveAddedMessage(entry)
+    local itemText = buildItemText(entry)
+    local text = format(L.WhisperSoftResAdded, itemText)
+    if len(text) <= MAX_WHISPER_LEN then
+        return text
+    end
+    return format(L.WhisperSoftResAdded, buildFallbackItemText(entry))
+end
+
 local requestWhisperReply
 
 local function registerWhisperHandler()
@@ -139,7 +166,8 @@ local function registerWhisperHandler()
 end
 
 requestWhisperReply = function(msg, sender)
-    if not isRequest(msg) then
+    local command, itemRef = parseRequest(msg)
+    if not command then
         return false
     end
 
@@ -152,11 +180,20 @@ requestWhisperReply = function(msg, sender)
         return true
     end
 
-    if not (module.HasData and module:HasData()) then
+    if not canReplyFromCurrentClient() then
         return true
     end
 
-    if not canReplyFromCurrentClient() then
+    if itemRef and itemRef ~= "" then
+        local ok, reserveEntry
+        if module.AddPlayerReserve then
+            ok, reserveEntry = module:AddPlayerReserve(target, itemRef)
+        end
+        if ok and reserveEntry then
+            sendWhisper(target, buildReserveAddedMessage(reserveEntry))
+        else
+            sendWhisper(target, L.WhisperSoftResInvalidItem)
+        end
         return true
     end
 

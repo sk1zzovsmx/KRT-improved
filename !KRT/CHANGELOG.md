@@ -464,10 +464,14 @@ Release-Version: 0.8.0-beta.1
 - **Master item metadata** - Current Master Loot item views now refresh from
   the shared item cache loader when inventory/manual item metadata resolves
   after initial selection.
-- **Whisper SoftRes replies** - Added opt-in `!sr`/`!softres` whisper replies,
-  with `sr`/`softres` fallback aliases for private servers that reserve `!`
-  commands, so ML/leader/assistant clients with reserve data can send a player
-  their current reserves in chat-safe whisper lines.
+- **Whisper SoftRes replies** - Added opt-in `+sr`/`+softres` whisper replies,
+  so ML/leader/assistant clients with reserve data can send a player their
+  current reserves in concise chat-safe whisper lines.
+  Players can also whisper `+sr <item link>` or `+softres <item link>` to add a
+  local reserve and receive an explicit success or invalid-item reply. Empty
+  reserve data now replies with the same no-reserves feedback instead of silence.
+  The Reserve List footer action now announces the whisper commands to the raid
+  instead of duplicating the window close button, and stays silent outside raid.
 - **Auto-loot suggestions** - Added a lightweight suggestion-only loot rules
   classifier for ignored items, enchanting materials, and quality BoE loot,
   including 3.3.5a tooltip-based bind detection; it does not auto-award or

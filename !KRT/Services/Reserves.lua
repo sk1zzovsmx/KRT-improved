@@ -17,11 +17,13 @@ local Strings = feature.Strings
 local Database = feature.Database
 local Services = feature.Services
 local Item = feature.Item
+local LootSources = feature.LootSources
 local Timer = feature.Timer
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
 local format = string.format
+local match = string.match
 
 local tostring, tonumber = tostring, tonumber
 
@@ -480,6 +482,165 @@ do
         KRT_Reserves = buildSavedReservesData(canonical)
     end
 
+    local function normalizeReserveItemRef(itemRef)
+        if type(itemRef) ~= "string" then
+            return itemRef
+        end
+
+        local text = Strings.TrimText(itemRef, true)
+        if text == nil or text == "" then
+            return nil
+        end
+
+        return match(text, "^%[(.+)%]$") or text
+    end
+
+    local function getReserveItemSnapshot(itemRef)
+        local normalizedRef = normalizeReserveItemRef(itemRef)
+        if normalizedRef == nil then
+            return nil
+        end
+
+        local itemId = Item.GetItemIdFromLink(normalizedRef)
+        local itemName
+        local itemLink
+        local itemIcon
+
+        if type(GetItemInfo) == "function" then
+            local fetchedName, fetchedLink, _, _, _, _, _, _, _, fetchedIcon = GetItemInfo(normalizedRef)
+            itemName = fetchedName
+            itemLink = fetchedLink
+            itemIcon = fetchedIcon
+        end
+
+        itemId = itemId or Item.GetItemIdFromLink(itemLink)
+        if not itemId then
+            return nil
+        end
+
+        if type(itemLink) ~= "string" or itemLink == "" then
+            if type(normalizedRef) == "string" and normalizedRef:find("|Hitem:", 1, true) then
+                itemLink = normalizedRef
+            else
+                itemLink = nil
+            end
+        end
+
+        if type(itemName) ~= "string" or itemName == "" then
+            itemName = type(itemLink) == "string" and match(itemLink, "|h%[(.-)%]|h") or nil
+        end
+
+        if type(itemName) ~= "string" or itemName == "" then
+            itemName = type(itemRef) == "string" and match(Strings.TrimText(itemRef), "^%[(.+)%]$") or nil
+        end
+
+        if type(itemIcon) ~= "string" or itemIcon == "" then
+            itemIcon = type(GetItemIcon) == "function" and GetItemIcon(itemId) or nil
+        end
+        if type(itemIcon) ~= "string" or itemIcon == "" then
+            itemIcon = fallbackIcon
+        end
+
+        return {
+            rawID = itemId,
+            itemLink = itemLink,
+            itemName = itemName,
+            itemIcon = itemIcon,
+            quantity = 1,
+            plus = 0,
+        }
+    end
+
+    local function getCurrentRaidForReserveSource()
+        local currentRaid = Database and Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
+        if type(currentRaid) == "table" then
+            return currentRaid
+        end
+        if Database and Database.EnsureRaidById then
+            return Database.EnsureRaidById(currentRaid)
+        end
+        return nil
+    end
+
+    local function buildReserveSourceContext()
+        local raid = getCurrentRaidForReserveSource()
+        if type(raid) ~= "table" then
+            return nil
+        end
+
+        local zone = raid.zone
+        return {
+            raid = zone,
+            zoneName = zone,
+            instanceName = zone,
+            raidSize = tonumber(raid.size) or 0,
+            difficulty = tonumber(raid.difficulty) or 0,
+        }
+    end
+
+    local function resolveReserveSourceName(itemId)
+        local resolver = LootSources
+        if type(resolver) ~= "table" or type(resolver.FindSource) ~= "function" then
+            return nil
+        end
+
+        local source = resolver.FindSource(itemId, buildReserveSourceContext())
+        if type(source) ~= "table" then
+            return nil
+        end
+
+        if source.kind == "shared" and source.shared == true and type(source.npcName) == "string" then
+            return source.npcName ~= "" and source.npcName or nil
+        end
+
+        if source.reason ~= nil or source.confidence ~= "exact" then
+            return nil
+        end
+
+        if source.kind ~= "boss" and source.kind ~= "trash" then
+            return nil
+        end
+        if type(source.npcName) ~= "string" or source.npcName == "" then
+            return nil
+        end
+        return source.npcName
+    end
+
+    local function upsertPlayerReserve(target, playerKey, displayName, reserveEntry)
+        local player = target[playerKey]
+        if not player then
+            player = {
+                playerNameDisplay = displayName,
+                reserves = {},
+            }
+            target[playerKey] = player
+        elseif type(player.reserves) ~= "table" then
+            player.reserves = {}
+        end
+
+        player.playerNameDisplay = player.playerNameDisplay or displayName
+
+        for i = 1, #player.reserves do
+            local row = player.reserves[i]
+            if type(row) == "table" and row.rawID == reserveEntry.rawID then
+                row.itemLink = reserveEntry.itemLink or row.itemLink
+                row.itemName = reserveEntry.itemName or row.itemName
+                row.itemIcon = reserveEntry.itemIcon or row.itemIcon
+                row.quantity = tonumber(row.quantity) or 1
+                row.plus = tonumber(row.plus) or 0
+                row.source = reserveEntry.source or row.source
+                return row, false
+            end
+        end
+
+        local copied = copyReserveEntryForSave(reserveEntry)
+        if not copied then
+            return nil, false
+        end
+        player.reserves[#player.reserves + 1] = copied
+        return copied, true
+    end
+
     local function clearDisplayRefreshQueue()
         if pendingDisplayRefreshHandle then
             module:CancelTimer(pendingDisplayRefreshHandle)
@@ -787,6 +948,37 @@ do
             end
         end
         return entries
+    end
+
+    function module:AddPlayerReserve(playerName, itemRef)
+        local displayName = resolvePlayerNameDisplay(nil, nil, playerName)
+        if displayName == "?" then
+            return false, "invalid_player"
+        end
+
+        local reserveEntry = getReserveItemSnapshot(itemRef)
+        if not reserveEntry then
+            return false, "invalid_item"
+        end
+
+        reserveEntry.source = resolveReserveSourceName(reserveEntry.rawID)
+
+        local playerKey = resolveReservePlayerKey(displayName) or Strings.NormalizeLower(displayName, true)
+        if playerKey == nil or playerKey == "" then
+            return false, "invalid_player"
+        end
+
+        local row = upsertPlayerReserve(persistedReservesData, playerKey, displayName, reserveEntry)
+        if not row then
+            return false, "invalid_item"
+        end
+
+        syncedCacheMeta = nil
+        syncedCacheActive = false
+        copyReservesData(persistedReservesData, reservesData)
+        saveCanonicalReservesData(persistedReservesData)
+        notifyReservesDataChanged("whisper-reserve", nil, self:GetImportMode(), addon.tLength(reservesData))
+        return true, row
     end
 
     -- Parse imported text (SoftRes CSV)
@@ -1358,6 +1550,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/Bus",
             "Modules/Strings",
             "Modules/Item",
+            "Modules/LootSources",
             "Services/Reserves/Import",
             "Services/Reserves/Aliases",
             "Services/Reserves/Display",

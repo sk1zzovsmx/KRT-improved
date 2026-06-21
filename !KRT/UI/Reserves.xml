@@ -249,7 +249,19 @@
 					</Frame>
 				</ScrollChild>
 			</ScrollFrame>
-			<Button name="$parentClearButton" inherits="KRTActionButtonTemplate">
+			<Button name="$parentClearBtn" inherits="KRTActionButtonTemplate">
+				<Size>
+					<AbsDimension x="65" y="19" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativePoint="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="-27" y="-5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentEditButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -273,9 +285,9 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentCloseButton" inherits="KRTActionButtonTemplate">
+			<Button name="$parentWhisperHelpButton" inherits="KRTActionButtonTemplate">
 				<Size>
-					<AbsDimension x="80" y="24" />
+					<AbsDimension x="100" y="24" />
 				</Size>
 				<Anchors>
 					<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT">

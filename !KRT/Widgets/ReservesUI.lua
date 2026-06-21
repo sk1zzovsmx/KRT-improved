@@ -14,6 +14,7 @@ local UI = feature.UI
 local UIWidgets = UI.Widgets
 local Frames = UI.Frames
 local Scaffold = UI.Scaffold
+local Popups = UI.Popups
 local Primitives = UI.Primitives
 local EditBoxes = UI.EditBoxes
 local Tooltips = UI.Tooltips
@@ -30,6 +31,8 @@ local tinsert, twipe = table.insert, table.wipe
 local pairs, type = pairs, type
 local format = string.format
 local tostring, tonumber = tostring, tonumber
+local GetNumRaidMembers = GetNumRaidMembers
+local UnitInRaid = UnitInRaid
 
 local InternalEvents = Events.Internal
 local registry = feature.ModuleRegistry
@@ -44,6 +47,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/UI/Facade",
             "Modules/UI/Frames",
             "Modules/UI/Visuals",
+            "Services/Chat",
             "Services/Reserves",
         },
     })
@@ -59,6 +63,7 @@ do
     local module = Widgets.ReservesUI
     local uiState = Scaffold.EnsureModuleState(module)
     local Reserves = Services and Services.Reserves
+    local Chat = Services and Services.Chat
 
     -- ----- Internal state ----- --
 
@@ -69,6 +74,7 @@ do
     local reserveItemRows = {}
     local rowsByItemID = {}
     local lastQueryAttemptAt = 0
+    local CLEAR_SAVED_RESERVES_POPUP_KEY = "KRT_RESERVES_CLEAR_SAVED"
     local reserveRowStyle = {
         odd = { 0.04, 0.06, 0.09, 0.30 },
         even = { 0.08, 0.10, 0.14, 0.36 },
@@ -87,8 +93,9 @@ do
 
     function uiState.AcquireRefs(frame)
         return {
-            closeButton = Frames.GetRef(frame, "CloseButton"),
-            clearButton = Frames.GetRef(frame, "ClearButton"),
+            whisperHelpButton = Frames.GetRef(frame, "WhisperHelpButton"),
+            clearBtn = Frames.GetRef(frame, "ClearBtn"),
+            editButton = Frames.GetRef(frame, "EditButton"),
             queryButton = Frames.GetRef(frame, "QueryButton"),
             scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"],
             scrollChild = (frame.ScrollFrame and frame.ScrollFrame.ScrollChild) or _G["KRTReserveListFrameScrollChild"],
@@ -294,17 +301,21 @@ do
                 addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
             end
         end
-        local clearButton = frameName and _G[frameName .. "ClearButton"]
-        if clearButton then
-            clearButton:SetText(hasReserveData() and L.BtnClearReserves or L.BtnImport)
+        local clearBtn = frameName and _G[frameName .. "ClearBtn"]
+        if clearBtn then
+            clearBtn:SetText(L.BtnClear)
+        end
+        local editButton = frameName and _G[frameName .. "EditButton"]
+        if editButton then
+            editButton:SetText(L.BtnEdit)
         end
         local queryButton = frameName and _G[frameName .. "QueryButton"]
         if queryButton then
             queryButton:SetText(L.BtnQueryItem)
         end
-        local closeButton = frameName and _G[frameName .. "CloseButton"]
-        if closeButton then
-            closeButton:SetText(L.BtnClose)
+        local whisperHelpButton = frameName and _G[frameName .. "WhisperHelpButton"]
+        if whisperHelpButton then
+            whisperHelpButton:SetText(L.BtnSpamSoftResWhisper)
         end
         uiState.Localized = true
     end
@@ -315,11 +326,22 @@ do
             return
         end
         local hasData = hasReserveData()
-        local clearButton = _G[frameName .. "ClearButton"]
-        if clearButton then
-            clearButton:SetText(hasData and L.BtnClearReserves or L.BtnImport)
-            clearButton:Show()
-            Primitives.SetEnabled(clearButton, true)
+        local clearBtn = _G[frameName .. "ClearBtn"]
+        if clearBtn then
+            clearBtn:SetText(L.BtnClear)
+            if hasData then
+                clearBtn:Show()
+                Primitives.SetEnabled(clearBtn, true)
+            else
+                clearBtn:Hide()
+                Primitives.SetEnabled(clearBtn, false)
+            end
+        end
+        local editButton = _G[frameName .. "EditButton"]
+        if editButton then
+            editButton:SetText(L.BtnEdit)
+            editButton:Show()
+            Primitives.SetEnabled(editButton, false)
         end
         local queryButton = _G[frameName .. "QueryButton"]
         if queryButton then
@@ -523,6 +545,58 @@ do
         return out
     end
 
+    local function confirmClearSavedReservesFromUI()
+        if not hasReserveData() then
+            return false
+        end
+
+        local options = {
+            button1 = L.BtnClear,
+            button2 = L.BtnCancel,
+        }
+        if
+            Popups
+            and Popups.ShowConfirm
+            and Popups.ShowConfirm(CLEAR_SAVED_RESERVES_POPUP_KEY, L.StrConfirmClearReserves, clearSavedReservesFromUI, CLEAR_SAVED_RESERVES_POPUP_KEY, options)
+        then
+            return true
+        end
+
+        return clearSavedReservesFromUI()
+    end
+
+    local function getWhisperTargetName()
+        local unitName = _G.UnitName
+        local playerName = type(unitName) == "function" and unitName("player") or nil
+        if type(playerName) == "string" and playerName ~= "" then
+            return playerName
+        end
+        return "me"
+    end
+
+    local function isPlayerInRaid()
+        if type(UnitInRaid) == "function" and UnitInRaid("player") then
+            return true
+        end
+        if type(GetNumRaidMembers) == "function" and (tonumber(GetNumRaidMembers()) or 0) > 0 then
+            return true
+        end
+        return false
+    end
+
+    local function announceSoftResWhisperHelp()
+        if not isPlayerInRaid() then
+            return false
+        end
+        if not (Chat and Chat.Announce) then
+            return false
+        end
+        local targetName = getWhisperTargetName()
+        Chat:Announce(format(L.ChatSoftResWhisperHelpQuery, targetName, targetName), "RAID")
+        Chat:Announce(format(L.ChatSoftResWhisperHelpAdd, targetName, targetName), "RAID")
+        return true
+    end
+
     -- ----- Public methods ----- --
 
     local function refreshReservesUi()
@@ -537,26 +611,26 @@ do
         scrollFrame = refs.scrollFrame or scrollFrame
         scrollChild = refs.scrollChild or scrollChild
 
-        if refs.closeButton then
-            refs.closeButton:SetScript("OnClick", function()
-                module:Hide()
+        if refs.whisperHelpButton then
+            refs.whisperHelpButton:SetScript("OnClick", function()
+                announceSoftResWhisperHelp()
             end)
             if isDebugEnabled() then
-                addon:debug(Diag.D.LogReservesBindButton:format("CloseButton", "Hide"))
+                addon:debug(Diag.D.LogReservesBindButton:format("WhisperHelpButton", "AnnounceWhisperHelp"))
             end
         end
 
-        if refs.clearButton then
-            refs.clearButton:SetScript("OnClick", function()
-                if hasReserveData() then
-                    clearSavedReservesFromUI()
-                else
-                    UIWidgets.Call("Reserves", "ToggleImport")
-                end
+        if refs.clearBtn then
+            refs.clearBtn:SetScript("OnClick", function()
+                confirmClearSavedReservesFromUI()
             end)
             if isDebugEnabled() then
-                addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ClearOrImport"))
+                addon:debug(Diag.D.LogReservesBindButton:format("ClearBtn", "Clear"))
             end
+        end
+
+        if refs.editButton then
+            refs.editButton:SetScript("OnClick", function() end)
         end
 
         if refs.queryButton then
