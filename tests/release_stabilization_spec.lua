@@ -2586,6 +2586,16 @@ local function setHarnessOption(h, namespace, key, value, defaults)
     return cfg
 end
 
+local function flushHarnessTimers(h, maxPasses)
+    local passes = 0
+    local limit = maxPasses or 1000
+    while h:timerCount() > 0 do
+        passes = passes + 1
+        assertTrue(passes <= limit, "expected harness timers to drain")
+        h:flushTimers()
+    end
+end
+
 local function getHarnessOption(h, namespace, key)
     local cfg = h.addon.Options.Get(namespace)
     return cfg and cfg:Get(key) or nil
@@ -16142,6 +16152,111 @@ test("master item selection popup stays clickable", function()
     assertEqual(selectedIndex, 1, "expected clicking the selection popup button to pick the corresponding loot index")
 end)
 
+test("master item selection popup builds on demand after hidden loot open", function()
+    local h = newHarness()
+    local selectedIndex = nil
+    _G.KRTMasterItemSelectionFrame = nil
+    _G.KRTMasterItemSelectionBtn1 = nil
+    _G.KRTMasterItemSelectionBtn2 = nil
+    local linkOne = h.registerItem(9403, "Late Popup Blade")
+    local linkTwo = h.registerItem(9404, "Late Popup Axe")
+    local items = {
+        [1] = { itemLink = linkOne, itemName = "Late Popup Blade", itemTexture = "IconOne", count = 1 },
+        [2] = { itemLink = linkTwo, itemName = "Late Popup Axe", itemTexture = "IconTwo", count = 1 },
+    }
+
+    h.addon.Services.Loot = {
+        FetchLoot = function()
+            h.feature.lootState.lootCount = 2
+            h.feature.lootState.currentItemIndex = 1
+        end,
+        GetItem = function(index)
+            return items[index]
+        end,
+        GetItemName = function(index)
+            return items[index] and items[index].itemName or nil
+        end,
+        GetItemTexture = function(index)
+            return items[index] and items[index].itemTexture or nil
+        end,
+        GetCurrentItemCount = function()
+            return 1
+        end,
+        SelectItem = function(_, index)
+            selectedIndex = index
+        end,
+        ItemExists = function(_, index)
+            return items[index] ~= nil
+        end,
+    }
+    h.addon.Services.Raid = {
+        IsMasterLooter = function()
+            return true
+        end,
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    _G.UnitName = function(unit)
+        if unit == "target" then
+            return "Loot Target"
+        end
+        return unit
+    end
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.UI = h.addon.UI
+    loadMasterController(h)
+
+    local Master = h.addon.Controllers.Master
+    Master.RequestRefresh = function() end
+    Master:LOOT_OPENED()
+
+    local frame = h.makeFrame(true, "KRTMaster")
+    installMasterFrameParts(h, frame)
+    loadMasterFrameForTest(Master, frame)
+    Master.EnsureUI = function()
+        return frame
+    end
+
+    Master._Private.BtnSelectItem(h.makeFrame(true, "ItemSelectInvoker"))
+
+    local firstButton = _G.KRTMasterItemSelectionBtn1
+    local secondButton = _G.KRTMasterItemSelectionBtn2
+
+    assertTrue(firstButton ~= nil, "expected Select Item to build the first popup button on demand")
+    assertTrue(secondButton ~= nil, "expected Select Item to build the second popup button on demand")
+    assertTrue(type(firstButton.OnClick) == "function", "expected the on-demand selection button to keep its click handler")
+
+    firstButton:OnClick("LeftButton")
+
+    assertEqual(selectedIndex, 1, "expected on-demand selection popup button to pick the corresponding loot index")
+end)
+
 test("master workflow model exposes compact session winners", function()
     local h = newHarness()
 
@@ -20007,6 +20122,7 @@ test("reserves whisper softres replies with player reserves for authorized holde
     h.addon.Services.Reserves:Load()
 
     local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+softres", "Alice")
+    flushHarnessTimers(h)
 
     assertTrue(handled == true, "expected +softres command to be recognized")
     assertTrue(#sent >= 3, "expected header and reserve lines")
@@ -20019,6 +20135,58 @@ test("reserves whisper softres replies with player reserves for authorized holde
     assertTextNotContains(sent[3].msg, "P+4", "expected plus value to be omitted in multi-mode reply")
     for i = 1, #sent do
         assertTrue(string.len(sent[i].msg) <= 255, "expected whisper line to stay chat-safe")
+    end
+end)
+
+test("reserves whisper softres throttles burst reserve list requests", function()
+    local h = newHarness()
+    local sent = {}
+    local burstCount = 40
+    _G.KRT_Reserves = {}
+    for i = 1, burstCount do
+        local playerName = string.format("Player%02d", i)
+        _G.KRT_Reserves[playerName] = {
+            reserves = {
+                { rawID = 1001, itemName = "Coldsteel Dagger", quantity = 1 },
+                { rawID = 1002, itemName = "Frost Edge", quantity = 2 },
+            },
+        }
+    end
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h.addon.Events.Wow = { ChatMsgWhisper = "wow.CHAT_MSG_WHISPER" }
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    for i = 1, burstCount do
+        local playerName = string.format("Player%02d", i)
+        h.Bus.TriggerEvent("wow.CHAT_MSG_WHISPER", "+softres", playerName)
+    end
+
+    assertEqual(#sent, 1, "expected burst reserve requests to send only one immediate whisper")
+    assertEqual(sent[1].target, "Player01", "expected first immediate burst reply to target first requester")
+    flushHarnessTimers(h, burstCount * 3)
+
+    assertEqual(#sent, burstCount * 3, "expected every burst reserve request to receive a full reply")
+    for i = 1, burstCount do
+        local playerName = string.format("Player%02d", i)
+        local offset = (i - 1) * 3
+        assertEqual(sent[offset + 1].target, playerName, "expected burst reply header to target requester")
+        assertEqual(sent[offset + 1].msg, "Your SoftRes reserves:", "expected burst reply header")
+        assertEqual(sent[offset + 2].target, playerName, "expected first burst reserve line to target requester")
+        assertTextContains(sent[offset + 2].msg, "Coldsteel Dagger", "expected first burst reserve item")
+        assertEqual(sent[offset + 3].target, playerName, "expected second burst reserve line to target requester")
+        assertTextContains(sent[offset + 3].msg, "Frost Edge", "expected second burst reserve item")
+    end
+    for i = 1, #sent do
+        assertTrue(string.len(sent[i].msg) <= 255, "expected burst reserve reply line to stay chat-safe")
     end
 end)
 
@@ -20046,6 +20214,7 @@ test("reserves whisper softres replies with plus suffix in plus mode", function(
     h.addon.Services.Reserves:Load()
 
     local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("+sr", "Alice")
+    flushHarnessTimers(h)
 
     assertTrue(handled == true, "expected +sr command to be recognized")
     assertTrue(#sent >= 2, "expected header and reserve line")
@@ -20079,6 +20248,7 @@ test("reserves whisper softres accepts advertised aliases", function()
     for i = 1, #aliases do
         sent = {}
         local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply(aliases[i], "Alice")
+        flushHarnessTimers(h)
         assertTrue(handled == true, "expected SoftRes whisper alias to be recognized")
         assertTrue(#sent >= 2, "expected alias to send reserve reply")
         assertTrue(string.find(sent[2].msg, "Coldsteel Dagger", 1, true) ~= nil, "expected reserve item in alias reply")
@@ -20086,6 +20256,7 @@ test("reserves whisper softres accepts advertised aliases", function()
 
     sent = {}
     h.Bus.TriggerEvent("wow.CHAT_MSG_WHISPER", "+sr", "Alice")
+    flushHarnessTimers(h)
     assertTrue(#sent >= 2, "expected whisper bus event to route to the reserve reply handler")
 
     local legacyAliases = { "!sr", "!softres", "sr", "softres", "krt sr", "krt softres" }
@@ -20143,6 +20314,57 @@ test("reserves whisper softres adds an item reserve and replies with success", f
     assertEqual(_G.KRT_Reserves.Alice.reserves[1].rawID, 39717, "expected added reserve to persist")
     assertEqual(_G.KRT_Reserves.Alice.reserves[1].source, "Deathbringer Saurfang", "expected persisted source to avoid whisper grouping")
     assertEqual(changed[1], "whisper-reserve", "expected reserve views to refresh after whisper add")
+end)
+
+test("reserves whisper softres throttles burst item add whispers", function()
+    local h = newHarness()
+    local sent = {}
+    local changed = {}
+    local burstCount = 40
+    local itemLink = h.registerItem(39717, "Inexorable Sabatons", 4, "Icon39717")
+    _G.KRT_Reserves = {}
+    setHarnessOption(h, "Reserves", "softResWhisperAdds", true, { softResWhisperAdds = true })
+    h.addon.Comms.SendWhisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h.addon.Events.Wow = { ChatMsgWhisper = "wow.CHAT_MSG_WHISPER" }
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+    h.Bus.RegisterCallback(h.addon.Events.Internal.ReservesDataChanged, function(_, reason)
+        changed[#changed + 1] = reason
+    end)
+
+    for i = 1, burstCount do
+        local playerName = string.format("Player%02d", i)
+        h.Bus.TriggerEvent("wow.CHAT_MSG_WHISPER", "+sr " .. itemLink, playerName)
+    end
+
+    local players, entries = h.addon.Services.Reserves:GetCounts()
+    assertEqual(players, burstCount, "expected every burst add sender to be persisted")
+    assertEqual(entries, burstCount, "expected every burst add whisper to create a reserve entry")
+    assertEqual(#sent, 1, "expected burst add whispers to send only one immediate confirmation")
+    assertEqual(sent[1].target, "Player01", "expected first immediate burst confirmation to target first requester")
+    flushHarnessTimers(h, burstCount)
+
+    assertEqual(#sent, burstCount, "expected one confirmation per burst add whisper")
+    assertEqual(#changed, burstCount, "expected every burst add whisper to refresh reserve views")
+    for i = 1, burstCount do
+        local playerName = string.format("Player%02d", i)
+        local entriesForPlayer = h.addon.Services.Reserves:GetPlayerReserveEntries(playerName)
+        assertEqual(#entriesForPlayer, 1, "expected persisted reserve for burst sender")
+        assertEqual(entriesForPlayer[1].rawID, 39717, "expected burst sender reserve item id")
+        assertEqual(sent[i].target, playerName, "expected burst add confirmation to target requester")
+        assertEqual(sent[i].msg, "Your " .. itemLink .. " reserve is added!", "expected burst add confirmation text")
+        assertEqual(changed[i], "whisper-reserve", "expected burst add refresh reason")
+    end
+    for i = 1, #sent do
+        assertTrue(string.len(sent[i].msg) <= 255, "expected burst add confirmation to stay chat-safe")
+    end
 end)
 
 test("reserves whisper softres stores shared source for ambiguous item reserves", function()

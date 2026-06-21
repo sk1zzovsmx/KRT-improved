@@ -40,9 +40,60 @@ local REQUESTS = {
     ["+sr"] = true,
     ["+softres"] = true,
 }
+local WHISPER_THROTTLE_SECONDS = 1
 
 -- ----- Private helpers ----- --
 local trimText = Strings.TrimText
+local whisperQueue = {}
+local whisperQueueHead = 1
+local whisperQueueTail = 0
+local whisperThrottleHandle = nil
+local processWhisperQueue
+
+local function hasQueuedWhispers()
+    return whisperQueueHead <= whisperQueueTail
+end
+
+local function pushQueuedWhisper(target, text)
+    whisperQueueTail = whisperQueueTail + 1
+    whisperQueue[whisperQueueTail] = {
+        target = target,
+        text = text,
+    }
+end
+
+local function popQueuedWhisper()
+    if not hasQueuedWhispers() then
+        return nil
+    end
+
+    local item = whisperQueue[whisperQueueHead]
+    whisperQueue[whisperQueueHead] = nil
+    whisperQueueHead = whisperQueueHead + 1
+    if whisperQueueHead > whisperQueueTail then
+        whisperQueueHead = 1
+        whisperQueueTail = 0
+    end
+    return item
+end
+
+local function sendWhisperNow(target, text)
+    if not (Comms and Comms.SendWhisper) then
+        return false
+    end
+    return Comms.SendWhisper(target, text)
+end
+
+local function scheduleWhisperThrottle()
+    if whisperThrottleHandle ~= nil then
+        return
+    end
+    if not (module.ScheduleTimer and processWhisperQueue) then
+        return
+    end
+
+    whisperThrottleHandle = module:ScheduleTimer(processWhisperQueue, WHISPER_THROTTLE_SECONDS)
+end
 
 local function parseRequest(text)
     local raw = trimText(text or "")
@@ -125,11 +176,29 @@ local function buildItemText(entry)
     return buildFallbackItemText(entry) .. suffix
 end
 
+processWhisperQueue = function()
+    whisperThrottleHandle = nil
+    local item = popQueuedWhisper()
+    if not item then
+        return
+    end
+
+    sendWhisperNow(item.target, item.text)
+    scheduleWhisperThrottle()
+end
+
 local function sendWhisper(target, text)
     if not (Comms and Comms.SendWhisper) then
         return false
     end
-    return Comms.SendWhisper(target, text)
+    if whisperThrottleHandle ~= nil then
+        pushQueuedWhisper(target, text)
+        return true
+    end
+
+    local ok = sendWhisperNow(target, text)
+    scheduleWhisperThrottle()
+    return ok
 end
 
 local function sendReserveMessages(target, entries)

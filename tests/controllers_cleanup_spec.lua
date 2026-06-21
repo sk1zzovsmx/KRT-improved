@@ -46,6 +46,8 @@ assertNotContains(master, "module.PrepareDropDowns = prepareDropDowns", "Master 
 assertNotContains(master, "addon.options", "Master option reads must go through Options namespace helpers")
 assertNotContains(master, "addon.Database.GetCurrentRaid", "Master current raid lookups must use the local Database dependency")
 assertContains(master, "local UI = feature.UI", "Master must localize UI root from feature shared")
+assertContains(master, 'Popups.Show("KRT_MASTER_LOOT_GRID_CONFIRM"', "Master manual grid confirm path should use shared popup helper")
+assertNotContains(master, 'StaticPopup_Show("KRT_MASTER_LOOT_GRID_CONFIRM"', "Master manual grid confirm path should not call StaticPopup_Show directly")
 assertNotContains(master, "local UIFacade = addon.UI", "Master must not read UI facade from addon root")
 assertNotContains(master, "addon.UIPrimitives or UIPrimitives", "Master must use the UI.Primitives dependency")
 assertContains(master, "local GetOption = Options.GetValue", "Master must centralize namespace option reads")

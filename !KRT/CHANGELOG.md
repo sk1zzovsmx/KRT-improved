@@ -18,6 +18,9 @@ Release-Version: 0.8.0-beta.1
 
 ### Fixes
 
+- **Loot Master roll announcements** - Added missing localized multi-item roll
+  announcement templates so roll messages no longer print localization keys
+  such as `ChatRollMSMultipleHigh`.
 - **Reserve List item headers** - Aligned grouped item headers with Loot Master
   and Loot History sizing, using compact item icons and shared small text.
 - **Reserve List player colors** - Normalized reserve player class tokens in
@@ -51,6 +54,8 @@ Release-Version: 0.8.0-beta.1
   staying non-clickable after countdown completion or interruption by isolating
   displayed roll-list row data from shared list-controller recycling and
   redrawing the list when winner selection becomes available.
+- **Loot Master item selection** - Fixed Select Item doing nothing when loot was
+  opened before the Loot Master selection popup had been created.
 - **Group Loot inventory trades** - Loot Master inventory-item roll and trade
   actions now use a separate inventory-trade permission, so raid leaders,
   assistants, and the active Master Looter can trade already-held items while
@@ -152,6 +157,9 @@ Release-Version: 0.8.0-beta.1
 - **Logger XML/Lua ownership follow-up** - Restored pushed button texture,
   fixed Logger/selectable draw layers, moved UI XML loading into the TOC, and
   removed the retired `KRT.xml` include manifest.
+- **SoftRes whisper throttle** - Queued opt-in SoftRes whisper replies and
+  item-add confirmations so burst requests drain one whisper at a time instead
+  of flooding the server chat throttle.
 
 ## [0.8.0-beta.1] - 2026-06-05
 

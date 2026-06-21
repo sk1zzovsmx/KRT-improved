@@ -1990,8 +1990,11 @@ do
             if lootState.opened == true then
                 Loot:FetchLoot()
             end
-        elseif module._selectionFrame then
-            Primitives.Toggle(module._selectionFrame)
+        else
+            updateSelectionFrame()
+            if module._selectionFrame then
+                Primitives.Toggle(module._selectionFrame)
+            end
         end
         module:RequestRefresh()
     end
@@ -2870,11 +2873,8 @@ do
             playerName = playerName,
         }
         popup._krtData = data
-        if type(StaticPopup_Show) == "function" then
-            local dialog = StaticPopup_Show("KRT_MASTER_LOOT_GRID_CONFIRM", data.itemText, playerName, data)
-            if dialog then
-                dialog.data = data
-            end
+        if Popups and Popups.Show then
+            Popups.Show("KRT_MASTER_LOOT_GRID_CONFIRM", data.itemText, playerName, data)
         end
         return true
     end
