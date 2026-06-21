@@ -5,6 +5,21 @@ KRT ships a repo-local MCP server for addon and skill workflows.
 The server is intentionally thin: it wraps existing repo scripts so humans and agents
 share one execution path.
 
+## Project Registration
+
+The repo registers this server in both:
+
+- `.codex/config.toml`
+  Project-local Codex config used by the structured `55to53` workflow.
+- `.mcp.json`
+  Project MCP manifest alongside other repo-local MCP servers such as `lua-lsp`.
+
+Keep these registrations project-local so agents can use the same repo-specific tooling
+without relying on personal global Codex config.
+
+Mechanic integration remains optional. The structured `55to53` workflow base depends on
+`AGENTS.md`, `.codex/*`, and the KRT MCP registration, not on a local Mechanic install.
+
 ## Start Command
 
 Use the cross-platform Python entrypoint:
@@ -41,8 +56,8 @@ Server implementation: `tools/krt_mcp_server.py`.
 3. Run `skills_verify` before doc/tooling updates.
 4. Run `skills_sync` when vendored snapshots drift.
 5. Run `repo_quality_check` for fast local guardrails.
-6. If Mechanic is required and missing, run `mechanic_bootstrap`.
-7. Use `mechanic_call` for addon-aware checks.
+6. If addon-aware Mechanic flows are needed and Mechanic is missing, run `mechanic_bootstrap`.
+7. Use `mechanic_call` only for checks that specifically need the external Mechanic companion.
 
 ## Shell Equivalents
 

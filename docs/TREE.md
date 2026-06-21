@@ -203,6 +203,11 @@
 |           |   \\-- ...
 |           |-- LICENSE
 |           \\-- SKILL.md
+|-- .codex
+|   |-- agents
+|   |   |-- code-mapper.toml
+|   |   \\-- spark-implementer.toml
+|   \\-- config.toml
 |-- .githooks
 |   |-- pre-commit
 |   \\-- README.md

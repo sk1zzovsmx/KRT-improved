@@ -28,6 +28,79 @@ Developer docs package:
 
 ---
 
+## Delegated Codex workflow: 55to53
+
+In this project, the delegated `55to53` workflow is the default workflow for every
+non-trivial code change. The user may also refer to it explicitly by name.
+
+### Roles
+
+- The parent agent uses the main project model, normally `gpt-5.5`.
+- The parent agent owns analysis, reasoning, planning, review, and final correction.
+- The exploration subagent is `code-mapper`.
+- The implementation subagent is `spark_implementer`.
+- `code-mapper` is read-only exploration and should map ownership, call paths, branch points,
+  and unknowns before edits when uncertainty is material.
+- `spark_implementer` is implementation-only and should use `gpt-5.3-codex-spark`.
+
+### Required workflow
+
+1. The parent agent analyzes the task.
+2. For non-trivial code changes, the parent agent should use `code-mapper` first when file
+   ownership, execution flow, or branch behavior is not already clear.
+3. Before editing files, the parent agent creates a concise operational plan.
+4. The plan must include:
+   - goal of the change
+   - files or functions likely involved
+   - implementation strategy
+   - risks or regressions to check
+   - tests or checks to run
+5. The parent agent delegates implementation to `spark_implementer`.
+6. `spark_implementer` receives only closed, operational instructions, not the open-ended
+   user request.
+7. `spark_implementer` applies only the parent-approved plan.
+8. `spark_implementer` must keep the diff minimal.
+9. `spark_implementer` must avoid unrelated refactors, broad rewrites, speculative
+   improvements, and architectural changes.
+10. After implementation, the parent agent reviews the final diff.
+11. The parent review must check:
+    - whether the implementation matches the plan
+    - unnecessary changes
+    - regressions
+    - style consistency
+    - public behavior changes
+    - test/check results
+12. If Spark deviates from the plan, introduces regressions, modifies too much, or leaves
+    incomplete work, the parent agent must correct the code directly or delegate a smaller
+    corrective patch to `spark_implementer`.
+13. The task is not complete until the parent agent has reviewed the final code.
+
+### Final response requirements
+
+The final response must include:
+
+- mini plan followed
+- files changed
+- summary of changes
+- tests/checks run
+- remaining risks, if any
+
+### Repo policy
+
+- Keep project-specific Codex workflow files under `.codex/` in the repository.
+- Treat `.codex/config.toml` and `.codex/agents/*` as project infrastructure, not personal
+  machine-local preferences.
+- Do not move this workflow back to a global profile unless the user explicitly requests it.
+
+### User reinforcement phrase
+
+This rule is persistent in the project and should not need to be repeated in every prompt.
+For large, delicate, risky, or multi-file tasks, the user may reinforce it with:
+"Usa il workflow delegato del progetto: 5.5 pianifica, code-mapper mappa,
+spark_implementer applica, 5.5 revisiona e corregge prima di chiudere."
+
+---
+
 ## 2) Hard Constraints (**BINDING**)
 
 - Client/API: Wrath of the Lich King 3.3.5a, Interface 30300, Lua 5.1.

@@ -1,5 +1,10 @@
 {
   "mcpServers": {
+    "krt": {
+      "command": "py",
+      "args": ["-3", "tools/krt.py", "run-krt-mcp"],
+      "cwd": "."
+    },
     "lua-lsp": {
       "command": "mcp-language-server",
       "args": ["--workspace", ".", "--lsp", "lua-language-server"],

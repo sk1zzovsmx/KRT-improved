@@ -1,6 +1,23 @@
 # Agent Skills
 
 This repository keeps repo-local AI skills under `.agents/skills`.
+Project-local Codex workflow configuration lives under `.codex/`.
+
+## Project Workflow Base
+
+The current structured Codex workflow for KRT is split across:
+
+- `AGENTS.md`
+  Persistent project policy, workflow rules, and review expectations.
+- `.codex/config.toml`
+  Project-local parent model settings and MCP registration.
+- `.codex/agents/code-mapper.toml`
+  Read-only exploration subagent for ownership, call-path, and branch-point mapping.
+- `.codex/agents/spark-implementer.toml`
+  Implementation-only subagent for parent-approved minimal diffs.
+
+Treat these `.codex/*` files as project infrastructure, not personal machine-local preferences.
+This project workflow base does not require Mechanic to be installed locally.
 
 ## Active Skill
 
