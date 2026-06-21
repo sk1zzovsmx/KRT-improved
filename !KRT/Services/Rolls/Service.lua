@@ -147,6 +147,12 @@ do
     end
 
     -- ----- Private helpers ----- --
+    local function logRollRecordState(value)
+        if IsDebugEnabled() then
+            addon:debug(Diag.D.LogRollsRecordState:format(tostring(value)))
+        end
+    end
+
     -- ============================================================================
     -- Session helpers
     -- ============================================================================
@@ -296,32 +302,14 @@ do
     -- Eligibility helpers
     -- ============================================================================
     local historyContext
-    getCurrentRollItemID = function()
-        local session = getRollSession()
-        local sessionItemId = session and tonumber(session.itemId) or nil
-        if sessionItemId and sessionItemId > 0 then
-            if IsDebugEnabled() then
-                addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(sessionItemId)))
-            end
-            return sessionItemId
-        end
-
-        local index = GetItemIndex()
-        local item = GetItem and GetItem(index)
-        local itemLink = item and item.itemLink
-        if not itemLink then
-            return nil
-        end
-        local itemId = Item.GetItemIdFromLink(itemLink)
-        if itemId and session then
-            session.itemId = itemId
-            session.itemLink = itemLink
-            session.itemKey = Item.GetItemStringFromLink(itemLink) or itemLink
-        end
+    local function logCurrentRollItemId(itemId)
         if IsDebugEnabled() then
             addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
         end
-        return itemId
+    end
+
+    getCurrentRollItemID = function()
+        return Sessions.GetCurrentRollItemId(getSessionsContext(), logCurrentRollItemId)
     end
 
     local function getHistoryContext()
@@ -522,6 +510,65 @@ do
         state.record = false
     end
 
+    local function beginRollIntake()
+        state.canRoll = true
+        state.record = true
+        lootState.rollStarted = true
+        ensureAdHocRollSession()
+        ensureResponseSession()
+        state.warned = false
+        state.countdownExpired = false
+
+        if state.count == 0 then
+            lootState.winner = nil
+            lootState.rollWinner = nil
+        end
+
+        updateSessionRollWindow(true)
+    end
+
+    local function finishRollIntake()
+        state.canRoll = false
+        state.record = false
+
+        local context = getCurrentRollContext()
+        prepareResponseState(context)
+        finalizeMaterializedResponses(context.itemId, context.itemLink, context.rollType)
+        updateSessionRollWindow(false)
+    end
+
+    local function resetForTieReroll(session, reroll, itemId, itemLink, currentRollType)
+        clearRollEntries()
+        clearResponseState({
+            preserveManualExclusions = true,
+            preserveTieReroll = true,
+        })
+        state.sessionId = tostring(session.id)
+        state.rolled = false
+        state.warned = false
+        state.record = true
+        state.canRoll = true
+        state.countdownExpired = false
+
+        lootState.winner = nil
+        lootState.rollWinner = nil
+        lootState.rollsCount = 0
+        lootState.itemTraded = 0
+        lootState.rollStarted = true
+
+        session.active = true
+        session.endsAt = nil
+        updateSessionRollWindow(true)
+        prepareResponseState({
+            itemId = itemId,
+            itemLink = itemLink,
+            rollType = currentRollType,
+        }, {
+            seedReserved = false,
+            seedTieReroll = true,
+        })
+    end
+
     -- ----- Public methods ----- --
     function module:Roll(_btn)
         local itemId = getCurrentRollItemID()
@@ -558,33 +605,14 @@ do
 
     function module:SetRollRecordingEnabled(bool)
         local on = (bool == true)
-        state.canRoll = on
-        state.record = on
 
         if on then
-            -- Starting intake always reopens the roll-started UI state, even when
-            -- the session was materialized earlier by the service bootstrap.
-            lootState.rollStarted = true
-            ensureAdHocRollSession()
-            ensureResponseSession()
-            state.warned = false
-            state.countdownExpired = false
-
-            -- Reset only if we are starting a clean session
-            if state.count == 0 then
-                lootState.winner = nil
-                lootState.rollWinner = nil
-            end
+            beginRollIntake()
         else
-            local context = getCurrentRollContext()
-            prepareResponseState(context)
-            finalizeMaterializedResponses(context.itemId, context.itemLink, context.rollType)
+            finishRollIntake()
         end
-        updateSessionRollWindow(on)
 
-        if IsDebugEnabled() then
-            addon:debug(Diag.D.LogRollsRecordState:format(tostring(bool)))
-        end
+        logRollRecordState(bool)
     end
 
     function module:CHAT_MSG_SYSTEM(msg)
@@ -684,41 +712,20 @@ do
         currentRollType = getActiveRollType()
         reroll.sourceRollType = currentRollType
 
-        clearRollEntries()
-        clearResponseState({
-            preserveManualExclusions = true,
-            preserveTieReroll = true,
-        })
-        state.sessionId = tostring(session.id)
-        state.rolled = false
-        state.warned = false
-        state.record = true
-        state.canRoll = true
-        state.countdownExpired = false
-
-        lootState.winner = nil
-        lootState.rollWinner = nil
-        lootState.rollsCount = 0
-        lootState.itemTraded = 0
-        lootState.rollStarted = true
-
-        session.active = true
-        session.endsAt = nil
-        updateSessionRollWindow(true)
-        prepareResponseState({
-            itemId = itemId,
-            itemLink = itemLink,
-            rollType = currentRollType,
-        }, {
-            seedReserved = false,
-            seedTieReroll = true,
-        })
+        resetForTieReroll(session, reroll, itemId, itemLink, currentRollType)
 
         if IsDebugEnabled() then
             addon:debug(Diag.D.LogRollsTieReroll:format(tostring(itemLink), tconcat(reroll.ordered, ",")))
         end
         module:GetDisplayModel()
         return true, reroll.ordered
+    end
+
+    local function finalizeRollSession()
+        finishRollIntake()
+        logRollRecordState(false)
+        Countdown.Stop(state)
+        Display.BuildModel(getDisplayContext())
     end
 
     function module:ValidateWinner(playerName, itemLink, rollType)
@@ -777,9 +784,7 @@ do
     end
 
     function module:FinalizeRollSession()
-        module:SetRollRecordingEnabled(false)
-        module:StopCountdown()
-        module:GetDisplayModel()
+        finalizeRollSession()
     end
 end
 

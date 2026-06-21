@@ -1075,24 +1075,24 @@ do
     end
 
     local function requestCoalescedUiRefresh(reason)
-        if module._uiRefreshHandle then
+        if module._refreshHandle then
             if reason ~= nil then
-                module._uiRefreshReason = reason
+                module._refreshReason = reason
             end
             return
         end
 
-        module._uiRefreshReason = reason
-        module._uiRefreshHandle = module:ScheduleTimer(function()
-            local refreshReason = module._uiRefreshReason
-            module._uiRefreshHandle = nil
-            module._uiRefreshReason = nil
+        module._refreshReason = reason
+        module._refreshHandle = module:ScheduleTimer(function()
+            local refreshReason = module._refreshReason
+            module._refreshHandle = nil
+            module._refreshReason = nil
             module:RequestRefresh(refreshReason)
         end, 0)
 
-        if not module._uiRefreshHandle then
-            local refreshReason = module._uiRefreshReason
-            module._uiRefreshReason = nil
+        if not module._refreshHandle then
+            local refreshReason = module._refreshReason
+            module._refreshReason = nil
             module:RequestRefresh(refreshReason)
         end
     end

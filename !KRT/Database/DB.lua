@@ -136,6 +136,14 @@ function Database.GetRaidQueries()
     return getManagerStore("GetRaidQueries")
 end
 
+function Database.GetRaidQueriesOrNil()
+    if type(Database.GetRaidQueries) ~= "function" then
+        return nil
+    end
+
+    return Database.GetRaidQueries()
+end
+
 function Database.GetRaidMigrations()
     return getManagerStore("GetRaidMigrations")
 end

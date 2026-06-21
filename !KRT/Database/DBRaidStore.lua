@@ -28,6 +28,21 @@ do
         _bossIdxByNid = true,
         _lootIdxByNid = true,
     }
+    local RUNTIME_INDEX_MAP_KEYS = {
+        "playersByName",
+        "playerByNid",
+        "playerNidByName",
+        "playerIdxByNid",
+        "bossIdxByNid",
+        "bossByNid",
+        "bossPlayerSetByBossNid",
+        "lootIdxByNid",
+        "lootByNid",
+        "lootIdxByBossNid",
+        "lootIdxByLooterNid",
+        "attendanceIdxByPlayerNid",
+        "attendanceByPlayerNid",
+    }
 
     local storeState = coreState.raidStore
     if type(storeState) ~= "table" then
@@ -110,20 +125,15 @@ do
     end
 
     local function isRuntimeIndexReady(runtime)
-        return type(runtime) == "table"
-            and type(runtime.playersByName) == "table"
-            and type(runtime.playerByNid) == "table"
-            and type(runtime.playerNidByName) == "table"
-            and type(runtime.playerIdxByNid) == "table"
-            and type(runtime.bossIdxByNid) == "table"
-            and type(runtime.bossByNid) == "table"
-            and type(runtime.bossPlayerSetByBossNid) == "table"
-            and type(runtime.lootIdxByNid) == "table"
-            and type(runtime.lootByNid) == "table"
-            and type(runtime.lootIdxByBossNid) == "table"
-            and type(runtime.lootIdxByLooterNid) == "table"
-            and type(runtime.attendanceIdxByPlayerNid) == "table"
-            and type(runtime.attendanceByPlayerNid) == "table"
+        if type(runtime) ~= "table" then
+            return false
+        end
+        for i = 1, #RUNTIME_INDEX_MAP_KEYS do
+            if not (type(runtime[RUNTIME_INDEX_MAP_KEYS[i]]) == "table") then
+                return false
+            end
+        end
+        return true
     end
 
     local function ensureRuntimeTable(raid)
@@ -139,6 +149,15 @@ do
         local map = clearMap(runtime[key])
         runtime[key] = map
         return map
+    end
+
+    local function acquireRuntimeIndexMaps(runtime)
+        local maps = {}
+        for i = 1, #RUNTIME_INDEX_MAP_KEYS do
+            local key = RUNTIME_INDEX_MAP_KEYS[i]
+            maps[key] = acquireRuntimeIndexMap(runtime, key)
+        end
+        return maps
     end
 
     local function appendRuntimeIndexList(indexMap, key, value)
@@ -173,6 +192,59 @@ do
         end
     end
 
+    local function indexLootRuntimeRow(runtime, loot, index, replaceExisting)
+        if type(runtime) ~= "table" or type(loot) ~= "table" then
+            return false
+        end
+        local resolvedIndex = tonumber(index)
+        if type(resolvedIndex) ~= "number" or resolvedIndex <= 0 then
+            return false
+        end
+        local lootNid = tonumber(loot.lootNid)
+        if not lootNid then
+            return false
+        end
+
+        runtime.lootIdxByNid[lootNid] = resolvedIndex
+        runtime.lootByNid[lootNid] = loot
+
+        if replaceExisting then
+            removeRuntimeIndexListValue(runtime.lootIdxByBossNid, resolvedIndex)
+            removeRuntimeIndexListValue(runtime.lootIdxByLooterNid, resolvedIndex)
+        end
+
+        local bossNid = tonumber(loot.bossNid)
+        if bossNid and bossNid > 0 then
+            appendRuntimeIndexList(runtime.lootIdxByBossNid, bossNid, resolvedIndex)
+        end
+
+        local looterNid = tonumber(loot.looterNid)
+        if looterNid and looterNid > 0 then
+            appendRuntimeIndexList(runtime.lootIdxByLooterNid, looterNid, resolvedIndex)
+        end
+
+        return true
+    end
+
+    local function normalizeRuntimeState(raid)
+        if type(raid) ~= "table" then
+            return
+        end
+
+        removeRootRuntimeCaches(raid)
+        if type(raid._runtime) ~= "table" then
+            raid._runtime = nil
+        end
+    end
+
+    local function stripRuntimeState(raid)
+        if type(raid) ~= "table" then
+            return
+        end
+        removeRootRuntimeCaches(raid)
+        raid._runtime = nil
+    end
+
     local function buildRuntimeSignature(raid, players, bosses, lootRows, attendance)
         return tostring(#players)
             .. "|"
@@ -187,6 +259,20 @@ do
             .. tostring(tonumber(raid.nextBossNid) or 1)
             .. "|"
             .. tostring(tonumber(raid.nextLootNid) or 1)
+    end
+
+    local function getRuntimeCollections(raid)
+        return raid.players or {}, raid.bossKills or {}, raid.loot or {}, raid.attendance or {}
+    end
+
+    local function buildRaidRuntimeSignature(raid)
+        local players, bosses, lootRows, attendance = getRuntimeCollections(raid)
+        return buildRuntimeSignature(raid, players, bosses, lootRows, attendance)
+    end
+
+    local function refreshRuntimeSignature(raid, runtime)
+        runtime.signature = buildRaidRuntimeSignature(raid)
+        return runtime.signature
     end
 
     local function appendNormalizedAttendanceSegment(entry, segment)
@@ -355,56 +441,41 @@ do
         end
 
         local runtime = ensureRuntimeTable(raid)
-        local playersByName = acquireRuntimeIndexMap(runtime, "playersByName")
-        local playerByNid = acquireRuntimeIndexMap(runtime, "playerByNid")
-        local playerNidByName = acquireRuntimeIndexMap(runtime, "playerNidByName")
-        local playerIdxByNid = acquireRuntimeIndexMap(runtime, "playerIdxByNid")
-        local bossIdxByNid = acquireRuntimeIndexMap(runtime, "bossIdxByNid")
-        local bossByNid = acquireRuntimeIndexMap(runtime, "bossByNid")
-        local bossPlayerSetByBossNid = acquireRuntimeIndexMap(runtime, "bossPlayerSetByBossNid")
-        local lootIdxByNid = acquireRuntimeIndexMap(runtime, "lootIdxByNid")
-        local lootByNid = acquireRuntimeIndexMap(runtime, "lootByNid")
-        local lootIdxByBossNid = acquireRuntimeIndexMap(runtime, "lootIdxByBossNid")
-        local lootIdxByLooterNid = acquireRuntimeIndexMap(runtime, "lootIdxByLooterNid")
-        local attendanceIdxByPlayerNid = acquireRuntimeIndexMap(runtime, "attendanceIdxByPlayerNid")
-        local attendanceByPlayerNid = acquireRuntimeIndexMap(runtime, "attendanceByPlayerNid")
-
-        local players = raid.players or {}
+        local maps = acquireRuntimeIndexMaps(runtime)
+        local players, bosses, lootRows, attendance = getRuntimeCollections(raid)
         for i = 1, #players do
             local player = players[i]
             if type(player) == "table" then
                 if player.name then
-                    playersByName[player.name] = player
+                    maps.playersByName[player.name] = player
                 end
                 local playerNid = tonumber(player.playerNid)
                 if playerNid then
-                    playerByNid[playerNid] = player
+                    maps.playerByNid[playerNid] = player
                     if player.name then
-                        playerNidByName[player.name] = playerNid
+                        maps.playerNidByName[player.name] = playerNid
                     end
-                    playerIdxByNid[playerNid] = i
+                    maps.playerIdxByNid[playerNid] = i
                 end
             end
         end
 
-        local attendance = raid.attendance or {}
         for i = 1, #attendance do
             local entry = attendance[i]
             local playerNid = type(entry) == "table" and tonumber(entry.playerNid) or nil
             if playerNid then
-                attendanceIdxByPlayerNid[playerNid] = i
-                attendanceByPlayerNid[playerNid] = entry
+                maps.attendanceIdxByPlayerNid[playerNid] = i
+                maps.attendanceByPlayerNid[playerNid] = entry
             end
         end
 
-        local bosses = raid.bossKills or {}
         for i = 1, #bosses do
             local boss = bosses[i]
             if type(boss) == "table" then
                 local bossNid = tonumber(boss.bossNid)
                 if bossNid then
-                    bossIdxByNid[bossNid] = i
-                    bossByNid[bossNid] = boss
+                    maps.bossIdxByNid[bossNid] = i
+                    maps.bossByNid[bossNid] = boss
                     local attendeeSet = {}
                     local attendees = boss.players
                     if type(attendees) == "table" then
@@ -415,32 +486,16 @@ do
                             end
                         end
                     end
-                    bossPlayerSetByBossNid[bossNid] = attendeeSet
+                    maps.bossPlayerSetByBossNid[bossNid] = attendeeSet
                 end
             end
         end
 
-        local lootRows = raid.loot or {}
         for i = 1, #lootRows do
-            local loot = lootRows[i]
-            if type(loot) == "table" then
-                local lootNid = tonumber(loot.lootNid)
-                if lootNid then
-                    lootIdxByNid[lootNid] = i
-                    lootByNid[lootNid] = loot
-                end
-                local bossNid = tonumber(loot.bossNid)
-                if bossNid and bossNid > 0 then
-                    appendRuntimeIndexList(lootIdxByBossNid, bossNid, i)
-                end
-                local looterNid = tonumber(loot.looterNid)
-                if looterNid and looterNid > 0 then
-                    appendRuntimeIndexList(lootIdxByLooterNid, looterNid, i)
-                end
-            end
+            indexLootRuntimeRow(runtime, lootRows[i], i, false)
         end
 
-        runtime.signature = buildRuntimeSignature(raid, players, bosses, lootRows, attendance)
+        refreshRuntimeSignature(raid, runtime)
 
         return runtime
     end
@@ -661,10 +716,7 @@ do
         raid.nextLootNid = getNextLootNid()
         raid.raidNid = tonumber(raid.raidNid)
 
-        if type(raid._runtime) ~= "table" then
-            raid._runtime = nil
-        end
-        removeRootRuntimeCaches(raid)
+        normalizeRuntimeState(raid)
         return raid
     end
 
@@ -675,11 +727,7 @@ do
         end
 
         local runtime = raid._runtime
-        local players = raid.players or {}
-        local bosses = raid.bossKills or {}
-        local lootRows = raid.loot or {}
-        local attendance = raid.attendance or {}
-        local signature = buildRuntimeSignature(raid, players, bosses, lootRows, attendance)
+        local signature = buildRaidRuntimeSignature(raid)
         if isRuntimeIndexReady(runtime) and runtime.signature == signature then
             return runtime
         end
@@ -705,19 +753,10 @@ do
             return nil
         end
 
-        runtime.lootIdxByNid[lootNid] = resolvedIndex
-        runtime.lootByNid[lootNid] = row
-        removeRuntimeIndexListValue(runtime.lootIdxByBossNid, resolvedIndex)
-        removeRuntimeIndexListValue(runtime.lootIdxByLooterNid, resolvedIndex)
-        local bossNid = tonumber(row.bossNid)
-        if bossNid and bossNid > 0 then
-            appendRuntimeIndexList(runtime.lootIdxByBossNid, bossNid, resolvedIndex)
+        if not indexLootRuntimeRow(runtime, row, resolvedIndex, true) then
+            return nil
         end
-        local looterNid = tonumber(row.looterNid)
-        if looterNid and looterNid > 0 then
-            appendRuntimeIndexList(runtime.lootIdxByLooterNid, looterNid, resolvedIndex)
-        end
-        runtime.signature = buildRuntimeSignature(raid, raid.players or {}, raid.bossKills or {}, lootRows, raid.attendance or {})
+        refreshRuntimeSignature(raid, runtime)
         return runtime
     end
 
@@ -725,8 +764,7 @@ do
         if type(raid) ~= "table" then
             return
         end
-        removeRootRuntimeCaches(raid)
-        raid._runtime = nil
+        stripRuntimeState(raid)
     end
 
     function module:StripAllRuntime()

@@ -37,10 +37,14 @@ local function isWidgetAvailable(widgetId)
 end
 
 local function callWidgetMethod(widgetId, methodName, ...)
-    if not (UIWidgets.IsEnabled(widgetId) and UIWidgets.IsRegistered(widgetId)) then
+    if not isWidgetAvailable(widgetId) then
         return nil
     end
     return UIWidgets.Call(widgetId, methodName, ...)
+end
+
+local function callControllerMethod(controllerName, methodName, ...)
+    return Database.RequestControllerMethod(controllerName, methodName, ...)
 end
 
 local function toggleLootCounterWidget()
@@ -100,7 +104,7 @@ local function buildMenu()
             notCheckable = 1,
             disabled = disableLootActions,
             func = function()
-                Database.RequestControllerMethod("Master", "Toggle")
+                callControllerMethod("Master", "Toggle")
             end,
         },
         {
@@ -127,7 +131,7 @@ local function buildMenu()
             text = L.StrLootHistory,
             notCheckable = 1,
             func = function()
-                Database.RequestControllerMethod("Logger", "ToggleLootHistory")
+                callControllerMethod("Logger", "ToggleLootHistory")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -135,7 +139,7 @@ local function buildMenu()
             text = L.StrRaidAttendance,
             notCheckable = 1,
             func = function()
-                Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")
+                callControllerMethod("Logger", "ToggleRaidAttendance")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -143,7 +147,7 @@ local function buildMenu()
             text = RAID_WARNING,
             notCheckable = 1,
             func = function()
-                Database.RequestControllerMethod("Warnings", "Toggle")
+                callControllerMethod("Warnings", "Toggle")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -151,7 +155,7 @@ local function buildMenu()
             text = L.StrLFMSpam,
             notCheckable = 1,
             func = function()
-                Database.RequestControllerMethod("Spammer", "Toggle")
+                callControllerMethod("Spammer", "Toggle")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },

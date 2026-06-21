@@ -16,7 +16,6 @@ local type, tostring, tonumber = type, tostring, tonumber
 feature.EnsureServiceNamespace("Logger", "Store")
 local Logger = Services.Logger
 local Store = Logger.Store
-local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
 local bossIdx
 local lootIdx
 local playerIdx
@@ -28,13 +27,6 @@ local resolveLootLooterClass
 local invalidateIndexes
 
 -- ----- Private helpers ----- --
-local function getRaidQueries()
-    if not RaidQueries and Database.GetRaidQueries then
-        RaidQueries = Database.GetRaidQueries()
-    end
-    return RaidQueries
-end
-
 -- ----- Public methods ----- --
 
 resolvePlayerNameByNid = function(raid, playerNid)
@@ -72,7 +64,7 @@ resolveLootLooterNid = function(raid, looter)
 end
 
 resolveLootLooterName = function(raid, loot)
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.ResolveLootLooterName then
         return queries:ResolveLootLooterName(raid, loot)
     end

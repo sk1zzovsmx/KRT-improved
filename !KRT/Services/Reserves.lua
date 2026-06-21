@@ -35,7 +35,6 @@ do
     feature.EnsureServiceNamespace("Reserves")
     local Reserves = Services.Reserves
     local module = Reserves
-    local Service = module
     module._Sync = module._Sync or {}
     local Sync = module._Sync
 
@@ -370,7 +369,7 @@ do
         return players, entries
     end
 
-    function Service:GetCounts(sourceData)
+    function module:GetCounts(sourceData)
         if sourceData ~= nil then
             return countReserves(sourceData)
         end
@@ -518,7 +517,7 @@ do
 
     local function finishApplyImport(parsed, raidId, opts, normalized, perfLabel, perfStart, extraDetails)
         clearDisplayRefreshQueue()
-        local mode = (parsed.mode == "plus" or parsed.mode == "multi") and parsed.mode or Service:GetImportMode()
+        local mode = (parsed.mode == "plus" or parsed.mode == "multi") and parsed.mode or module:GetImportMode()
         copyReservesData(normalized, persistedReservesData)
         copyReservesData(persistedReservesData, reservesData)
         syncedCacheMeta = nil
@@ -625,13 +624,13 @@ do
             resolvePlayerNameDisplay = resolvePlayerNameDisplay,
             getReserveEntryForItem = getReserveEntryForItem,
             getPlusForItem = function(itemId, playerName)
-                return Service:GetPlusForItem(itemId, playerName)
+                return module:GetPlusForItem(itemId, playerName)
             end,
             isPlusSystem = function()
-                return Service:GetImportMode() == "plus"
+                return module:GetImportMode() == "plus"
             end,
             isMultiReserve = function()
-                return Service:GetImportMode() == "multi"
+                return module:GetImportMode() == "multi"
             end,
             getRaidService = function()
                 return Services.Raid
@@ -660,7 +659,7 @@ do
 
     -- ----- Saved Data Management ----- --
 
-    function Service:Save(contextTag)
+    function module:Save(contextTag)
         local canonical = applyRuntimeReservesData(persistedReservesData, contextTag or "save", persistedReservesData)
         if not syncedCacheActive then
             copyReservesData(canonical, reservesData)
@@ -668,7 +667,7 @@ do
         saveCanonicalReservesData(canonical)
     end
 
-    function Service:Load()
+    function module:Load()
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_Reserves ~= nil)))
         end
@@ -686,7 +685,7 @@ do
         rebuildReserveIndexes()
     end
 
-    function Service:ClearSavedReserves()
+    function module:ClearSavedReserves()
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesClearSavedReserves)
         end
@@ -703,15 +702,15 @@ do
         end
     end
 
-    function Service:HasData()
+    function module:HasData()
         return next(reservesData) ~= nil
     end
 
-    function Service:IsLocalDataAvailable()
+    function module:IsLocalDataAvailable()
         return next(persistedReservesData) ~= nil
     end
 
-    function Service:HasItemReserves(itemId)
+    function module:HasItemReserves(itemId)
         if not itemId then
             return false
         end
@@ -740,11 +739,11 @@ do
         return reserve
     end
 
-    function Service:GetNameAliases()
+    function module:GetNameAliases()
         return AliasHelpers.CopyAliasMap(getNameAliasMap())
     end
 
-    function Service:SetNameAlias(reserveName, raidName)
+    function module:SetNameAlias(reserveName, raidName)
         local nextMap = AliasHelpers.CopyAliasMap(getNameAliasMap())
         local ok, reason = AliasHelpers.SetAlias(nextMap, reserveName, raidName)
         if not ok then
@@ -759,7 +758,7 @@ do
         return true
     end
 
-    function Service:RemoveNameAlias(reserveName)
+    function module:RemoveNameAlias(reserveName)
         local nextMap = AliasHelpers.CopyAliasMap(getNameAliasMap())
         local ok, reason = AliasHelpers.ClearAlias(nextMap, reserveName)
         if not ok then
@@ -774,7 +773,7 @@ do
         return true
     end
 
-    function Service:GetPlayerReserveEntries(playerName)
+    function module:GetPlayerReserveEntries(playerName)
         local reserve = getReserve(playerName)
         if type(reserve) ~= "table" or type(reserve.reserves) ~= "table" then
             return {}
@@ -792,7 +791,7 @@ do
 
     -- Parse imported text (SoftRes CSV)
     -- mode: "multi" (multi-reserve enabled; Plus ignored) or "plus" (priority; requires 1 item per player)
-    function Service:GetImportMode()
+    function module:GetImportMode()
         if importMode == nil then
             local inferred
 
@@ -887,15 +886,15 @@ do
         return false
     end
 
-    function Service:SetImportMode(mode, syncOptions)
+    function module:SetImportMode(mode, syncOptions)
         return setImportMode(mode, syncOptions)
     end
 
-    function Service:IsPlusSystem()
+    function module:IsPlusSystem()
         return self:GetImportMode() == "plus"
     end
 
-    function Service:ParseImport(text, mode, opts)
+    function module:ParseImport(text, mode, opts)
         local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local parsed, errCode, errData = importParser.ParseImport(self, text, mode, opts)
         local players, entries = getParsedReserveCounts(parsed)
@@ -918,7 +917,7 @@ do
         return parsed, errCode, errData
     end
 
-    function Service:ApplyImport(parsed, raidId, opts)
+    function module:ApplyImport(parsed, raidId, opts)
         local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         if type(parsed) ~= "table" or type(parsed.reservesData) ~= "table" then
             finishPerf("Reserves.ApplyImport", perfStart, "ok=0 reason=INVALID_PARSED")
@@ -929,7 +928,7 @@ do
         return finishApplyImport(parsed, raidId, opts, normalized, "Reserves.ApplyImport", perfStart)
     end
 
-    function Service:RequestApplyImport(parsed, raidId, callback, opts)
+    function module:RequestApplyImport(parsed, raidId, callback, opts)
         opts = (type(opts) == "table") and opts or {}
         local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         if type(parsed) ~= "table" or type(parsed.reservesData) ~= "table" then
@@ -1035,7 +1034,7 @@ do
     end
 
     -- ----- Item Info Querying ----- --
-    function Service:QueryItemInfo(itemId)
+    function module:QueryItemInfo(itemId)
         local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         if not itemId then
             finishPerf("Reserves.QueryItemInfo", perfStart, "item=? ready=0 pending=" .. tostring(pendingItemCount))
@@ -1094,7 +1093,7 @@ do
     end
 
     -- Query all missing items for reserves
-    function Service:QueryMissingItems(silent, primeFn)
+    function module:QueryMissingItems(silent, primeFn)
         local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local seen = {}
         local count = 0
@@ -1158,7 +1157,7 @@ do
         return icon
     end
 
-    function Service:GetReserveCountForItem(itemId, playerName)
+    function module:GetReserveCountForItem(itemId, playerName)
         local r = getReserveEntryForItem(itemId, playerName)
         if not r then
             return 0
@@ -1167,7 +1166,7 @@ do
     end
 
     -- Gets the "Plus" value for a reserved item for a player (0 if missing).
-    function Service:GetPlusForItem(itemId, playerName)
+    function module:GetPlusForItem(itemId, playerName)
         -- Plus values are meaningful only in Plus System mode.
         if self:GetImportMode() ~= "plus" then
             return 0
@@ -1181,15 +1180,15 @@ do
     -- If raid context is unavailable, keeps backward-compatible behavior and
     -- treats any reserve entry as eligible.
 
-    function Service:HasCurrentRaidPlayersForItem(itemId, raidNum)
+    function module:HasCurrentRaidPlayersForItem(itemId, raidNum)
         return DisplayHelpers.HasCurrentRaidPlayersForItem(getDisplayContext(), itemId, raidNum)
     end
 
-    function Service:GetItemReserveContext(itemId, raidNum)
+    function module:GetItemReserveContext(itemId, raidNum)
         return DisplayHelpers.GetItemReserveContext(getDisplayContext(), itemId, raidNum)
     end
 
-    function Service:GetReadinessReport(itemId, raidNum)
+    function module:GetReadinessReport(itemId, raidNum)
         local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local report = DisplayHelpers.GetReadinessReport(getDisplayContext(), itemId, raidNum)
         local rosterReport = report and report.rosterReport or {}
@@ -1208,7 +1207,7 @@ do
         return report
     end
 
-    function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
+    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
         return DisplayHelpers.GetPlayersForItem(getDisplayContext(), itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
     end
 
@@ -1232,7 +1231,7 @@ do
     -- Returns the formatted player list for an item (comma-separated).
     -- useColor, showPlus, showMulti, onlyCurrentRaidPlayers, and raidNum
     -- follow the same rules as GetPlayersForItem.
-    function Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
+    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesFormatPlayers:format(itemId))
         end
@@ -1244,7 +1243,7 @@ do
         return #list > 0 and tconcat(list, ", ") or ""
     end
 
-    function Service:GetDisplayList()
+    function module:GetDisplayList()
         local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
         local wasDirty = reservesDirty == true
         local list = DisplayHelpers.GetDisplayList(getDisplayContext())
@@ -1252,7 +1251,7 @@ do
         return list
     end
 
-    function Service:GetSyncMetadata()
+    function module:GetSyncMetadata()
         return getActiveSyncMetadata()
     end
 
@@ -1260,12 +1259,12 @@ do
         return persistedReservesData, getActiveSyncMetadata()
     end
 
-    function Service:GetSyncPayload()
+    function module:GetSyncPayload()
         return Sync:GetPayload()
     end
 
     function Sync:SetSyncedData(sourceData, meta)
-        if Service:IsLocalDataAvailable() then
+        if module:IsLocalDataAvailable() then
             return false, "local_data_present"
         end
 
@@ -1287,11 +1286,11 @@ do
         return true
     end
 
-    function Service:SetSyncedData(sourceData, meta)
+    function module:SetSyncedData(sourceData, meta)
         return Sync:SetSyncedData(sourceData, meta)
     end
 
-    function Service:DeleteSyncedReservesCache()
+    function module:DeleteSyncedReservesCache()
         if not syncedCacheActive then
             return false
         end
@@ -1302,14 +1301,14 @@ do
         return true
     end
 
-    function Service:IsSourceCollapsed(source)
+    function module:IsSourceCollapsed(source)
         if not source then
             return false
         end
         return collapsedBossGroups[source] == true
     end
 
-    function Service:ToggleSourceCollapsed(source)
+    function module:ToggleSourceCollapsed(source)
         if not source then
             return false
         end
@@ -1321,14 +1320,14 @@ do
         return nextState
     end
 
-    function Service:RequestSyncMetadata()
+    function module:RequestSyncMetadata()
         if not (Sync and Sync.RequestMetadata) then
             return false
         end
         return Sync:RequestMetadata()
     end
 
-    function Service:HandleSyncMessage(prefix, msg, channel, sender)
+    function module:HandleSyncMessage(prefix, msg, channel, sender)
         if not (Sync and Sync.HandleMessage) then
             return false
         end
@@ -1342,7 +1341,7 @@ do
         return pendingItemInfo[itemId] ~= nil
     end
 
-    function Service:HasPendingItem(itemId)
+    function module:HasPendingItem(itemId)
         return hasPendingItem(itemId)
     end
 end

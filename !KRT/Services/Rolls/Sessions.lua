@@ -181,6 +181,37 @@ local function getRollSessionItemKey(itemLink)
     return Item.GetItemStringFromLink(itemLink) or itemLink
 end
 
+function Sessions.GetCurrentRollItemId(ctx, onResolved)
+    local session = Sessions.GetRollSession(ctx)
+    local sessionItemId = session and tonumber(session.itemId) or nil
+
+    if sessionItemId and sessionItemId > 0 then
+        if onResolved then
+            onResolved(sessionItemId)
+        end
+        return sessionItemId
+    end
+
+    local index = ctx.getItemIndex and ctx.getItemIndex() or nil
+    local item = ctx.getItem and ctx.getItem(index) or nil
+    local itemLink = item and item.itemLink
+    if not itemLink then
+        return nil
+    end
+
+    local itemId = Item.GetItemIdFromLink(itemLink)
+    if itemId and session then
+        session.itemId = itemId
+        session.itemLink = itemLink
+        session.itemKey = getRollSessionItemKey(itemLink) or itemLink
+    end
+
+    if onResolved then
+        onResolved(itemId)
+    end
+    return itemId
+end
+
 function Sessions.OpenRollSession(ctx, itemLink, rollType, source)
     local _, lootState = assertContext(ctx)
     local itemId

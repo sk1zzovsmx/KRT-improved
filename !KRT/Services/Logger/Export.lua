@@ -62,13 +62,6 @@ local HEADER_RAID_ATTENDANCE = {
 }
 
 -- ----- Private helpers ----- --
-local function getRaidQueries()
-    if Database.GetRaidQueries then
-        return Database.GetRaidQueries()
-    end
-    return nil
-end
-
 local function normalizeContext(context)
     return type(context) == "table" and context or {}
 end
@@ -180,7 +173,7 @@ end
 function Export:GetLootCSV(raid, context)
     local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     context = normalizeContext(context)
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     local playerName = getSelectedPlayerName(raid, context)
     local lootRows = queries and queries.GetLoot and queries:GetLoot(raid, context.selectedBossNid, playerName) or {}
     local rows = {}
@@ -217,7 +210,7 @@ end
 
 function Export:GetRaidAttendanceCSV(raid)
     local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     local attendanceRows = queries and queries.GetRaidAttendance and queries:GetRaidAttendance(raid) or {}
     local rows = {}
 

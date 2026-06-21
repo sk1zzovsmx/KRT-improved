@@ -48,7 +48,6 @@ local Payload = assert(Comms and Comms.Payload, "Comms payload helpers are not i
 do
     DB.Syncer = DB.Syncer or {}
     local module = DB.Syncer
-    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
 
     -- ----- Internal state ----- --
     local COMM_PREFIX = "KRTLogSync"
@@ -361,15 +360,8 @@ do
         return splitFields(raw, LIST_SEP, names)
     end
 
-    local function getRaidQueries()
-        if not RaidQueries and Database.GetRaidQueries then
-            RaidQueries = Database.GetRaidQueries()
-        end
-        return RaidQueries
-    end
-
     local function resolveLootLooterNameFromMap(loot, playerNameByNid)
-        local queries = getRaidQueries()
+        local queries = Database.GetRaidQueriesOrNil()
         if queries and queries.ResolveLootLooterNameFromMap then
             return queries:ResolveLootLooterNameFromMap(loot, playerNameByNid)
         end
@@ -1006,6 +998,52 @@ do
         return nil, nil
     end
 
+    local function applySnapshotHeaderToRaid(raid, header)
+        raid.schemaVersion = tonumber(header.schemaVersion) or tonumber(raid.schemaVersion) or 1
+        raid.zone = header.zone or raid.zone
+        raid.size = tonumber(header.size) or tonumber(raid.size)
+        raid.difficulty = tonumber(header.difficulty) or tonumber(raid.difficulty)
+        raid.realm = header.realm or raid.realm
+
+        local startTime = tonumber(header.startTime)
+        local endTime = tonumber(header.endTime)
+        if startTime and startTime > 0 then
+            raid.startTime = startTime
+        end
+        if endTime and endTime > 0 then
+            raid.endTime = endTime
+        end
+    end
+
+    local function applySnapshotNextNids(raid, header)
+        raid.nextPlayerNid = math.max(tonumber(raid.nextPlayerNid) or 1, tonumber(header.nextPlayerNid) or 1)
+        raid.nextBossNid = math.max(tonumber(raid.nextBossNid) or 1, tonumber(header.nextBossNid) or 1)
+        raid.nextLootNid = math.max(tonumber(raid.nextLootNid) or 1, tonumber(header.nextLootNid) or 1)
+    end
+
+    local function finalizeSnapshotRaid(raid)
+        if Database and Database.StripRuntimeRaidCaches then
+            Database.StripRuntimeRaidCaches(raid)
+        end
+        Database.EnsureRaidSchema(raid)
+        return raid
+    end
+
+    local function getSnapshotImportRaidStore()
+        return Database.GetRaidStoreOrNil("DBSyncer.ImportSnapshotAsNewRaid", { "CreateRaidRecord", "InsertRaid" })
+    end
+
+    local function createRaidFromSnapshotHeader(raidStore, header)
+        return raidStore:CreateRaidRecord({
+            realm = header.realm,
+            zone = header.zone,
+            size = tonumber(header.size),
+            difficulty = tonumber(header.difficulty),
+            startTime = tonumber(header.startTime) or Time.GetCurrentTime(),
+            endTime = (tonumber(header.endTime) or 0) > 0 and tonumber(header.endTime) or nil,
+        })
+    end
+
     local function applySnapshotToRaid(raid, snapshot, updateMeta)
         if not (raid and snapshot and snapshot.header) then
             return nil
@@ -1013,18 +1051,7 @@ do
         local header = snapshot.header
 
         if updateMeta then
-            raid.schemaVersion = tonumber(header.schemaVersion) or tonumber(raid.schemaVersion) or 1
-            raid.zone = header.zone or raid.zone
-            raid.size = tonumber(header.size) or tonumber(raid.size)
-            raid.difficulty = tonumber(header.difficulty) or tonumber(raid.difficulty)
-            raid.realm = header.realm or raid.realm
-
-            if tonumber(header.startTime) and tonumber(header.startTime) > 0 then
-                raid.startTime = tonumber(header.startTime)
-            end
-            if tonumber(header.endTime) and tonumber(header.endTime) > 0 then
-                raid.endTime = tonumber(header.endTime)
-            end
+            applySnapshotHeaderToRaid(raid, header)
         end
 
         raid.players = raid.players or {}
@@ -1145,16 +1172,8 @@ do
             end
         end
 
-        raid.nextPlayerNid = math.max(tonumber(raid.nextPlayerNid) or 1, tonumber(header.nextPlayerNid) or 1)
-        raid.nextBossNid = math.max(tonumber(raid.nextBossNid) or 1, tonumber(header.nextBossNid) or 1)
-        raid.nextLootNid = math.max(tonumber(raid.nextLootNid) or 1, tonumber(header.nextLootNid) or 1)
-
-        if Database and Database.StripRuntimeRaidCaches then
-            Database.StripRuntimeRaidCaches(raid)
-        end
-        Database.EnsureRaidSchema(raid)
-
-        return raid
+        applySnapshotNextNids(raid, header)
+        return finalizeSnapshotRaid(raid)
     end
 
     local function importSnapshotAsNewRaid(snapshot)
@@ -1163,19 +1182,12 @@ do
             return nil, nil
         end
 
-        local raidStore = Database.GetRaidStoreOrNil("DBSyncer.ImportSnapshotAsNewRaid", { "CreateRaidRecord", "InsertRaid" })
+        local raidStore = getSnapshotImportRaidStore()
         if not raidStore then
             return nil, nil
         end
 
-        local raid = raidStore:CreateRaidRecord({
-            realm = header.realm,
-            zone = header.zone,
-            size = tonumber(header.size),
-            difficulty = tonumber(header.difficulty),
-            startTime = tonumber(header.startTime) or Time.GetCurrentTime(),
-            endTime = (tonumber(header.endTime) or 0) > 0 and tonumber(header.endTime) or nil,
-        })
+        local raid = createRaidFromSnapshotHeader(raidStore, header)
 
         raid = applySnapshotToRaid(raid, snapshot, true)
         if not raid then

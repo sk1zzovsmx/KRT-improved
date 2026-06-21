@@ -907,25 +907,30 @@ local function assertControllerDispatchPair(controllerName, methodName, sourcePa
 end
 
 local function assertControllerDispatchContracts()
-    local sources = {
-        "!KRT/EntryPoints/SlashEvents.lua",
-        "!KRT/EntryPoints/Minimap.lua",
+    local scans = {
+        {
+            path = "!KRT/EntryPoints/SlashEvents.lua",
+            pattern = 'callControllerMethod%("([%w_]+)"%s*,%s*"([%w_]+)"',
+        },
+        {
+            path = "!KRT/EntryPoints/Minimap.lua",
+            pattern = 'callControllerMethod%("([%w_]+)"%s*,%s*"([%w_]+)"',
+        },
     }
-    local dispatchPattern = 'Database%.RequestControllerMethod%("([%w_]+)"%s*,%s*"([%w_]+)"'
     local total = 0
 
-    for i = 1, #sources do
-        local sourcePath = sources[i]
-        local source = read(sourcePath)
+    for i = 1, #scans do
+        local scan = scans[i]
+        local source = read(scan.path)
         local count = 0
 
-        for controllerName, methodName in source:gmatch(dispatchPattern) do
-            assertControllerDispatchPair(controllerName, methodName, sourcePath)
+        for controllerName, methodName in source:gmatch(scan.pattern) do
+            assertControllerDispatchPair(controllerName, methodName, scan.path)
             count = count + 1
             total = total + 1
         end
 
-        assert(count > 0, sourcePath .. " must contain literal controller dispatch pairs")
+        assert(count > 0, scan.path .. " must contain literal controller dispatch pairs")
     end
 
     assert(total > 0, "controller dispatch sweep must find literal dispatch pairs")
@@ -955,7 +960,7 @@ local function assertWidgetDispatchContracts()
     local scans = {
         {
             path = "!KRT/EntryPoints/SlashEvents.lua",
-            pattern = 'callWidget%("([%w_]+)"%s*,%s*"([%w_]+)"',
+            pattern = 'callWidgetMethod%("([%w_]+)"%s*,%s*"([%w_]+)"',
             required = true,
         },
         {
@@ -996,8 +1001,8 @@ end
 local function assertMinimapRaidMenuContract()
     local source = read("!KRT/EntryPoints/Minimap.lua")
     local reservesDispatch = 'callWidgetMethod("Reserves", "Toggle")'
-    local lootHistoryDispatch = 'Database.RequestControllerMethod("Logger", "ToggleLootHistory")'
-    local raidAttendanceDispatch = 'Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")'
+    local lootHistoryDispatch = 'callControllerMethod("Logger", "ToggleLootHistory")'
+    local raidAttendanceDispatch = 'callControllerMethod("Logger", "ToggleRaidAttendance")'
 
     assertContains(source, reservesDispatch, "minimap menu must open Loot Reserve through UI facade")
     assertContains(source, lootHistoryDispatch, "minimap menu must open Loot History through Logger controller")

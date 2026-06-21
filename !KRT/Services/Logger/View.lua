@@ -26,13 +26,6 @@ local buildRows
 local isBossFightRecord = Database.IsBossFightRecord
 
 -- ----- Private helpers ----- --
-local function getRaidQueries()
-    if Database.GetRaidQueries then
-        return Database.GetRaidQueries()
-    end
-    return nil
-end
-
 local function getOutputCount(out)
     if type(out) ~= "table" then
         return 0
@@ -107,7 +100,7 @@ end
 
 function View:FillBossList(out, raid)
     local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.GetBossKills then
         local result = queries:GetBossKills(raid, out)
         finishPerf("Logger.View.FillBossList", perfStart, raid, out)
@@ -128,7 +121,7 @@ end
 
 function View:FillRaidAttendeesList(out, raid)
     local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.GetRaidAttendance then
         local result = queries:GetRaidAttendance(raid, out)
         finishPerf("Logger.View.FillRaidAttendeesList", perfStart, raid, out)
@@ -150,7 +143,7 @@ end
 
 function View:FillBossAttendeesList(out, raid, bossNid)
     local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.GetBossAttendance then
         local result = queries:GetBossAttendance(raid, bossNid, out)
         finishPerf("Logger.View.FillBossAttendeesList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?"))
@@ -236,7 +229,7 @@ end
 
 function View:FillLootList(out, raid, bossNid, playerName)
     local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.GetLoot then
         local result = queries:GetLoot(raid, bossNid, playerName, out)
         finishPerf("Logger.View.FillLootList", perfStart, raid, out, "boss=" .. tostring(bossNid or "?") .. " player=" .. tostring(playerName or ""))

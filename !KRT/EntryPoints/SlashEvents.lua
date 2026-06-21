@@ -318,7 +318,7 @@ local function notifyWidgetCallUnavailable(widgetId, methodName)
     addon:warn(L.MsgFeatureUnavailable, widgetId, methodName)
 end
 
-local function callWidget(widgetId, methodName, ...)
+local function callWidgetMethod(widgetId, methodName, ...)
     if UIWidgets and type(UIWidgets.IsEnabled) == "function" and not UIWidgets.IsEnabled(widgetId) then
         notifyWidgetCallUnavailable(widgetId, methodName)
         return nil
@@ -348,6 +348,10 @@ end
 
 local function isToggleCommand(sub)
     return isBlank(sub) or sub == "toggle"
+end
+
+local function callControllerMethod(controllerName, methodName, ...)
+    return Database.RequestControllerMethod(controllerName, methodName, ...)
 end
 
 local function callSyncerMethod(methodName, ...)
@@ -482,7 +486,7 @@ local function handleDebugRaidGridCommand(arg)
         end
     end
 
-    local shown = Database.RequestControllerMethod("Master", "ShowDebugRaidGrid", count or 25)
+    local shown = callControllerMethod("Master", "ShowDebugRaidGrid", count or 25)
     if not shown then
         addon:warn(L.MsgFeatureUnavailable, "Master", "debug raidgrid")
         return
@@ -885,31 +889,31 @@ end
 local function handleConfigCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if sub == "reset" then
-        callWidget("Config", "Default")
+        callWidgetMethod("Config", "Default")
     else
-        callWidget("Config", "Toggle")
+        callWidgetMethod("Config", "Toggle")
     end
 end
 
 local function handleWarningsCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        Database.RequestControllerMethod("Warnings", "Toggle")
+        callControllerMethod("Warnings", "Toggle")
     elseif sub == "help" then
         addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
         printHelp("[ID]", L.StrCmdWarningAnnounce)
     else
-        Database.RequestControllerMethod("Warnings", "RequestAnnounce", sub)
+        callControllerMethod("Warnings", "RequestAnnounce", sub)
     end
 end
 
 local function handleLoggerCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        Database.RequestControllerMethod("Logger", "ToggleLootHistory")
+        callControllerMethod("Logger", "ToggleLootHistory")
     elseif sub == "attendance" or sub == "attendees" or sub == "att" then
-        Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")
+        callControllerMethod("Logger", "ToggleRaidAttendance")
     elseif sub == "req" then
         callSyncerMethodWithTarget("RequestLoggerReq", arg)
     elseif sub == "push" then
@@ -926,20 +930,20 @@ local function handleLoggerCommand(rest)
 end
 
 local function handleAttendanceCommand()
-    Database.RequestControllerMethod("Logger", "ToggleRaidAttendance")
+    callControllerMethod("Logger", "ToggleRaidAttendance")
 end
 
 local function handleLootCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        Database.RequestControllerMethod("Master", "Toggle")
+        callControllerMethod("Master", "Toggle")
     end
 end
 
 local function handleCounterCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if isToggleCommand(sub) then
-        callWidget("LootCounter", "Toggle")
+        callWidgetMethod("LootCounter", "Toggle")
     end
 end
 
@@ -1119,9 +1123,9 @@ local function handleReservesCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     local reserves = Services and Services.Reserves or nil
     if isToggleCommand(sub) then
-        callWidget("Reserves", "Toggle")
+        callWidgetMethod("Reserves", "Toggle")
     elseif sub == "import" then
-        callWidget("Reserves", "ToggleImport")
+        callWidgetMethod("Reserves", "ToggleImport")
     elseif sub == "check" or sub == "readiness" then
         printSoftResReadinessReport()
     elseif sub == "alias" then
@@ -1262,11 +1266,11 @@ end
 local function handleLfmCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if isToggleCommand(sub) or sub == "show" then
-        Database.RequestControllerMethod("Spammer", "Toggle")
+        callControllerMethod("Spammer", "Toggle")
     elseif sub == "start" then
-        Database.RequestControllerMethod("Spammer", "RequestStart")
+        callControllerMethod("Spammer", "RequestStart")
     elseif sub == "stop" then
-        Database.RequestControllerMethod("Spammer", "RequestStop")
+        callControllerMethod("Spammer", "RequestStop")
     else
         addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
@@ -1351,7 +1355,7 @@ local function handleSlashCommand(msg)
     end
 
     if cmd == "show" or cmd == "toggle" then
-        Database.RequestControllerMethod("Master", "Toggle")
+        callControllerMethod("Master", "Toggle")
         return
     end
     local fn = slashHandlers[cmd]

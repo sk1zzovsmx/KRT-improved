@@ -124,8 +124,8 @@ Interpretation:
 - `name-collision` is mostly analysis noise and not immediate cleanup scope by itself.
 - The actionable lane is `merge-now` plus duplicated public facades where one owner
   only forwards to another owner.
-- `Services/Reserves.lua` remains the clearest high-value contraction target because
-  it still exposes two public-looking entry surfaces for the same behavior.
+- After Wave S3, `Services/Reserves.lua` no longer has a duplicate local facade owner; deeper
+  Reserves work should continue only for proven package-internal contracts.
 
 Stage plan for the current API-reduction program:
 
@@ -428,7 +428,7 @@ What this means:
 ### 2.5 Database and Infra
 
 - `!KRT/Database/DBSyncer.lua`: contract wave completed, uses service-owned capability query
-- `!KRT/Database/DBRaidStore.lua`: cleanup wave C2 in progress
+- `!KRT/Database/DBRaidStore.lua`: cleanup wave C2 completed
 - `!KRT/Modules/UI/Frames.lua`: cleanup wave U1 in progress
 - `!KRT/Init.lua`: contract wave completed, root chat/capability facades removed
 
@@ -467,6 +467,30 @@ because they sit on repo-wide boundaries.
 3. `!KRT/Database/DBSyncer.lua` - about 1454 lines
 4. `!KRT/Database/DBRaidStore.lua` - about 755 lines
 5. `!KRT/Modules/UI/Frames.lua` - about 889 lines
+
+### Wave 5 follow-up: remaining `getRaidQueries` wrappers
+
+Wave 4 centralized optional dynamic query access and removed dynamic wrappers from
+Logger View/Export.
+
+Wave 5 removed Logger-owned memoized query caches from:
+- `!KRT/Services/Logger/Actions.lua`
+- `!KRT/Services/Logger/Store.lua`
+
+Remaining memoized wrappers:
+- `!KRT/Database/DBSyncer.lua`
+- `!KRT/Services/Loot/Service.lua`
+- `!KRT/Services/Raid/LootRecords.lua`
+- `!KRT/Services/Raid/State.lua`
+
+- direct callers remain in `!KRT/Controllers/Logger.lua`, `!KRT/Database/DB.lua`,
+  and `!KRT/Database/DBManager.lua`.
+
+Required before later implementation:
+- Map each remaining owner separately.
+- Confirm whether late `Database.GetRaidQueries` assignment still needs cache
+  refresh behavior.
+- Split remaining cleanup into one owner group per task.
 
 ### P3: Bootstrap Follow-up
 
@@ -535,8 +559,15 @@ Scope:
 - reduce risk from long stateful functions
 
 Current worktree progress:
-- current roll context recovery is centralized for submit, validate, and display flows
-- response-state preparation and seeding now share one helper path
+- current-roll item resolution now lives under `Services/Rolls/Sessions.lua`
+  with the other session/context helpers
+- `Services/Rolls/Service.lua` keeps the public facade while using private
+  helpers for roll intake start, roll intake finish, tie-reroll reset, and
+  finalization
+- public response lifecycle and display-model contracts are preserved:
+  `PASS`, `CANCELLED`, `TIMED_OUT`, `INELIGIBLE`, late `OOT` rolls, and
+  `Rolls:GetDisplayModel().resolution`
+- Wave S2 completed: Rolls Service facade helper cleanup
 
 Non-goals:
 - no winner-policy changes
@@ -567,6 +598,10 @@ Scope:
 Current worktree progress:
 - reserve-index rebuild and change publication now share one helper path
 - itemId-based entry scans now use one helper for item-data updates and multi-reserve checks
+- `Services/Reserves.lua` now uses `module` as its only local public facade owner
+- public `addon.Services.Reserves:*` method names and behavior are preserved
+- `_Sync` remains package-internal behind the parent Reserves facade
+- Wave S3 completed: Reserves Service facade owner normalization
 
 Non-goals:
 - no reserve rules change
@@ -594,6 +629,13 @@ Scope:
 
 Current worktree progress:
 - controller method dispatch now shares one helper path across toggle and action commands
+- slash controller routes now use a local `callControllerMethod(...)` helper over
+  `Database.RequestControllerMethod(...)`
+- slash widget routes now use a local `callWidgetMethod(...)` helper over
+  `addon.UI.Widgets.Call(...)`
+- command syntax, help text, sync commands, validation output, and diagnostic
+  summaries are unchanged
+- Wave E1 completed: Slash routing helper normalization
 
 Non-goals:
 - no command syntax changes
@@ -623,6 +665,13 @@ Scope:
 Current worktree progress:
 - controller and widget dispatch from the minimap menu now share helper paths
 - loot-counter fallback routing is centralized without changing menu behavior
+- minimap controller routes now use a local `callControllerMethod(...)` helper
+  over `Database.RequestControllerMethod(...)`
+- minimap widget routes now share `isWidgetAvailable(...)` and
+  `callWidgetMethod(...)`
+- menu labels, menu order, disabled-state checks, drag behavior, and XML layout
+  are unchanged
+- Wave E2 completed: Minimap entrypoint routing normalization
 
 Non-goals:
 - no menu option changes unless tied to cleanup correctness
@@ -650,6 +699,13 @@ Current worktree progress:
 - group sync gating now shares one helper across request, push, and sync entrypoints
 - target normalization and pending-request registration now use one helper path
 - sync sender failure bookkeeping now shares one helper across merge and payload-validation paths
+- DBSyncer no longer keeps a memoized `RaidQueries` cache or local
+  `getRaidQueries()` wrapper
+- loot looter resolution now uses `Database.GetRaidQueriesOrNil()` at snapshot
+  build time
+- snapshot header application, next-NID advancement, runtime cleanup, and import
+  store acquisition now have explicit local helper boundaries
+- Wave C1 completed: Syncer store boundary cleanup
 
 Non-goals:
 - no sync payload contract changes without explicit migration plan
@@ -671,6 +727,13 @@ Scope:
 Current worktree progress:
 - NID allocation for raid, player, boss, and loot normalization now shares one helper path
 - runtime table acquisition, runtime index-map reset, and runtime signature building now share local helpers
+- runtime index-map ownership now uses one local key list shared by readiness
+  and acquisition paths
+- runtime signature refresh and normalize-vs-strip runtime cleanup now have
+  explicit local helper boundaries
+- loot runtime row indexing now shares one helper across full rebuild and
+  targeted upsert paths
+- Wave C2 completed: Raid store runtime boundary cleanup
 
 Non-goals:
 - no persisted raid schema changes
@@ -692,6 +755,11 @@ Scope:
 Current worktree progress:
 - frame-name resolution now shares one helper across generic frame helper entrypoints
 - UI-bound checks and show-with-refresh flow now share local helper paths inside the scaffold
+- scaffold config validation now shares one local helper with the existing
+  error contract
+- module frame load state, ref acquisition, and refresh dispatch now have
+  explicit helper boundaries inside the scaffold
+- Wave U1 completed: UI Scaffold infrastructure cleanup
 
 Non-goals:
 - no broad UI behavior rewrite
@@ -746,9 +814,8 @@ These are not strong cleanup candidates right now.
 
 If continuing the cleanup program immediately, start with:
 
-1. `!KRT/Services/Rolls/Service.lua` API contraction and helper dedup
-2. `!KRT/Services/Reserves.lua` facade dedup (`Service:*` + `module:*`)
-3. `!KRT/EntryPoints/SlashEvents.lua` boundary cleanup follow-up
+1. one remaining `getRaidQueries` owner group, starting with `!KRT/Services/Loot/Service.lua`
+2. deeper `!KRT/Services/Reserves.lua` review only for proven package-internal contracts
 
 That sequence gives the best technical ROI while keeping the already-stable UI
 owner layer closed.

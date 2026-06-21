@@ -228,17 +228,8 @@ restoreCurrentRaidIndex = function(raidStore, currentRaidNid)
     end
 end
 
-local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
-
-local function getRaidQueries()
-    if not RaidQueries and Database.GetRaidQueries then
-        RaidQueries = Database.GetRaidQueries()
-    end
-    return RaidQueries
-end
-
 findBossByNid = function(raid, bossNid, opts)
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.FindBossByNid then
         return queries:FindBossByNid(raid, bossNid, opts)
     end
@@ -246,7 +237,7 @@ findBossByNid = function(raid, bossNid, opts)
 end
 
 findBossByName = function(raid, bossName, opts)
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.FindBossByName then
         return queries:FindBossByName(raid, bossName, opts)
     end
@@ -254,7 +245,7 @@ findBossByName = function(raid, bossName, opts)
 end
 
 findBossBySourceNpcId = function(raid, sourceNpcId, opts)
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.FindBossBySourceNpcId then
         return queries:FindBossBySourceNpcId(raid, sourceNpcId, opts)
     end
@@ -262,7 +253,7 @@ findBossBySourceNpcId = function(raid, sourceNpcId, opts)
 end
 
 local function findBossBySourceKey(raid, sourceKey, opts)
-    local queries = getRaidQueries()
+    local queries = Database.GetRaidQueriesOrNil()
     if queries and queries.FindBossBySourceKey then
         return queries:FindBossBySourceKey(raid, sourceKey, opts)
     end

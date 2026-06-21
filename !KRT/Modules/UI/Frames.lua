@@ -665,17 +665,7 @@ function Scaffold.EnsureModuleState(mod)
     return ModuleState.Ensure(mod)
 end
 
-function Scaffold.DefineModule(cfg)
-    cfg = cfg or {}
-    local module = cfg.module
-    local getFrame = cfg.getFrame
-    local acquireRefs = cfg.acquireRefs
-    local bindHandlers = cfg.bind
-    local localize = cfg.localize
-    local onLoadFrame = cfg.onLoad
-    local initFrameOpts = cfg.initFrameOpts
-    local refreshFn = cfg.refresh
-
+local function validateScaffoldConfig(module, getFrame, acquireRefs, bindHandlers, localize, onLoadFrame, refreshFn)
     if type(module) ~= "table" then
         error("UI.Scaffold.DefineModule: cfg.module must be a table")
     end
@@ -697,6 +687,53 @@ function Scaffold.DefineModule(cfg)
     if refreshFn and type(refreshFn) ~= "function" then
         error("UI.Scaffold.DefineModule: cfg.refresh must be a function")
     end
+end
+
+local function dispatchModuleRefresh(module, refreshFn, uiState, frame, refs, dirty, reason)
+    if refreshFn then
+        return refreshFn(uiState.FrameName, frame, refs, dirty, reason)
+    end
+    if type(module.RefreshUI) == "function" then
+        return module:RefreshUI(uiState.FrameName, frame, refs, dirty, reason)
+    end
+    if type(module.Refresh) == "function" then
+        return module:Refresh(dirty, reason)
+    end
+end
+
+local function loadModuleFrame(module, frame, uiState, onLoadFrame, initFrameOpts)
+    if uiState.Loaded then
+        return uiState.FrameName
+    end
+
+    local frameName
+    if onLoadFrame then
+        frameName = onLoadFrame(frame)
+    else
+        frameName = Frames.BindModuleFrame(module, frame, initFrameOpts)
+    end
+
+    uiState.FrameName = frameName or (frame.GetName and frame:GetName()) or uiState.FrameName
+    uiState.Loaded = uiState.FrameName ~= nil
+
+    return uiState.FrameName
+end
+
+local function acquireModuleRefs(frame, frameName, acquireRefs)
+    return acquireRefs and acquireRefs(frame, frameName) or {}
+end
+
+function Scaffold.DefineModule(cfg)
+    cfg = cfg or {}
+    local module = cfg.module
+    local getFrame = cfg.getFrame
+    local acquireRefs = cfg.acquireRefs
+    local bindHandlers = cfg.bind
+    local localize = cfg.localize
+    local onLoadFrame = cfg.onLoad
+    local initFrameOpts = cfg.initFrameOpts
+    local refreshFn = cfg.refresh
+    validateScaffoldConfig(module, getFrame, acquireRefs, bindHandlers, localize, onLoadFrame, refreshFn)
 
     local uiState = Scaffold.EnsureModuleState(module)
 
@@ -712,15 +749,7 @@ function Scaffold.DefineModule(cfg)
         uiState.Reason = nil
 
         local refs = module.refs
-        if refreshFn then
-            return refreshFn(uiState.FrameName, frame, refs, dirty, reason)
-        end
-        if type(module.RefreshUI) == "function" then
-            return module:RefreshUI(uiState.FrameName, frame, refs, dirty, reason)
-        end
-        if type(module.Refresh) == "function" then
-            return module:Refresh(dirty, reason)
-        end
+        return dispatchModuleRefresh(module, refreshFn, uiState, frame, refs, dirty, reason)
     end
 
     local requestRefresh = Frames.MakeEventDrivenRefresher(getFrame, doRefresh)
@@ -749,17 +778,10 @@ function Scaffold.DefineModule(cfg)
         end
 
         if not uiState.Loaded then
-            local frameName
-            if onLoadFrame then
-                frameName = onLoadFrame(frame)
-            else
-                frameName = Frames.BindModuleFrame(module, frame, initFrameOpts)
-            end
-            uiState.FrameName = frameName or (frame.GetName and frame:GetName()) or uiState.FrameName
-            uiState.Loaded = uiState.FrameName ~= nil
+            loadModuleFrame(module, frame, uiState, onLoadFrame, initFrameOpts)
         end
 
-        local refs = acquireRefs and acquireRefs(frame, uiState.FrameName) or {}
+        local refs = acquireModuleRefs(frame, uiState.FrameName, acquireRefs)
         self.frame = frame
         self.refs = refs
 

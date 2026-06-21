@@ -1897,6 +1897,12 @@ local function newHarness()
     Database.GetRaidQueries = function()
         return nil
     end
+    Database.GetRaidQueriesOrNil = function()
+        if type(Database.GetRaidQueries) ~= "function" then
+            return nil
+        end
+        return Database.GetRaidQueries()
+    end
     Database.GetRaidStoreOrNil = function()
         return nil
     end
@@ -3646,6 +3652,58 @@ test("runtime cache builds logger history query indexes", function()
     assertEqual(runtime.lootIdxByLooterNid[2][2], 4, "expected appended looter loot index to be patched")
 end)
 
+test("runtime cache upsert moves loot index between boss and looter maps", function()
+    local h = newHarness()
+    h:load("!KRT/Database/DBRaidStore.lua")
+    local store = h.addon.DB.RaidStore
+    local raid = {
+        schemaVersion = 1,
+        raidNid = 1,
+        players = {
+            { playerNid = 1, name = "Alice", countMS = 0 },
+            { playerNid = 2, name = "Bob", countMS = 0 },
+        },
+        bossKills = {
+            { bossNid = 10, name = "Patchwerk" },
+            { bossNid = 20, name = "Grobbulus" },
+        },
+        loot = {
+            { lootNid = 101, bossNid = 10, itemId = 9001, looterNid = 1 },
+        },
+        nextPlayerNid = 3,
+        nextBossNid = 21,
+        nextLootNid = 102,
+    }
+
+    local function hasListValue(list, value)
+        if type(list) ~= "table" then
+            return false
+        end
+        for i = 1, #list do
+            if list[i] == value then
+                return true
+            end
+        end
+        return false
+    end
+
+    local runtime1 = store:EnsureRaidRuntime(raid)
+    local row = raid.loot[1]
+    row.bossNid = 20
+    row.looterNid = 2
+
+    local runtime2 = store:UpsertLootIndex(raid, row, 1)
+    local runtime3 = store:EnsureRaidRuntime(raid)
+
+    assertTrue(runtime2 == runtime1, "expected upsert to patch the existing runtime table")
+    assertTrue(runtime3 == runtime1, "expected patched signature to avoid a full rebuild")
+    assertTrue(not hasListValue(runtime1.lootIdxByBossNid[10], 1), "expected old boss index to be cleared")
+    assertTrue(hasListValue(runtime1.lootIdxByBossNid[20], 1), "expected new boss index to be added")
+    assertTrue(not hasListValue(runtime1.lootIdxByLooterNid[1], 1), "expected old looter index to be cleared")
+    assertTrue(hasListValue(runtime1.lootIdxByLooterNid[2], 1), "expected new looter index to be added")
+    assertTrue(runtime1.lootByNid[101] == row, "expected loot nid lookup to stay attached to the row")
+end)
+
 test("runtime cache rebuilds when signature changes without explicit strip", function()
     local h = newHarness()
     h:load("!KRT/Database/DBRaidStore.lua")
@@ -4794,6 +4852,119 @@ test("db syncer snapshot payload uses nid references for repeated player fields"
 
     assertEqual(bossPlayers, table.concat({ "1", "2" }, string.char(31)), "expected boss attendee payload to use playerNid references")
     assertEqual(lootLooter, "1", "expected loot looter payload to use playerNid reference")
+end)
+
+test("db syncer resolves loot looter through current query facade", function()
+    local source = newHarness()
+    local itemLink = source.registerItem(9003, "Dynamic Query Sync Blade")
+    local itemString = source.addon.Item.GetItemStringFromLink(itemLink)
+    source:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 79,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 2, class = "MAGE", join = 1000, countMS = 3 },
+            },
+            bossKills = {},
+            loot = {
+                {
+                    lootNid = 101,
+                    itemId = 9003,
+                    itemName = "Dynamic Query Sync Blade",
+                    itemString = itemString,
+                    itemLink = itemLink,
+                    itemRarity = 4,
+                    itemTexture = "Icon9003",
+                    itemCount = 1,
+                    rollType = source.rollTypes.MAINSPEC,
+                    rollValue = 98,
+                    bossNid = 0,
+                    time = 1015,
+                },
+            },
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 102,
+        },
+    })
+
+    local staleQueries = {
+        ResolveLootLooterNameFromMap = function()
+            return "Stale"
+        end,
+    }
+    source.Database.GetRaidQueries = function()
+        return staleQueries
+    end
+
+    local snapshotMessages = {}
+    source.addon.IsInGroup = function()
+        return true
+    end
+    source.addon.IsInRaid = function()
+        return false
+    end
+    source.addon.Strings.TrimText = function(value)
+        return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    _G.SendAddonMessage = function(prefix, payload, channel, target)
+        snapshotMessages[#snapshotMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+            channel = channel,
+            target = target,
+        }
+    end
+
+    local currentQueries = {
+        ResolveLootLooterNameFromMap = function(_, loot, playerNameByNid)
+            assertEqual(tonumber(loot and loot.lootNid), 101, "expected current query to receive the loot row")
+            return playerNameByNid[1] or ""
+        end,
+    }
+    source:load("!KRT/Modules/Comms.lua")
+    source:load("!KRT/Modules/Base64.lua")
+    source:load("!KRT/Database/DBSyncer.lua")
+
+    source.Database.GetRaidQueries = function()
+        return currentQueries
+    end
+    source.Database.GetRaidQueriesOrNil = function()
+        return currentQueries
+    end
+
+    assertTrue(source.addon.DB.Syncer:BroadcastLoggerPush(79, "Bob") == true, "expected source push snapshot to send")
+
+    local encodedParts = {}
+    for i = 1, #snapshotMessages do
+        local fields = {}
+        for field in snapshotMessages[i].payload:gmatch("[^\t]+") do
+            fields[#fields + 1] = field
+        end
+        encodedParts[tonumber(fields[6]) or i] = fields[8] or ""
+    end
+
+    local snapshotPayload = source.addon.Base64.Decode(table.concat(encodedParts, ""))
+    assertTrue(type(snapshotPayload) == "string" and snapshotPayload ~= "", "expected decoded snapshot payload")
+
+    local lootLooter = nil
+    for line in snapshotPayload:gmatch("[^\n]+") do
+        local fields = {}
+        for field in line:gmatch("[^\t]+") do
+            fields[#fields + 1] = field
+        end
+        if fields[1] == "L" then
+            lootLooter = source.addon.Base64.Decode(fields[10] or "")
+            break
+        end
+    end
+
+    assertEqual(lootLooter, "Alice", "expected DBSyncer to use the current query facade")
 end)
 
 test("db syncer records sync payload byte chunk metrics", function()
@@ -10891,6 +11062,66 @@ test("ui tooltips bind reusable model providers", function()
     assertTrue(_G.GameTooltip.hidden == true, "expected provider tooltip OnLeave to hide")
 end)
 
+test("ui scaffold define module keeps bind and refresh lifecycle centralized", function()
+    local h = newHarness()
+    local frame = h.makeFrame(true, "KRTU1ScaffoldFrame")
+    local driver = h.makeFrame(true, "KRTU1ScaffoldRefreshDriver")
+    local calls = {}
+
+    _G.KRTU1ScaffoldFrame = frame
+    _G.CreateFrame = function()
+        return driver
+    end
+
+    h:load("!KRT/Modules/UI/Frames.lua")
+
+    local module = {}
+    h.addon.UI.Scaffold.DefineModule({
+        module = module,
+        getFrame = function()
+            return frame
+        end,
+        acquireRefs = function(boundFrame, frameName)
+            calls[#calls + 1] = "refs:" .. tostring(frameName)
+            assertEqual(boundFrame, frame, "expected acquireRefs to receive the module frame")
+            return { Button = true }
+        end,
+        bind = function(frameName, boundFrame, refs)
+            calls[#calls + 1] = "bind:" .. tostring(frameName) .. ":" .. tostring(refs.Button)
+            assertEqual(boundFrame, frame, "expected bind to receive the module frame")
+        end,
+        localize = function(frameName, boundFrame, refs)
+            calls[#calls + 1] = "localize:" .. tostring(frameName) .. ":" .. tostring(refs.Button)
+            assertEqual(boundFrame, frame, "expected localize to receive the module frame")
+        end,
+        refresh = function(frameName, boundFrame, refs, dirty, reason)
+            calls[#calls + 1] = "refresh:" .. tostring(frameName) .. ":" .. tostring(dirty) .. ":" .. tostring(reason)
+            assertEqual(boundFrame, frame, "expected refresh to receive the module frame")
+            assertTrue(refs.Button == true, "expected refresh to receive acquired refs")
+        end,
+    })
+
+    local boundFrame, refs = module:BindUI()
+
+    assertEqual(boundFrame, frame, "expected BindUI to return the module frame")
+    assertTrue(refs.Button == true, "expected BindUI to return acquired refs")
+    assertEqual(calls[1], "refs:KRTU1ScaffoldFrame", "expected refs before bind")
+    assertEqual(calls[2], "bind:KRTU1ScaffoldFrame:true", "expected bind after refs")
+    assertEqual(calls[3], "localize:KRTU1ScaffoldFrame:true", "expected localize after bind")
+    assertTrue(driver.OnUpdate ~= nil, "expected visible bind to schedule refresh")
+
+    driver.OnUpdate(driver)
+    assertEqual(calls[4], "refresh:KRTU1ScaffoldFrame:true:bind", "expected bind refresh")
+
+    module:RequestRefresh("manual")
+    assertTrue(driver.OnUpdate ~= nil, "expected manual refresh to schedule driver")
+    driver.OnUpdate(driver)
+    assertEqual(calls[5], "refresh:KRTU1ScaffoldFrame:true:manual", "expected manual refresh")
+
+    assertEqual(module:EnsureUI(), frame, "expected EnsureUI to reuse bound frame")
+    assertEqual(#calls, 5, "expected EnsureUI not to rebind or relocalize")
+end)
+
 test("auto loot rules suggest disenchant for enchanting materials", function()
     local h = newHarness()
     h:load("!KRT/Modules/Dataset/IgnoredItems.lua")
@@ -15571,7 +15802,7 @@ test("master add-roll refreshes coalesce duplicate bursts", function()
     assertEqual(refreshCount, 0, "expected add-roll burst to defer Master refresh")
     h:flushTimers()
     assertEqual(refreshCount, 1, "expected add-roll burst to request one Master refresh")
-    assertEqual(Master._uiRefreshHandle, nil, "expected coalesced Master refresh handle to clear after firing")
+    assertEqual(Master._refreshHandle, nil, "expected coalesced Master refresh handle to clear after firing")
 end)
 
 test("manual exclusion blocks candidate eligibility and roll intake", function()

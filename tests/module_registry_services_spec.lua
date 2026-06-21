@@ -692,7 +692,7 @@ local expectedReservesServices = {
     {
         name = "Services/Reserves",
         path = "!KRT/Services/Reserves.lua",
-        owner = "Service",
+        owner = "module",
         separator = ":",
         deps = {
             "Init",
