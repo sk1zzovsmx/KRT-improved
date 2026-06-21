@@ -242,6 +242,8 @@
 |   |-- mcp.json
 |   \\-- settings.json
 |-- docs
+|   |-- reports
+|   |   \\-- krt-useless-code-analysis-2026-06-20.md
 |   |-- superpowers
 |   |   |-- plans
 |   |   |   |-- 2026-06-04-atlasloot-raid-dataset.md
@@ -275,7 +277,8 @@
 |   |   |   |-- 2026-06-16-krt-dead-ui-fallback-removal.md
 |   |   |   |-- 2026-06-16-krt-ui-xml-lua-homogenization.md
 |   |   |   |-- 2026-06-17-krt-logger-ui-semantic-split.md
-|   |   |   \\-- 2026-06-17-krt-xml-visual-simplification.md
+|   |   |   |-- 2026-06-17-krt-xml-visual-simplification.md
+|   |   |   \\-- 2026-06-20-krt-useless-code-analysis.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       |-- 2026-06-05-master-loot-grid-design.md

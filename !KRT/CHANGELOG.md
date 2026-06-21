@@ -91,6 +91,12 @@ Release-Version: 0.8.0-beta.1
 - **Logger history row allocation** - Reduced temporary row allocation in
   Logger history query refreshes by filling caller-provided output buffers
   directly and reusing row tables while clearing stale fields and tail rows.
+- **Logger CSV export allocation** - Reduced temporary row allocation in
+  Logger loot and raid-attendance CSV exports by streaming rows directly into
+  the CSV builder with reusable field buffers.
+- **Logger sync payload compaction** - Reduced Logger snapshot payload size by
+  serializing resolved loot looters as player NID references when the receiver
+  already supports numeric and legacy name fallbacks.
 - **Logger history maintenance chunking** - Added a chunked Loot History scan
   path for the config maintenance action so large history reports can advance
   through scheduled timer slices instead of one synchronous scan.

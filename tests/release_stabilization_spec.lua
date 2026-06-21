@@ -4821,7 +4821,15 @@ test("db syncer snapshot payload uses nid references for repeated player fields"
                 { playerNid = 2, name = "Longplayernametwo", rank = 1, subgroup = 3, class = "PRIEST", join = 1000, countMS = 2 },
             },
             bossKills = {
-                { bossNid = 10, name = "Patchwerk", mode = "n", difficulty = 4, time = 1010, hash = "patchwerk-1010", players = { 1, 2 } },
+                {
+                    bossNid = 10,
+                    name = "Patchwerk",
+                    mode = "n",
+                    difficulty = 4,
+                    time = 1010,
+                    hash = "patchwerk-1010",
+                    players = { "Longplayernameone", "Longplayernametwo" },
+                },
             },
             loot = {
                 {
@@ -5011,7 +5019,7 @@ test("db syncer resolves loot looter through current query facade", function()
         end
     end
 
-    assertEqual(lootLooter, "Alice", "expected DBSyncer to use the current query facade")
+    assertEqual(lootLooter, "1", "expected DBSyncer to use the current query facade")
 end)
 
 test("db syncer records sync payload byte chunk metrics", function()

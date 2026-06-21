@@ -11,6 +11,7 @@ local Services = feature.Services
 
 local tostring, tonumber, type = tostring, tonumber, type
 local date = date
+local concat = table.concat
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "Export")
@@ -87,35 +88,26 @@ local function encodeCSVField(value)
     return text
 end
 
-local function appendCSVLine(lines, fields)
-    local encoded = {}
-    for i = 1, #fields do
+local function appendCSVLine(lines, fields, encoded, fieldCount)
+    local count = fieldCount or #fields
+    for i = 1, count do
         encoded[i] = encodeCSVField(fields[i])
     end
-    lines[#lines + 1] = table.concat(encoded, ",")
-end
-
-local function buildCSV(header, rows)
-    local lines = {}
-    appendCSVLine(lines, header)
-    for i = 1, #rows do
-        appendCSVLine(lines, rows[i])
-    end
-    return table.concat(lines, "\n")
+    lines[#lines + 1] = concat(encoded, ",", 1, count)
 end
 
 local function getRaidNid(raid)
     return tonumber(raid and raid.raidNid) or ""
 end
 
-local function finishPerf(label, startedAt, raid, rows, csvText)
+local function finishPerf(label, startedAt, raid, rowCount, csvText)
     if not (startedAt and addon._PerfFinish) then
         return
     end
 
-    local rowCount = type(rows) == "table" and #rows or 0
+    local resolvedRowCount = tonumber(rowCount) or 0
     local byteCount = type(csvText) == "string" and #csvText or 0
-    local details = "raid=" .. tostring(getRaidNid(raid)) .. " rows=" .. tostring(rowCount) .. " bytes=" .. tostring(byteCount)
+    local details = "raid=" .. tostring(getRaidNid(raid)) .. " rows=" .. tostring(resolvedRowCount) .. " bytes=" .. tostring(byteCount)
     addon:_PerfFinish(label, startedAt, details)
 end
 
@@ -175,69 +167,83 @@ function Export:GetLootCSV(raid, context)
     context = normalizeContext(context)
     local queries = Database.GetRaidQueriesOrNil()
     local playerName = getSelectedPlayerName(raid, context)
-    local lootRows = queries and queries.GetLoot and queries:GetLoot(raid, context.selectedBossNid, playerName) or {}
-    local rows = {}
+    local lootRows = {}
+    if queries and queries.GetLoot then
+        queries:GetLoot(raid, context.selectedBossNid, playerName, lootRows)
+    end
+    local lines = {}
+    local fields = {}
+    local encoded = {}
+    local rowCount = 0
+    appendCSVLine(lines, HEADER_LOOT, encoded, #HEADER_LOOT)
 
     for i = 1, #lootRows do
         local loot = lootRows[i]
         if loot then
             local bossNid = tonumber(loot.bossNid) or ""
-            rows[#rows + 1] = {
-                getRaidNid(raid),
-                getRaidDate(raid),
-                getRaidZone(raid),
-                getRaidSize(raid),
-                getRaidDifficulty(raid),
-                bossNid,
-                loot.sourceName or getBossNameByNid(raid, bossNid),
-                formatTimestamp(getBossTimeByNid(raid, bossNid)),
-                tonumber(loot.id) or "",
-                tonumber(loot.itemId) or "",
-                loot.itemName or "",
-                loot.looter or "",
-                loot.looterClass or "",
-                formatRollTypeForExport(loot.rollType),
-                formatRollValueForExport(loot.rollValue),
-                formatTimestamp(loot.time),
-            }
+            fields[1] = getRaidNid(raid)
+            fields[2] = getRaidDate(raid)
+            fields[3] = getRaidZone(raid)
+            fields[4] = getRaidSize(raid)
+            fields[5] = getRaidDifficulty(raid)
+            fields[6] = bossNid
+            fields[7] = loot.sourceName or getBossNameByNid(raid, bossNid)
+            fields[8] = formatTimestamp(getBossTimeByNid(raid, bossNid))
+            fields[9] = tonumber(loot.id) or ""
+            fields[10] = tonumber(loot.itemId) or ""
+            fields[11] = loot.itemName or ""
+            fields[12] = loot.looter or ""
+            fields[13] = loot.looterClass or ""
+            fields[14] = formatRollTypeForExport(loot.rollType)
+            fields[15] = formatRollValueForExport(loot.rollValue)
+            fields[16] = formatTimestamp(loot.time)
+            rowCount = rowCount + 1
+            appendCSVLine(lines, fields, encoded, 16)
         end
     end
 
-    local csv = buildCSV(HEADER_LOOT, rows)
-    finishPerf("Logger.Export.GetLootCSV", perfStart, raid, rows, csv)
+    local csv = concat(lines, "\n")
+    finishPerf("Logger.Export.GetLootCSV", perfStart, raid, rowCount, csv)
     return csv
 end
 
 function Export:GetRaidAttendanceCSV(raid)
     local perfStart = addon.hasPerf and addon._PerfStart and addon:_PerfStart() or nil
     local queries = Database.GetRaidQueriesOrNil()
-    local attendanceRows = queries and queries.GetRaidAttendance and queries:GetRaidAttendance(raid) or {}
-    local rows = {}
+    local attendanceRows = {}
+    if queries and queries.GetRaidAttendance then
+        queries:GetRaidAttendance(raid, attendanceRows)
+    end
+    local lines = {}
+    local fields = {}
+    local encoded = {}
+    local rowCount = 0
+    appendCSVLine(lines, HEADER_RAID_ATTENDANCE, encoded, #HEADER_RAID_ATTENDANCE)
 
     for i = 1, #attendanceRows do
         local entry = attendanceRows[i]
         if entry then
-            rows[#rows + 1] = {
-                getRaidNid(raid),
-                getRaidDate(raid),
-                getRaidZone(raid),
-                getRaidSize(raid),
-                getRaidDifficulty(raid),
-                tonumber(entry.id) or "",
-                entry.name or "",
-                entry.class or "",
-                formatTimestamp(entry.join),
-                formatTimestamp(entry.leave),
-                tonumber(entry.attendanceSeconds) or 0,
-                tonumber(entry.onlineSeconds) or 0,
-                tonumber(entry.offlineSeconds) or 0,
-                tonumber(entry.segmentCount) or 0,
-            }
+            fields[1] = getRaidNid(raid)
+            fields[2] = getRaidDate(raid)
+            fields[3] = getRaidZone(raid)
+            fields[4] = getRaidSize(raid)
+            fields[5] = getRaidDifficulty(raid)
+            fields[6] = tonumber(entry.id) or ""
+            fields[7] = entry.name or ""
+            fields[8] = entry.class or ""
+            fields[9] = formatTimestamp(entry.join)
+            fields[10] = formatTimestamp(entry.leave)
+            fields[11] = tonumber(entry.attendanceSeconds) or 0
+            fields[12] = tonumber(entry.onlineSeconds) or 0
+            fields[13] = tonumber(entry.offlineSeconds) or 0
+            fields[14] = tonumber(entry.segmentCount) or 0
+            rowCount = rowCount + 1
+            appendCSVLine(lines, fields, encoded, 14)
         end
     end
 
-    local csv = buildCSV(HEADER_RAID_ATTENDANCE, rows)
-    finishPerf("Logger.Export.GetRaidAttendanceCSV", perfStart, raid, rows, csv)
+    local csv = concat(lines, "\n")
+    finishPerf("Logger.Export.GetRaidAttendanceCSV", perfStart, raid, rowCount, csv)
     return csv
 end
 

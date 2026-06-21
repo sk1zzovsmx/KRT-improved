@@ -368,12 +368,25 @@ do
         return ""
     end
 
-    local function resolveLootLooterRef(loot, playerNameByNid, validPlayerNids)
+    local function resolveLootLooterRef(loot, playerNameByNid, playerNidByName, validPlayerNids)
         local looterNid = tonumber(loot and loot.looterNid)
         if looterNid and looterNid > 0 and ((not validPlayerNids) or validPlayerNids[looterNid]) then
             return tostring(looterNid)
         end
-        return resolveLootLooterNameFromMap(loot, playerNameByNid)
+        local resolvedLooterName = resolveLootLooterNameFromMap(loot, playerNameByNid)
+        if type(resolvedLooterName) == "string" and resolvedLooterName ~= "" then
+            local normalizedLooterName = NormalizeLower(resolvedLooterName, true)
+            if normalizedLooterName and normalizedLooterName ~= "" and playerNidByName then
+                local mappedLooterNid = tonumber(playerNidByName[normalizedLooterName])
+                if mappedLooterNid and mappedLooterNid > 0 then
+                    local isValidMappedLooter = (not validPlayerNids) or validPlayerNids[mappedLooterNid]
+                    if isValidMappedLooter then
+                        return tostring(mappedLooterNid)
+                    end
+                end
+            end
+        end
+        return resolvedLooterName
     end
 
     local function cleanupExpiredState()
@@ -580,16 +593,7 @@ do
         )
 
         local players = sortedByNid(raid.players, "playerNid", "name")
-        local playerNameByNid = {}
-        local validPlayerNids = {}
-        for i = 1, #players do
-            local p = players[i]
-            local playerNid = tonumber(p and p.playerNid)
-            if playerNid and playerNid > 0 and p and p.name then
-                validPlayerNids[playerNid] = true
-                playerNameByNid[playerNid] = p.name
-            end
-        end
+        local playerNameByNid, playerNidByName, validPlayerNids = buildPlayerNameMaps(players)
         for i = 1, #players do
             local p = players[i]
             lines[#lines + 1] = packFields(
@@ -659,7 +663,7 @@ do
                 tonumber(loot.itemRarity) or 0,
                 encodeText(loot.itemTexture),
                 tonumber(loot.itemCount) or 1,
-                encodeText(resolveLootLooterRef(loot, playerNameByNid, validPlayerNids)),
+                encodeText(resolveLootLooterRef(loot, playerNameByNid, playerNidByName, validPlayerNids)),
                 tonumber(loot.rollType) or 0,
                 tonumber(loot.rollValue) or 0,
                 tonumber(loot.bossNid) or 0,

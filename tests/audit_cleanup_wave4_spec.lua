@@ -29,6 +29,8 @@ assertContains(loggerView, "Database.GetRaidQueriesOrNil()", "Logger View should
 assertContains(loggerExport, "Database.GetRaidQueriesOrNil()", "Logger Export should use the Database facade helper")
 assertNotContains(loggerView, "local function getRaidQueries()", "Logger View should not keep the duplicated local query wrapper")
 assertNotContains(loggerExport, "local function getRaidQueries()", "Logger Export should not keep the duplicated local query wrapper")
+assertNotContains(loggerExport, "local rows = {}", "Logger Export should build CSV content without per-export row table accumulation in GetLootCSV/GetRaidAttendanceCSV")
+assertNotContains(loggerExport, "rows[#rows + 1] = {", "Logger Export should build CSV content without preallocating row arrays in GetLootCSV/GetRaidAttendanceCSV")
 assertNotContains(loggerView, '"Database/DBRaidQueries"', "Logger View must not depend directly on DBRaidQueries")
 assertNotContains(loggerExport, '"Database/DBRaidQueries"', "Logger Export must not depend directly on DBRaidQueries")
 assertContains(releaseSpec, "Database.GetRaidQueriesOrNil = function()", "isolated release harness should expose the optional RaidQueries facade helper")
