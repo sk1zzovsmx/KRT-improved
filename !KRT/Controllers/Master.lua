@@ -2127,19 +2127,21 @@ do
             local itemLink = Loot.GetItemLink()
             local itemID = Item.GetItemIdFromLink(itemLink)
             RollsApi.EnsureLootRollSession(Rolls, itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow", buildLootRollSessionOptions())
-            local message
-
+            local srList = nil
             if rollType == rollTypes.RESERVED then
-                -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
                 local reserves = Services.Reserves
-                local srList = reserves and reserves.FormatReservedPlayersLine and reserves:FormatReservedPlayersLine(itemID, false, false, false, true) or ""
-                local suff = GetOption("Master", "sortAscending") and "Low" or "High"
-                message = lootState.selectedItemCount > 1 and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.selectedItemCount)
-                    or L[chatMsg]:format(srList, itemLink)
-            else
-                local suff = GetOption("Master", "sortAscending") and "Low" or "High"
-                message = lootState.selectedItemCount > 1 and L[chatMsg .. "Multiple" .. suff]:format(itemLink, lootState.selectedItemCount) or L[chatMsg]:format(itemLink)
+                srList = reserves and reserves.FormatReservedPlayersLine and reserves:FormatReservedPlayersLine(itemID, false, false, false, true) or ""
             end
+
+            local plan = MasterService.BuildRollAnnouncementPlan({
+                chatKey = chatMsg,
+                itemLink = itemLink,
+                rollType = rollType,
+                selectedItemCount = lootState.selectedItemCount,
+                sortAscending = GetOption("Master", "sortAscending") == true,
+                srList = srList,
+            })
+            local message = plan and plan.message or nil
 
             ChatApi.Announce(Chat, message)
             updateLootDistribution("roll_start", {

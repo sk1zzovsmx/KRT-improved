@@ -65,6 +65,12 @@ local function newAddon()
             TipMasterSelectItem = "Select item",
             TipMasterSpamLoot = "Spam loot",
             TipMasterSRUnavailable = "No SR",
+            ChatRollMS = "MS roll %s",
+            ChatRollMSMultipleHigh = "MS roll high %s x%d",
+            ChatRollMSMultipleLow = "MS roll low %s x%d",
+            ChatRollSR = "SR roll %s for %s",
+            ChatRollSRMultipleHigh = "SR roll high %s for %s x%d",
+            ChatRollSRMultipleLow = "SR roll low %s for %s x%d",
             TipMasterTrade = "Trade %s",
             TipMasterTradeMultiple = "Trade %d",
             WarnMLOnlyMode = "ML only",
@@ -92,6 +98,7 @@ loadAddonFile(addon, "!KRT/Services/Master/RollRows.lua")
 loadAddonFile(addon, "!KRT/Services/Master/AwardMessages.lua")
 loadAddonFile(addon, "!KRT/Services/Master/LootSpam.lua")
 loadAddonFile(addon, "!KRT/Services/Master/AwardCounter.lua")
+loadAddonFile(addon, "!KRT/Services/Master/RollAnnouncements.lua")
 loadAddonFile(addon, "!KRT/Services/Master/Service.lua")
 
 local Master = addon.Services.Master
@@ -277,5 +284,27 @@ assert(Master.ButtonState, "expected ButtonState module")
 assert(Master.RollRows, "expected RollRows module")
 assert(Master.AwardMessages, "expected AwardMessages module")
 assert(Master.LootSpam, "expected LootSpam module")
+
+local msPlan = Master.BuildRollAnnouncementPlan({
+    chatKey = "ChatRollMS",
+    itemLink = "[Blade]",
+    rollType = rollTypes.MAINSPEC,
+    selectedItemCount = 2,
+    sortAscending = false,
+})
+assert(msPlan.message == "MS roll high [Blade] x2", "expected high multi MS roll message")
+assert(msPlan.suffix == "High", "expected descending roll suffix")
+
+local srPlan = Master.BuildRollAnnouncementPlan({
+    chatKey = "ChatRollSR",
+    itemLink = "[Ring]",
+    rollType = rollTypes.RESERVED,
+    selectedItemCount = 1,
+    sortAscending = true,
+    srList = "Alice, Bob",
+})
+assert(srPlan.message == "SR roll Alice, Bob for [Ring]", "expected SR list in roll message")
+assert(srPlan.srList == "Alice, Bob", "expected SR list to be returned")
+assert(srPlan.suffix == "Low", "expected ascending roll suffix")
 
 print("master model services spec passed")

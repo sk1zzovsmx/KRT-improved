@@ -20,6 +20,7 @@ local DebugRaidGrid = Master.DebugRaidGrid
 local FlowState = Master.FlowState
 local AwardCounter = Master.AwardCounter
 local LootSpam = Master.LootSpam
+local RollAnnouncements = Master.RollAnnouncements
 local RollRows = Master.RollRows
 local SessionWinners = Master.SessionWinners
 local SoftRes = Master.SoftRes
@@ -96,6 +97,10 @@ function Master.BuildLootSpamPlan(opts)
     return LootSpam.BuildPlan(opts)
 end
 
+function Master.BuildRollAnnouncementPlan(opts)
+    return RollAnnouncements.BuildPlan(opts)
+end
+
 function Master.EnsureAwardCounterState(state)
     return AwardCounter.EnsureState(state)
 end
@@ -145,6 +150,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Services/Master/AwardMessages",
             "Services/Master/LootSpam",
             "Services/Master/AwardCounter",
+            "Services/Master/RollAnnouncements",
         },
     })
     registry.SetLoaded("Services/Master/Service")

@@ -115,11 +115,13 @@
 |   |   |-- Master
 |   |   |   |-- AssignmentCandidates.lua
 |   |   |   |-- AssignmentTargets.lua
+|   |   |   |-- AwardCounter.lua
 |   |   |   |-- AwardMessages.lua
 |   |   |   |-- ButtonState.lua
 |   |   |   |-- DebugRaidGrid.lua
 |   |   |   |-- FlowState.lua
 |   |   |   |-- LootSpam.lua
+|   |   |   |-- RollAnnouncements.lua
 |   |   |   |-- RollRows.lua
 |   |   |   |-- Service.lua
 |   |   |   |-- SessionWinners.lua
