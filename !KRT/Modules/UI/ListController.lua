@@ -3,6 +3,7 @@
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.UI.Lists
 -- events: none; owns deferred list refresh driver
+-- ui ownership: Lua owns list virtualization, row reuse, row placement, and scroll sizing.
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()

@@ -3144,7 +3144,9 @@ do
             if not frame then
                 return
             end
-            module._selectionFrame = CreateFrame("Frame", nil, frame, "KRTDialogTemplate")
+            local frameName = getFrameName()
+            local selectionName = frameName and (frameName .. "ItemSelectionFrame") or nil
+            module._selectionFrame = CreateFrame("Frame", selectionName, frame, "KRTItemSelectionFrame")
             module._selectionFrame:Hide()
         end
         for i = 1, #module._selectionButtons do

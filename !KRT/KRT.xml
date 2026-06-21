@@ -2,6 +2,8 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
     <!-- Unified UI include manifest. -->
+    <Include file="UI\RaidGrid.xml" />
+    <Include file="UI\ScreenNotice.xml" />
     <Include file="UI\Minimap.xml" />
     <Include file="UI\Spammer.xml" />
     <Include file="UI\Warnings.xml" />

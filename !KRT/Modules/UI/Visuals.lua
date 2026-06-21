@@ -3,6 +3,7 @@
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.UI.Primitives, addon.UI.Rows
 -- events: none
+-- ui ownership: Lua applies row/panel visual state and keeps XML-template fallbacks only.
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -51,30 +52,55 @@ local function setTextureColor(texture, r, g, b, a)
 end
 
 local function ensureRowTextures(row)
-    if not row or row._krtSelTex then
+    if not row or row._krtVisualsResolved then
         return
     end
 
-    local sel = row:CreateTexture(nil, "BACKGROUND")
-    sel:SetAllPoints(row)
-    sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    sel:SetBlendMode("ADD")
-    sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
-    sel:Hide()
-    row._krtSelTex = sel
+    local rowName = row.GetName and row:GetName() or nil
 
-    local focus = row:CreateTexture(nil, "ARTWORK")
-    focus:SetAllPoints(row)
-    focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    focus:SetBlendMode("ADD")
-    focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
-    focus:Hide()
-    row._krtFocusTex = focus
+    row._krtSelTex = row._krtSelTex or (rowName and _G[rowName .. "SelectedTexture"])
+    row._krtFocusTex = row._krtFocusTex or (rowName and _G[rowName .. "FocusTexture"])
 
-    local pushed = row:CreateTexture(nil, "ARTWORK")
-    pushed:SetAllPoints(row)
-    pushed:SetTexture(1, 1, 1, 0.08)
-    row:SetPushedTexture(pushed)
+    local pushed = rowName and _G[rowName .. "PushedTexture"]
+    if pushed and row.SetPushedTexture then
+        row:SetPushedTexture(pushed)
+    end
+
+    if row._krtSelTex and row._krtSelTex.Hide then
+        row._krtSelTex:Hide()
+    end
+    if row._krtFocusTex and row._krtFocusTex.Hide then
+        row._krtFocusTex:Hide()
+    end
+
+    if not row._krtSelTex and row.CreateTexture then
+        local sel = row:CreateTexture(nil, "BACKGROUND")
+        sel:SetAllPoints(row)
+        sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+        sel:SetBlendMode("ADD")
+        sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
+        sel:Hide()
+        row._krtSelTex = sel
+    end
+
+    if not row._krtFocusTex and row.CreateTexture then
+        local focus = row:CreateTexture(nil, "ARTWORK")
+        focus:SetAllPoints(row)
+        focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+        focus:SetBlendMode("ADD")
+        focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
+        focus:Hide()
+        row._krtFocusTex = focus
+    end
+
+    if not pushed and row.CreateTexture and row.SetPushedTexture then
+        pushed = row:CreateTexture(nil, "ARTWORK")
+        pushed:SetAllPoints(row)
+        pushed:SetTexture(1, 1, 1, 0.08)
+        row:SetPushedTexture(pushed)
+    end
+
+    row._krtVisualsResolved = true
 end
 
 local function isLoggerRow(row)
@@ -86,33 +112,49 @@ local function ensureLoggerHeaderTab(header)
         return
     end
 
-    local fill = header:CreateTexture(nil, "BACKGROUND")
-    fill:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-    fill:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    local headerName = header.GetName and header:GetName() or nil
+    local fill = headerName and _G[headerName .. "Fill"] or nil
+    if not fill then
+        fill = header:CreateTexture(nil, "BACKGROUND")
+        fill:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+        fill:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    end
     header._krtHeaderFill = fill
 
-    local top = header:CreateTexture(nil, "BORDER")
-    top:SetHeight(1)
-    top:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-    top:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+    local top = headerName and _G[headerName .. "Top"] or nil
+    if not top then
+        top = header:CreateTexture(nil, "BORDER")
+        top:SetHeight(1)
+        top:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+        top:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+    end
     header._krtHeaderTop = top
 
-    local bottom = header:CreateTexture(nil, "BORDER")
-    bottom:SetHeight(1)
-    bottom:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
-    bottom:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    local bottom = headerName and _G[headerName .. "Bottom"] or nil
+    if not bottom then
+        bottom = header:CreateTexture(nil, "BORDER")
+        bottom:SetHeight(1)
+        bottom:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+        bottom:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    end
     header._krtHeaderBottom = bottom
 
-    local left = header:CreateTexture(nil, "BORDER")
-    left:SetWidth(1)
-    left:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-    left:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+    local left = headerName and _G[headerName .. "Left"] or nil
+    if not left then
+        left = header:CreateTexture(nil, "BORDER")
+        left:SetWidth(1)
+        left:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+        left:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+    end
     header._krtHeaderLeft = left
 
-    local right = header:CreateTexture(nil, "BORDER")
-    right:SetWidth(1)
-    right:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
-    right:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    local right = headerName and _G[headerName .. "Right"] or nil
+    if not right then
+        right = header:CreateTexture(nil, "BORDER")
+        right:SetWidth(1)
+        right:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+        right:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    end
     header._krtHeaderRight = right
 
     header._krtHeaderTab = true
@@ -429,15 +471,23 @@ function Rows.StyleLoggerRow(row)
 
     row._krtRowVisualStyle = "logger"
     if not row._krtLoggerBg then
-        local bg = row:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints(row)
+        local rowName = row.GetName and row:GetName() or nil
+        local bg = rowName and _G[rowName .. "LoggerBg"] or nil
+        if not bg then
+            bg = row:CreateTexture(nil, "BACKGROUND")
+            bg:SetAllPoints(row)
+        end
         row._krtLoggerBg = bg
     end
     if not row._krtLoggerLine then
-        local line = row:CreateTexture(nil, "BORDER")
-        line:SetHeight(1)
-        line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
-        line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
+        local rowName = row.GetName and row:GetName() or nil
+        local line = rowName and _G[rowName .. "LoggerBottomLine"] or nil
+        if not line then
+            line = row:CreateTexture(nil, "BORDER")
+            line:SetHeight(1)
+            line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
+            line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
+        end
         row._krtLoggerLine = line
     end
 

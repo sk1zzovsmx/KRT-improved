@@ -3,6 +3,7 @@
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.UI.Frames/Scaffold/ModuleState/EditBoxes/Popups/Tooltips
 -- events: none; owns shared refresh driver
+-- ui ownership: Lua owns frame binding, named-reference resolution, scripts, and refresh drivers.
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -362,6 +363,29 @@ function Frames.GetNamedParts(widget, parts, cacheField)
     end
 
     widget[cacheField] = refs
+    return refs
+end
+
+function Frames.ResolveNamedPartsBySuffix(parent, map, cacheField)
+    if not parent or type(map) ~= "table" then
+        return nil
+    end
+
+    cacheField = cacheField or "_krtRefs"
+    if parent[cacheField] then
+        return parent[cacheField]
+    end
+
+    local parentName = parent.GetName and parent:GetName() or nil
+    local refs = {}
+
+    if parentName then
+        for key, suffix in pairs(map) do
+            refs[key] = _G[parentName .. suffix]
+        end
+    end
+
+    parent[cacheField] = refs
     return refs
 end
 

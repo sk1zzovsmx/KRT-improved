@@ -144,6 +144,28 @@ end
 dofile("!KRT/Modules/Events.lua")
 dofile("!KRT/Modules/Bus.lua")
 dofile("!KRT/Modules/UI/Effects.lua")
+
+frames.KRTScreenNoticeFrame = makeFrame("KRTScreenNoticeFrame")
+_G.KRTScreenNoticeFrame = frames.KRTScreenNoticeFrame
+_G.KRTScreenNoticeFrame:SetFrameStrata("TOOLTIP")
+_G.KRTScreenNoticeFrame:SetPoint("CENTER", _G.UIParent, "CENTER", 0, 140)
+_G.KRTScreenNoticeFrame:SetWidth(1)
+_G.KRTScreenNoticeFrame:SetHeight(1)
+_G.KRTScreenNoticeFrame:Hide()
+_G.KRTScreenNoticeFrameTitleText = makeFrame("KRTScreenNoticeFrameTitleText")
+_G.KRTScreenNoticeFrameDetailText = makeFrame("KRTScreenNoticeFrameDetailText")
+_G.KRTScreenNoticeFrame._fontStrings = {
+    _G.KRTScreenNoticeFrameTitleText,
+    _G.KRTScreenNoticeFrameDetailText,
+}
+_G.KRTScreenNoticeFrameTitleText:SetFont("FONTS\\FRIZQT__.TTF", 24, "OUTLINE")
+_G.KRTScreenNoticeFrameTitleText:SetTextColor(1, 1, 1, 1)
+_G.KRTScreenNoticeFrameTitleText:SetShadowOffset(2, -2)
+_G.KRTScreenNoticeFrameDetailText:SetFont("FONTS\\FRIZQT__.TTF", 16, "OUTLINE")
+_G.KRTScreenNoticeFrameDetailText:SetTextColor(0.78, 0.78, 0.78, 1)
+_G.KRTScreenNoticeFrameDetailText:SetShadowOffset(1, -1)
+_G.KRTScreenNoticeFrameDetailText:Hide()
+
 dofile("!KRT/Modules/UI/ScreenNotice.lua")
 
 addon.Bus.TriggerEvent(addon.Events.Internal.ScreenNotice, "Boss targeted, auto switch to Master Loot.", 1.25)
@@ -155,7 +177,7 @@ assert(frame._alpha == 1, "screen notice frame must start fully visible")
 assert(frame._strata == "TOOLTIP", "screen notice frame must render above raid UI")
 assert(frame._frameLevel == 1000, "screen notice frame must use a high frame level")
 assert(frame._point and frame._point[5] == 140, "screen notice frame must use RollFor-style vertical placement")
-assert(frame._fontStrings and frame._fontStrings[1]._text == "Boss targeted, auto switch to |cffff2020Master Loot|r.", "screen notice text must be applied")
+assert(_G.KRTScreenNoticeFrameTitleText._text == "Boss targeted, auto switch to |cffff2020Master Loot|r.", "screen notice text must be applied")
 assert(frame._fontStrings[1]._font[1] == "FONTS\\FRIZQT__.TTF", "screen notice title must use RollFor-style font path")
 assert(frame._fontStrings[1]._font[2] == 24, "screen notice title must use RollFor-style title size")
 assert(type(frame.OnUpdate) == "function", "screen notice must register timed fade update")

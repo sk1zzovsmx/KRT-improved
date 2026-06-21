@@ -149,6 +149,36 @@
 					</Anchors>
 				</Texture>
 			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentTopSeparator" file="Interface\\Buttons\\WHITE8x8" hidden="true">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-4" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.10" />
+				</Texture>
+				<Texture name="$parentBottomSeparator" file="Interface\\Buttons\\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" />
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-4" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.08" />
+				</Texture>
+			</Layer>
 			<Layer level="OVERLAY">
 				<FontString name="$parentQuantity" inherits="GameFontNormalSmall">
 					<Anchors>
@@ -166,4 +196,3 @@
 	</Frame>
 <!-- ====== End Reserve List Templates ====== -->
 </Ui>
-

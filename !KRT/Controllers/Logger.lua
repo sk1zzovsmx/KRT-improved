@@ -490,28 +490,46 @@ local function ensureAttendanceInspectIcon(row, index, ui)
         return icon
     end
 
-    icon = CreateFrame("Button", nil, row)
+    local rowName = row.GetName and row:GetName() or nil
+    local iconName = rowName and (rowName .. "InspectItemIcon" .. tostring(index)) or nil
+    if iconName then
+        icon = _G[iconName]
+    end
+    if not icon then
+        icon = CreateFrame("Button", iconName, row, "KRTLoggerInspectItemIconButtonTemplate")
+    end
+    if not icon then
+        icon = CreateFrame("Button", nil, row)
+    end
     icon:EnableMouse(true)
     icon:SetSize(RAID_INSPECT_ICON_SIZE, RAID_INSPECT_ICON_SIZE)
-    icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    icon:SetID(index)
+    icon.texture = iconName and _G[iconName .. "Texture"] or icon.texture
+    if not icon.texture then
+        icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    end
     icon.texture:SetAllPoints(icon)
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    icon:SetScript("OnEnter", function(self)
-        local link = self._krtItemLink
-        if not link then
-            return
-        end
-        if GameTooltip and GameTooltip.SetOwner and GameTooltip.SetHyperlink then
-            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-            GameTooltip:SetHyperlink(link)
-            GameTooltip:Show()
-        end
-    end)
-    icon:SetScript("OnLeave", function()
-        if GameTooltip and GameTooltip.Hide then
-            GameTooltip:Hide()
-        end
-    end)
+    if not icon:GetScript("OnEnter") then
+        icon:SetScript("OnEnter", function(self)
+            local link = self._krtItemLink
+            if not link then
+                return
+            end
+            if GameTooltip and GameTooltip.SetOwner and GameTooltip.SetHyperlink then
+                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                GameTooltip:SetHyperlink(link)
+                GameTooltip:Show()
+            end
+        end)
+    end
+    if not icon:GetScript("OnLeave") then
+        icon:SetScript("OnLeave", function()
+            if GameTooltip and GameTooltip.Hide then
+                GameTooltip:Hide()
+            end
+        end)
+    end
     list[index] = icon
     return icon
 end
@@ -552,10 +570,18 @@ local function ensureAttendanceSpecIcon(row)
         return row._krtAttendanceSpecIcon
     end
 
-    local icon = CreateFrame("Button", nil, row)
+    local rowName = row.GetName and row:GetName() or nil
+    local iconName = rowName and (rowName .. "SpecIcon") or nil
+    local icon = iconName and _G[iconName] or nil
+    if not icon then
+        icon = CreateFrame("Button", nil, row)
+    end
     icon:EnableMouse(true)
     icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
-    icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    icon.texture = iconName and _G[iconName .. "Texture"] or icon.texture
+    if not icon.texture then
+        icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    end
     icon.texture:SetAllPoints(icon)
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     bindAttendanceSpecIconTooltip(icon)

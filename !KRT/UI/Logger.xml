@@ -25,6 +25,88 @@
 					</Anchors>
 					<Color r="0" g="0" b="0" a="0.35" />
 				</Texture>
+				<Texture name="$parentFill" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="1" y="-1" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-1" y="1" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentTop" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="1" y="-1" />
+							</Offset>
+						</Anchor>
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-1" y="-1" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentBottom" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="1" y="1" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-1" y="1" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentLeft" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension x="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="1" y="-1" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="1" y="1" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRight" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension x="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-1" y="-1" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-1" y="1" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</Texture>
 			</Layer>
 		</Layers>
 		<ButtonText name="$parentText">
@@ -56,7 +138,7 @@
 		</HighlightTexture>
 	</Button>
 	<!-- Buttons Template -->
-	<Button name="KRTLoggerRaidButton" virtual="true">
+	<Button name="KRTLoggerRaidButton" inherits="KRTSelectableRowButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -77,6 +159,31 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
+				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -155,7 +262,7 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 	</Button>
-	<Button name="KRTLoggerBossButton" virtual="true">
+	<Button name="KRTLoggerBossButton" inherits="KRTSelectableRowButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -176,6 +283,31 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
+				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -254,7 +386,7 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 	</Button>
-	<Button name="KRTLoggerBossAttendeeButton" virtual="true">
+	<Button name="KRTLoggerBossAttendeeButton" inherits="KRTSelectableRowButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -275,6 +407,31 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
+				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -318,7 +475,7 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 	</Button>
-	<Button name="KRTLoggerRaidAttendeeButton" virtual="true">
+	<Button name="KRTLoggerRaidAttendeeButton" inherits="KRTSelectableRowButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -339,6 +496,31 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
+				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="22" />
@@ -433,6 +615,31 @@
 				</FontString>
 			</Layer>
 		</Layers>
+		<Frames>
+			<Button name="$parentSpecIcon" enableMouse="true" hidden="true">
+				<Size>
+					<AbsDimension x="17" y="17" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentSpec" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="1" y="-1" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture name="$parentTexture">
+							<Anchors>
+								<Anchor point="TOPLEFT" />
+								<Anchor point="BOTTOMRIGHT" />
+							</Anchors>
+							<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
+						</Texture>
+					</Layer>
+				</Layers>
+			</Button>
+		</Frames>
 		<HighlightTexture>
 			<Anchors>
 				<Anchor point="TOPLEFT" />
@@ -441,7 +648,23 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 	</Button>
-	<Button name="KRTLoggerLootButton" virtual="true">
+	<Button name="KRTLoggerInspectItemIconButtonTemplate" enableMouse="true" hidden="true" virtual="true">
+		<Size>
+			<AbsDimension x="16" y="16" />
+		</Size>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentTexture">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+	<Button name="KRTLoggerLootButton" inherits="KRTSelectableRowButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension y="30" />
 		</Size>
@@ -462,6 +685,31 @@
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
+				<Texture name="$parentLoggerBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.025" g="0.025" b="0.025" a="0.76" />
+				</Texture>
+				<Texture name="$parentLoggerBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="2" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="0.32" g="0.30" b="0.25" a="0.42" />
+				</Texture>
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="31" />

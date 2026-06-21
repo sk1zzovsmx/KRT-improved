@@ -3,6 +3,7 @@
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Widgets.RaidGrid
 -- events: listens SpecInspectUpdated
+-- ui ownership: XML owns fixed picker skeletons; Lua owns dynamic buttons, data, and selection.
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -235,43 +236,78 @@ do
         return result
     end
 
-    local function createButton(index)
+    local function createButtonFallback(index, button)
         local buttonName = "KRTRaidGridButton" .. tostring(index)
-        local button = _G.CreateFrame("Button", buttonName, frame)
+        if not button and _G.CreateFrame then
+            button = _G.CreateFrame("Button", buttonName, frame)
+        end
+        if not button then
+            return nil
+        end
         setSize(button, CFG.buttonWidth, CFG.buttonHeight)
-        safeCall(button, "RegisterForClicks", "LeftButtonUp")
 
-        button.bg = createTexture(button, "BACKGROUND")
+        button.bg = button.bg or createTexture(button, "BACKGROUND")
         safeCall(button.bg, "SetAllPoints", button)
-        updateButtonColor(button, false)
+        setTextureColor(button.bg, 0, 0, 0, CFG.buttonAlpha)
 
-        button.topLine = createTexture(button, "BORDER")
+        button.topLine = button.topLine or createTexture(button, "BORDER")
         safeCall(button.topLine, "SetHeight", 1)
         safeCall(button.topLine, "SetPoint", "TOPLEFT", button, "TOPLEFT", 0, 0)
         safeCall(button.topLine, "SetPoint", "TOPRIGHT", button, "TOPRIGHT", 0, 0)
         setTextureColor(button.topLine, 1, 1, 1, 0.08)
 
-        button.bottomLine = createTexture(button, "BORDER")
+        button.bottomLine = button.bottomLine or createTexture(button, "BORDER")
         safeCall(button.bottomLine, "SetHeight", 1)
         safeCall(button.bottomLine, "SetPoint", "BOTTOMLEFT", button, "BOTTOMLEFT", 0, 0)
         safeCall(button.bottomLine, "SetPoint", "BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
         setTextureColor(button.bottomLine, 0, 0, 0, 0.90)
 
-        button.highlight = createTexture(button, "HIGHLIGHT")
+        button.highlight = button.highlight or createTexture(button, "HIGHLIGHT")
         safeCall(button.highlight, "SetAllPoints", button)
         safeCall(button.highlight, "SetTexture", "Interface\\QuestFrame\\UI-QuestTitleHighlight")
         safeCall(button.highlight, "SetBlendMode", "ADD")
 
-        button.text = createFontString(button, "GameFontNormalLarge")
+        button.text = button.text or createFontString(button, "GameFontNormalLarge")
         safeCall(button.text, "SetPoint", "CENTER", button, "CENTER", 0, 0)
         safeCall(button.text, "SetWidth", CFG.buttonWidth - 8)
         safeCall(button.text, "SetJustifyH", "CENTER")
 
-        button.specIcon = createTexture(button, "ARTWORK")
+        button.specIcon = button.specIcon or createTexture(button, "ARTWORK")
         safeCall(button.specIcon, "SetPoint", "LEFT", button, "LEFT", 12, 0)
         setSize(button.specIcon, CFG.specIconSize, CFG.specIconSize)
         safeCall(button.specIcon, "SetTexCoord", 0.08, 0.92, 0.08, 0.92)
         safeCall(button.specIcon, "Hide")
+
+        return button
+    end
+
+    local function createButton(index)
+        local buttonName = "KRTRaidGridButton" .. tostring(index)
+        local button = _G[buttonName]
+        if not button and _G.CreateFrame then
+            button = _G.CreateFrame("Button", buttonName, frame, "KRTRaidGridButtonTemplate")
+        end
+        if not button and _G.CreateFrame then
+            button = createButtonFallback(index)
+        end
+
+        setSize(button, CFG.buttonWidth, CFG.buttonHeight)
+        safeCall(button, "RegisterForClicks", "LeftButtonUp")
+
+        button.bg = _G[buttonName .. "Bg"] or button.bg
+        button.topLine = _G[buttonName .. "TopLine"] or button.topLine
+        button.bottomLine = _G[buttonName .. "BottomLine"] or button.bottomLine
+        button.highlight = _G[buttonName .. "Highlight"] or button.highlight
+        button.text = _G[buttonName .. "Text"] or button.text
+        button.specIcon = _G[buttonName .. "SpecIcon"] or button.specIcon
+        if not button.bg or not button.text or not button.specIcon then
+            button = createButtonFallback(index, button)
+        end
+        setSize(button.specIcon, CFG.specIconSize, CFG.specIconSize)
+        safeCall(button.specIcon, "SetTexCoord", 0.08, 0.92, 0.08, 0.92)
+        safeCall(button.specIcon, "Hide")
+        buttons[index] = button
+        updateButtonColor(button, false)
 
         safeCall(button, "SetScript", "OnEnter", function(self)
             updateButtonColor(self, true)
@@ -296,7 +332,6 @@ do
             selectEntry(self.entry)
         end)
 
-        buttons[index] = button
         return button
     end
 
@@ -305,7 +340,7 @@ do
             return frame
         end
 
-        frame = _G.CreateFrame("Frame", "KRTRaidGridFrame", _G.UIParent, "KRTDialogTemplate")
+        frame = _G.KRTRaidGridFrame or _G.CreateFrame("Frame", "KRTRaidGridFrame", _G.UIParent, "KRTDialogTemplate")
         frame.buttons = buttons
         safeCall(frame, "Hide")
         safeCall(frame, "SetFrameStrata", "FULLSCREEN_DIALOG")
@@ -325,49 +360,56 @@ do
             end
         end)
 
-        if frame.SetBackdrop then
-            frame:SetBackdrop({
-                bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-                tile = true,
-                tileSize = 8,
-                edgeSize = 8,
-                insets = { left = 1, right = 1, top = 1, bottom = 1 },
-            })
+        frame.icon = _G.KRTRaidGridFrameIcon
+        if not frame.icon then
+            frame.icon = createTexture(frame, "ARTWORK")
+            setSize(frame.icon, 30, 30)
+            safeCall(frame.icon, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -18)
         end
 
-        frame.icon = createTexture(frame, "ARTWORK")
-        setSize(frame.icon, 30, 30)
-        safeCall(frame.icon, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -18)
+        frame.title = _G.KRTRaidGridFrameTitle
+        if not frame.title then
+            frame.title = createFontString(frame, "GameFontNormalLarge")
+            safeCall(frame.title, "SetPoint", "LEFT", frame.icon, "RIGHT", 8, 0)
+            safeCall(frame.title, "SetJustifyH", "LEFT")
+        end
 
-        frame.title = createFontString(frame, "GameFontNormalLarge")
-        safeCall(frame.title, "SetPoint", "LEFT", frame.icon, "RIGHT", 8, 0)
-        safeCall(frame.title, "SetJustifyH", "LEFT")
+        frame.count = _G.KRTRaidGridFrameCount
+        if not frame.count then
+            frame.count = createFontString(frame, "GameFontNormal")
+            safeCall(frame.count, "SetTextColor", 1, 1, 1)
+            safeCall(frame.count, "Hide")
+        end
 
-        frame.count = createFontString(frame, "GameFontNormal")
-        safeCall(frame.count, "SetPoint", "LEFT", frame.title, "RIGHT", 8, 0)
-        safeCall(frame.count, "SetTextColor", 1, 1, 1)
-        safeCall(frame.count, "Hide")
+        frame.divider = _G.KRTRaidGridFrameDivider
+        if not frame.divider then
+            frame.divider = createTexture(frame, "ARTWORK")
+            safeCall(frame.divider, "SetHeight", 1)
+            safeCall(frame.divider, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -CFG.headerHeight + 6)
+            safeCall(frame.divider, "SetPoint", "TOPRIGHT", frame, "TOPRIGHT", -22, -CFG.headerHeight + 6)
+            setTextureColor(frame.divider, 1, 0.82, 0, 0.35)
+        else
+            setTextureColor(frame.divider, 1, 0.82, 0, 0.35)
+        end
 
-        frame.divider = createTexture(frame, "ARTWORK")
-        safeCall(frame.divider, "SetHeight", 1)
-        safeCall(frame.divider, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 22, -CFG.headerHeight + 6)
-        safeCall(frame.divider, "SetPoint", "TOPRIGHT", frame, "TOPRIGHT", -22, -CFG.headerHeight + 6)
-        setTextureColor(frame.divider, 1, 0.82, 0, 0.35)
+        frame.empty = _G.KRTRaidGridFrameEmpty
+        if not frame.empty then
+            frame.empty = createFontString(frame, "GameFontHighlight")
+            safeCall(frame.empty, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 24, -CFG.headerHeight)
+            safeCall(frame.empty, "SetJustifyH", "LEFT")
+            safeCall(frame.empty, "SetTextColor", 1, 0.2, 0.2)
+            safeCall(frame.empty, "Hide")
+        end
 
-        frame.empty = createFontString(frame, "GameFontHighlight")
-        safeCall(frame.empty, "SetPoint", "TOPLEFT", frame, "TOPLEFT", 24, -CFG.headerHeight)
-        safeCall(frame.empty, "SetJustifyH", "LEFT")
-        safeCall(frame.empty, "SetTextColor", 1, 0.2, 0.2)
-
-        if _G.CreateFrame then
-            local close = _G.CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-            if close then
-                safeCall(close, "SetPoint", "TOPRIGHT", frame, "TOPRIGHT", -5, -5)
-                safeCall(close, "SetScript", "OnClick", function()
-                    module.Hide()
-                end)
-            end
+        frame.closeButton = _G.KRTRaidGridFrameCloseButton
+        if not frame.closeButton and _G.CreateFrame then
+            frame.closeButton = _G.CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+            safeCall(frame.closeButton, "SetPoint", "TOPRIGHT", frame, "TOPRIGHT", -5, -5)
+        end
+        if frame.closeButton then
+            safeCall(frame.closeButton, "SetScript", "OnClick", function()
+                module.Hide()
+            end)
         end
 
         if type(_G.UISpecialFrames) == "table" then

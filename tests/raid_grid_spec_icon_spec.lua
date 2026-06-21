@@ -170,11 +170,22 @@ fakeG = {
     },
 }
 
-function fakeG.CreateFrame(_, name)
+function fakeG.CreateFrame(_, name, parent, template)
     local frame = makeFrame(name)
+    frame.parent = parent
+    frame.template = template
     if name then
         frames[name] = frame
         fakeG[name] = frame
+    end
+    if name and string.find(name, "^KRTRaidGridButton") then
+        local childSuffixes = { "Bg", "TopLine", "BottomLine", "Highlight", "Text", "SpecIcon" }
+        for _, suffix in ipairs(childSuffixes) do
+            local childName = name .. suffix
+            local child = makeFrame(childName)
+            frames[childName] = child
+            fakeG[childName] = child
+        end
     end
     return frame
 end
@@ -274,6 +285,10 @@ grid.ShowPicker({
 })
 
 local button = assert(frames.KRTRaidGridButton1, "RaidGrid should create the first target button")
+assertEquals(button.template, "KRTRaidGridButtonTemplate", "RaidGrid dynamic buttons must use XML template")
+assertEquals(button.parent, frames.KRTRaidGridFrame, "RaidGrid dynamic buttons must attach to the grid frame")
+assert(button.text == fakeG.KRTRaidGridButton1Text, "RaidGrid must resolve XML text child")
+assert(button.specIcon == fakeG.KRTRaidGridButton1SpecIcon, "RaidGrid must resolve XML spec icon child")
 assert(button.specIcon, "RaidGrid target buttons should own a spec icon texture")
 assertEquals(button.specIcon.texture, snapshotIcon, "spec icon should use cached SpecInspect icon")
 assertEquals(button.specIcon.shown, true, "spec icon should be visible when cached")

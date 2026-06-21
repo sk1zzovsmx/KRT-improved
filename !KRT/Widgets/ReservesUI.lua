@@ -352,20 +352,32 @@ do
             return
         end
 
-        local topSeparator = row:CreateTexture(nil, "BORDER")
-        topSeparator:SetTexture("Interface\\Buttons\\WHITE8x8")
-        topSeparator:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-        topSeparator:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, 0)
-        topSeparator:SetHeight(1)
-        topSeparator:Hide()
-        row.topSeparator = topSeparator
+        local rowName = row.GetName and row:GetName() or nil
+        row.topSeparator = rowName and _G[rowName .. "TopSeparator"] or nil
+        row.separator = rowName and _G[rowName .. "BottomSeparator"] or nil
 
-        local separator = row:CreateTexture(nil, "BORDER")
-        separator:SetTexture("Interface\\Buttons\\WHITE8x8")
-        separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
-        separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
-        separator:SetHeight(1)
-        row.separator = separator
+        if row.topSeparator and row.topSeparator.Hide then
+            row.topSeparator:Hide()
+        end
+
+        if not row.topSeparator and row.CreateTexture then
+            local topSeparator = row:CreateTexture(nil, "BORDER")
+            topSeparator:SetTexture("Interface\\Buttons\\WHITE8x8")
+            topSeparator:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+            topSeparator:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, 0)
+            topSeparator:SetHeight(1)
+            topSeparator:Hide()
+            row.topSeparator = topSeparator
+        end
+
+        if not row.separator and row.CreateTexture then
+            local separator = row:CreateTexture(nil, "BORDER")
+            separator:SetTexture("Interface\\Buttons\\WHITE8x8")
+            separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
+            separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
+            separator:SetHeight(1)
+            row.separator = separator
+        end
         row._decorInitialized = true
     end
 

@@ -110,6 +110,110 @@
 		<PushedTexture inherits="UIPanelButtonPushedTexture" mod="ADD" />
 		<DisabledTexture inherits="UIPanelButtonDisabledTexture" />
 	</Button>
+	<!-- Selectable list row visual skeleton -->
+	<Button name="KRTSelectableRowButtonTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentSelectedTexture"
+					file="Interface\QuestFrame\UI-QuestTitleHighlight"
+					alphaMode="ADD"
+					hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.20" g="0.60" b="1.00" a="0.52" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentFocusTexture"
+					file="Interface\QuestFrame\UI-QuestTitleHighlight"
+					alphaMode="ADD"
+					hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0.20" g="0.60" b="1.00" a="0.72" />
+				</Texture>
+			</Layer>
+		</Layers>
+		<PushedTexture name="$parentPushedTexture" file="Interface\Buttons\WHITE8x8">
+			<Anchors>
+				<Anchor point="TOPLEFT" />
+				<Anchor point="BOTTOMRIGHT" />
+			</Anchors>
+			<Color r="1" g="1" b="1" a="0.08" />
+		</PushedTexture>
+	</Button>
+	<Button name="KRTRaidGridButtonTemplate" virtual="true">
+		<Size>
+			<AbsDimension x="150" y="28" />
+		</Size>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg" file="Interface\Buttons\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.42" />
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentTopLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="TOPRIGHT" />
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.08" />
+				</Texture>
+				<Texture name="$parentBottomLine" file="Interface\Buttons\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.9" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentSpecIcon" hidden="true">
+					<Size>
+						<AbsDimension x="16" y="16" />
+					</Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset>
+								<AbsDimension x="12" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
+				</Texture>
+				<FontString name="$parentText" inherits="GameFontNormalLarge" justifyH="CENTER" justifyV="MIDDLE">
+					<Anchors>
+						<Anchor point="CENTER">
+							<Offset>
+								<AbsDimension x="0" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<HighlightTexture name="$parentHighlight" file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD">
+			<Anchors>
+				<Anchor point="TOPLEFT" />
+				<Anchor point="BOTTOMRIGHT" />
+			</Anchors>
+		</HighlightTexture>
+	</Button>
 	<!-- Item icon button template -->
 	<Button name="KRTItemIconButtonTemplate" virtual="true">
 		<Size>
@@ -164,7 +268,7 @@
 	<!-- Numeric input template -->
 	<EditBox name="KRTNumericInputTemplate" inherits="KRTTextInputTemplate" numeric="true" virtual="true" />
 	<!-- Player Selection Button -->
-	<Button name="KRTSelectPlayerTemplate" virtual="true">
+	<Button name="KRTSelectPlayerTemplate" inherits="KRTSelectableRowButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension y="18" />
 		</Size>

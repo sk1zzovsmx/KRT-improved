@@ -3,6 +3,7 @@
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.UI.ScreenNotice
 -- events: listens Internal.ScreenNotice; delegates fade timing to UI.Effects
+-- ui ownership: XML owns static notice frame parts; Lua owns text, sizing, timing, and fade state.
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -40,6 +41,15 @@ end
 
 local function ensureFrame()
     if frame then
+        return frame
+    end
+    frame = _G[FRAME_NAME]
+    if frame then
+        titleText = _G[FRAME_NAME .. "TitleText"]
+        detailText = _G[FRAME_NAME .. "DetailText"]
+        if frame.SetFrameLevel then
+            frame:SetFrameLevel(1000)
+        end
         return frame
     end
     if type(CreateFrame) ~= "function" or not UIParent then
