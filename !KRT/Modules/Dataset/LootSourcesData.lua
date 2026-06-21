@@ -14,6 +14,7 @@ local tonumber = tonumber
 local tconcat = table.concat
 local strlower = string.lower
 local gsub = string.gsub
+local LootSourceCandidates = feature.LootSourceCandidates
 
 -- ----- Internal state ----- --
 local LootSourcesData = feature.LootSourcesData or {}
@@ -26,14 +27,6 @@ local ByInstance = LootSourcesData.ByInstance
 local BOSS_SOURCE_KIND = "boss"
 local UNKNOWN_MODE_SIZE = 0
 local UNKNOWN_MODE_DIFFICULTY = "any"
-local MODE_KEY_ORDER = {
-    "normal10",
-    "normal20",
-    "normal25",
-    "normal40",
-    "heroic10",
-    "heroic25",
-}
 
 -- ----- Private helpers ----- --
 local function isBossSource(source)
@@ -66,28 +59,12 @@ local function copyModes(modes)
     return copied
 end
 
-local function getModeSignature(modes)
-    if type(modes) ~= "table" then
-        return "any"
-    end
-
-    local out = {}
-    for i = 1, #MODE_KEY_ORDER do
-        local mode = MODE_KEY_ORDER[i]
-        if modes[mode] == true then
-            out[#out + 1] = mode
-        end
-    end
-
-    return (#out > 0) and tconcat(out, ",") or "any"
-end
-
 local function buildSourceKey(raidName, source)
     local raidKey = normalizeText(raidName) or "unknown"
     local kind = normalizeText(source and source.kind) or BOSS_SOURCE_KIND
     local npcId = tonumber(source and (source.npcId or source.sourceNpcId)) or 0
     local sourceName = normalizeText(source and (source.npcName or source.name)) or "unknown"
-    return tconcat({ raidKey, kind, tostring(npcId), sourceName, getModeSignature(source and source.modes) }, "|")
+    return tconcat({ raidKey, kind, tostring(npcId), sourceName, LootSourceCandidates.GetModeSignature(source and source.modes) }, "|")
 end
 
 local function parseMode(mode)
@@ -265,7 +242,7 @@ end
 
 do
     local name = "Modules/Dataset/LootSourcesData"
-    local deps = { "Init" }
+    local deps = { "Init", "Modules/LootSourceCandidates" }
     local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })

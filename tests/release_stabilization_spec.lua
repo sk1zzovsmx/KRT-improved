@@ -2345,8 +2345,8 @@ local function newHarness()
             }
             local lootSourceFiles = {
                 "!KRT/Modules/Dataset/IgnoredMobs.lua",
-                "!KRT/Modules/Dataset/LootSourcesData.lua",
                 "!KRT/Modules/LootSourceCandidates.lua",
+                "!KRT/Modules/Dataset/LootSourcesData.lua",
                 "!KRT/Modules/LootSources.lua",
             }
             local raidServiceFiles = {
@@ -2606,6 +2606,7 @@ local function loadMasterController(h)
     h:load("!KRT/Services/Master/FlowState.lua")
     h:load("!KRT/Services/Master/ButtonState.lua")
     h:load("!KRT/Services/Master/RollRows.lua")
+    h:load("!KRT/Services/Master/AssignmentHelpers.lua")
     h:load("!KRT/Services/Master/AssignmentCandidates.lua")
     h:load("!KRT/Services/Master/AssignmentTargets.lua")
     h:load("!KRT/Services/Master/DebugRaidGrid.lua")
@@ -7015,6 +7016,7 @@ local function loadRealLootSourceDataset(h)
         "!KRT/Modules/Dataset/LootSources/Vanilla.lua",
         "!KRT/Modules/Dataset/LootSources/BurningCrusade.lua",
         "!KRT/Modules/Dataset/LootSources/Wrath.lua",
+        "!KRT/Modules/LootSourceCandidates.lua",
         "!KRT/Modules/Dataset/LootSourcesData.lua",
         "!KRT/Modules/LootSources.lua",
     }

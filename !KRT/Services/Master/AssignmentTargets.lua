@@ -14,6 +14,7 @@ addon.Services.Master = Master
 
 local AssignmentTargets = Master.AssignmentTargets or {}
 Master.AssignmentTargets = AssignmentTargets
+local AssignmentHelpers = Master.AssignmentHelpers
 
 local tinsert = table.insert
 local pairs = pairs
@@ -24,13 +25,6 @@ local tonumber = tonumber
 -- ----- Internal state ----- --
 
 -- ----- Private helpers ----- --
-local function getClass(classProvider, name)
-    if type(classProvider) == "function" then
-        return classProvider(name)
-    end
-    return nil
-end
-
 -- ----- Public methods ----- --
 
 function AssignmentTargets.BuildRows(groupedNames, classProvider)
@@ -47,7 +41,7 @@ function AssignmentTargets.BuildRows(groupedNames, classProvider)
                     name = name,
                     displayName = name,
                     group = group,
-                    class = getClass(classProvider, name),
+                    class = AssignmentHelpers.ResolveClass(classProvider, name),
                 })
             end
         end
@@ -68,6 +62,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Services/Master/AssignmentHelpers",
         },
     })
     registry.SetLoaded("Services/Master/AssignmentTargets")

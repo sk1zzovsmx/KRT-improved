@@ -13,6 +13,7 @@ local type, tostring, tonumber = type, tostring, tonumber
 local strsub = string.sub
 local strlen = string.len
 local gmatch = string.gmatch
+local tconcat = table.concat
 
 -- ----- Internal state ----- --
 local LootSourceCandidates = feature.LootSourceCandidates or {}
@@ -21,6 +22,14 @@ addon.LootSourceCandidates = LootSourceCandidates
 
 local SHARED_SOURCE_LABEL = "Shared"
 local SHARED_SOURCE_PREFIX = "Shared:"
+local MODE_KEY_ORDER = {
+    "normal10",
+    "normal20",
+    "normal25",
+    "normal40",
+    "heroic10",
+    "heroic25",
+}
 
 -- ----- Private helpers ----- --
 local function normalizeText(value)
@@ -45,6 +54,22 @@ local function candidateKey(name)
 end
 
 -- ----- Public methods ----- --
+function LootSourceCandidates.GetModeSignature(modes)
+    if type(modes) ~= "table" then
+        return "any"
+    end
+
+    local out = {}
+    for i = 1, #MODE_KEY_ORDER do
+        local mode = MODE_KEY_ORDER[i]
+        if modes[mode] == true then
+            out[#out + 1] = mode
+        end
+    end
+
+    return (#out > 0) and tconcat(out, ",") or "any"
+end
+
 function LootSourceCandidates.GetSharedLabel()
     return SHARED_SOURCE_LABEL
 end
@@ -163,14 +188,21 @@ function LootSourceCandidates.BuildLootSourceModel(loot, boss)
     return sourceName, sourceKind, nil, sourceKey
 end
 
+local name = "Modules/LootSourceCandidates"
+local deps = {
+    "Init",
+    "Modules/Strings",
+}
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
-    registry.AddModule("Modules/LootSourceCandidates", {
-        deps = {
-            "Init",
-            "Modules/ModuleRegistry",
-            "Modules/Strings",
-        },
-    })
-    registry.SetLoaded("Modules/LootSourceCandidates")
+    registry.AddModule(name, { deps = deps })
+    registry.SetLoaded(name)
+else
+    addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+    local pending = addon.ModuleRegistryPendingRegistrations
+    pending[#pending + 1] = {
+        name = name,
+        deps = deps,
+        loaded = true,
+    }
 end

@@ -14,6 +14,7 @@ addon.Services.Master = Master
 
 local AssignmentCandidates = Master.AssignmentCandidates or {}
 Master.AssignmentCandidates = AssignmentCandidates
+local AssignmentHelpers = Master.AssignmentHelpers
 
 local tinsert = table.insert
 local type = type
@@ -21,13 +22,6 @@ local type = type
 -- ----- Internal state ----- --
 
 -- ----- Private helpers ----- --
-local function getClass(classProvider, name)
-    if type(classProvider) == "function" then
-        return classProvider(name)
-    end
-    return nil
-end
-
 -- ----- Public methods ----- --
 
 function AssignmentCandidates.BuildRows(candidates, classProvider)
@@ -44,7 +38,7 @@ function AssignmentCandidates.BuildRows(candidates, classProvider)
                 name = name,
                 displayName = name,
                 index = candidate.index or i,
-                class = getClass(classProvider, name),
+                class = AssignmentHelpers.ResolveClass(classProvider, name),
             })
         end
     end
@@ -57,6 +51,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Services/Master/AssignmentHelpers",
         },
     })
     registry.SetLoaded("Services/Master/AssignmentCandidates")

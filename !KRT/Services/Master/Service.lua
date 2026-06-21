@@ -144,6 +144,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Services/Master/FlowState",
             "Services/Master/ButtonState",
             "Services/Master/RollRows",
+            "Services/Master/AssignmentHelpers",
             "Services/Master/AssignmentCandidates",
             "Services/Master/AssignmentTargets",
             "Services/Master/DebugRaidGrid",

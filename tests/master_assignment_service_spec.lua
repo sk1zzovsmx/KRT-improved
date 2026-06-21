@@ -20,6 +20,7 @@ local function loadAddonFile(path)
     chunk("!KRT", addon)
 end
 
+loadAddonFile("!KRT/Services/Master/AssignmentHelpers.lua")
 loadAddonFile("!KRT/Services/Master/AssignmentCandidates.lua")
 loadAddonFile("!KRT/Services/Master/AssignmentTargets.lua")
 loadAddonFile("!KRT/Services/Master/DebugRaidGrid.lua")
@@ -27,8 +28,14 @@ loadAddonFile("!KRT/Services/Master/Service.lua")
 
 local AssignmentCandidates = addon.Services.Master.AssignmentCandidates
 local AssignmentTargets = addon.Services.Master.AssignmentTargets
+local AssignmentHelpers = addon.Services.Master.AssignmentHelpers
 local DebugRaidGrid = addon.Services.Master.DebugRaidGrid
 local Master = addon.Services.Master
+
+assert(AssignmentHelpers.ResolveClass(function(name)
+    return name == "Alice" and "MAGE" or nil
+end, "Alice") == "MAGE", "expected shared assignment class resolver")
+assert(AssignmentHelpers.ResolveClass(nil, "Alice") == nil, "expected nil class without provider")
 
 local rows = AssignmentCandidates.BuildRows({
     { name = "Alice", index = 1 },

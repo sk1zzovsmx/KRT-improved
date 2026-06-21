@@ -121,8 +121,9 @@ local preRegistryUtilityModules = {
     { name = "Modules/Colors", deps = { "Init" } },
     { name = "Modules/Strings", deps = { "Init", "Modules/Colors" } },
     { name = "Modules/Item", deps = { "Init", "Modules/Timer", "Modules/Strings" } },
-    { name = "Modules/LootSourcesData", deps = { "Init" } },
-    { name = "Modules/LootSources", deps = { "Init", "Modules/Strings", "Modules/LootSourcesData" } },
+    { name = "Modules/LootSourceCandidates", deps = { "Init", "Modules/Strings" } },
+    { name = "Modules/LootSourcesData", deps = { "Init", "Modules/LootSourceCandidates" } },
+    { name = "Modules/LootSources", deps = { "Init", "Modules/Strings", "Modules/LootSourceCandidates", "Modules/LootSourcesData" } },
     { name = "Modules/IgnoredItems", deps = { "Init" } },
     { name = "Modules/Dataset/IgnoredMobs", deps = { "Init" } },
     { name = "Modules/Comms", deps = { "Init" } },
@@ -139,7 +140,6 @@ local directRegistryModules = {
     { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
     { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/LootSourceCandidates", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
 }
 

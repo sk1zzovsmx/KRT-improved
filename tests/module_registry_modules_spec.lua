@@ -81,15 +81,21 @@ local expectedModules = {
         events = "-- events: no bus events; item cache polling uses the Timer dependency",
     },
     {
+        name = "Modules/LootSourceCandidates",
+        path = "!KRT/Modules/LootSourceCandidates.lua",
+        deps = { "Init", "Modules/Strings" },
+        events = "-- events: none",
+    },
+    {
         name = "Modules/Dataset/LootSourcesData",
         path = "!KRT/Modules/Dataset/LootSourcesData.lua",
-        deps = { "Init" },
+        deps = { "Init", "Modules/LootSourceCandidates" },
         events = "-- events: none",
     },
     {
         name = "Modules/LootSources",
         path = "!KRT/Modules/LootSources.lua",
-        deps = { "Init", "Modules/Strings", "Modules/Dataset/LootSourcesData" },
+        deps = { "Init", "Modules/Strings", "Modules/LootSourceCandidates", "Modules/Dataset/LootSourcesData" },
         events = "-- events: none",
     },
     {
@@ -202,6 +208,13 @@ assertContains(
     "LootSourcesData must document its static dataset role as a note"
 )
 assert(not lootSourcesDataSource:find("function%s+LootSourcesData"), "LootSourcesData must remain a static dataset without public methods")
+
+assertContains(lootSourcesSource, "local LootSourceCandidates = feature.LootSourceCandidates", "LootSources module should localize LootSourceCandidates from feature shared")
+assertContains(
+    lootSourcesDataSource,
+    "local LootSourceCandidates = feature.LootSourceCandidates",
+    "LootSourcesData module should localize LootSourceCandidates from feature shared"
+)
 
 local timerSource = read("!KRT/Modules/Timer.lua")
 assertContains(timerSource, "-- shared: local feature = addon.Database.GetFeatureShared()", "Timer module must document its feature shared header dependency")
@@ -389,6 +402,9 @@ local lootSourcesStatus = registry.GetStatus("Modules/LootSources")
 local lootSourcesDataStatus = registry.GetStatus("Modules/Dataset/LootSourcesData")
 assert(stringsStatus.LoadOrder < lootSourcesStatus.LoadOrder, "Modules/Strings must load before Modules/LootSources")
 assert(lootSourcesDataStatus.LoadOrder < lootSourcesStatus.LoadOrder, "Modules/Dataset/LootSourcesData must load before Modules/LootSources")
+local lootSourcesCandidatesStatus = registry.GetStatus("Modules/LootSourceCandidates")
+assert(lootSourcesCandidatesStatus.LoadOrder < lootSourcesDataStatus.LoadOrder, "Modules/LootSourceCandidates must load before Modules/Dataset/LootSourcesData")
+assert(lootSourcesCandidatesStatus.LoadOrder < lootSourcesStatus.LoadOrder, "Modules/LootSourceCandidates must load before Modules/LootSources")
 
 local ok, issues = registry.GetLoadOrderStatus()
 assert(ok == true, "pre-registry utility module sequence must validate in TOC order")

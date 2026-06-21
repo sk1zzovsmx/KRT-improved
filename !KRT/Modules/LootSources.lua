@@ -8,6 +8,7 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Strings = feature.Strings
+local LootSourceCandidates = feature.LootSourceCandidates
 
 local type, tonumber, tostring = type, tonumber, tostring
 local pairs = pairs
@@ -43,14 +44,6 @@ local VALID_MODE_KEYS = {
     heroic10 = true,
     heroic25 = true,
 }
-local MODE_KEY_ORDER = {
-    "normal10",
-    "normal20",
-    "normal25",
-    "normal40",
-    "heroic10",
-    "heroic25",
-}
 
 -- ----- Private helpers ----- --
 local function trimText(value)
@@ -83,28 +76,12 @@ local function copyModes(modes)
     return copied
 end
 
-local function getModeSignature(modes)
-    if type(modes) ~= "table" then
-        return "any"
-    end
-
-    local out = {}
-    for i = 1, #MODE_KEY_ORDER do
-        local mode = MODE_KEY_ORDER[i]
-        if modes[mode] == true then
-            out[#out + 1] = mode
-        end
-    end
-
-    return (#out > 0) and tconcat(out, ",") or "any"
-end
-
 local function buildCandidateSourceKey(candidate)
     local raidKey = normalizeText(candidate and candidate.raid) or "unknown"
     local kind = normalizeText(candidate and candidate.kind) or "boss"
     local npcId = tonumber(candidate and (candidate.npcId or candidate.sourceNpcId)) or 0
     local sourceName = normalizeText(candidate and (candidate.npcName or candidate.name)) or "unknown"
-    return tconcat({ raidKey, kind, tostring(npcId), sourceName, getModeSignature(candidate and candidate.modes) }, "|")
+    return tconcat({ raidKey, kind, tostring(npcId), sourceName, LootSourceCandidates.GetModeSignature(candidate and candidate.modes) }, "|")
 end
 
 local function copyCandidate(candidate)
@@ -613,7 +590,7 @@ LootSources._SetDataForTests = setDataForTests
 
 do
     local name = "Modules/LootSources"
-    local deps = { "Init", "Modules/Strings", "Modules/Dataset/LootSourcesData" }
+    local deps = { "Init", "Modules/Strings", "Modules/LootSourceCandidates", "Modules/Dataset/LootSourcesData" }
     local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
