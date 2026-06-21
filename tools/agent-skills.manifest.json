@@ -2,6 +2,16 @@
     "version": 1,
     "sources": [
         {
+            "skill": "55to53-orchestrator",
+            "repo": "local",
+            "commit": "local",
+            "sourceBasePath": ".",
+            "verifyPolicy": "local-presence",
+            "destinationPath": ".agents/skills/55to53-orchestrator",
+            "adaptedFor": "Codex",
+            "notes": "Repo-local workflow gate for 55to53 delegated routing."
+        },
+        {
             "skill": "wow-addon-dev-wotlk-v335a",
             "repo": "Kirchlive/WoW-Addon-Dev-Wotlk-v335a-Claude-Skill",
             "commit": "2e1f0a37595d181427be5caeb29d76288f9c452c",

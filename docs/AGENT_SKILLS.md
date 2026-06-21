@@ -15,13 +15,21 @@ The current structured Codex workflow for KRT is split across:
   Read-only exploration subagent for ownership, call-path, and branch-point mapping.
 - `.codex/agents/spark-implementer.toml`
   Implementation-only subagent for parent-approved minimal diffs.
+- `.agents/skills/55to53-orchestrator`
+  Repo-local workflow gate that classifies task complexity and routes
+  complex implementation work through Spark.
 
 Treat these `.codex/*` files as project infrastructure, not personal machine-local preferences.
 This project workflow base does not require Mechanic to be installed locally.
 
 ## Active Skill
 
+- `55to53-orchestrator`
 - `wow-addon-dev-wotlk-v335a`
+
+`55to53-orchestrator` is repo-authored and local to this project. It is the
+operational layer that turns the delegated workflow from policy into a repeatable
+classification step before editing.
 
 The active skill is a Codex adaptation of:
 

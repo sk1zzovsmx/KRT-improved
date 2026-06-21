@@ -37,43 +37,65 @@ non-trivial code change. The user may also refer to it explicitly by name.
 
 - The parent agent uses the main project model, normally `gpt-5.5`.
 - The parent agent owns analysis, reasoning, planning, review, and final correction.
+- The workflow gate is the repo-local skill `55to53-orchestrator`.
 - The exploration subagent is `code-mapper`.
 - The implementation subagent is `spark_implementer`.
 - `code-mapper` is read-only exploration and should map ownership, call paths, branch points,
   and unknowns before edits when uncertainty is material.
 - `spark_implementer` is implementation-only and should use `gpt-5.3-codex-spark`.
 
+### Escalation criteria
+
+The parent may edit directly only for `trivial` or tightly `bounded` work.
+If a task is `complex-orchestrated`, implementation must go through
+`spark_implementer`.
+
+Treat a task as `complex-orchestrated` when any point below is true:
+
+- more than one file is likely to change
+- a shared module, service contract, controller boundary, or public behavior is involved
+- there is meaningful regression risk
+- ownership, call flow, or branch behavior is not already clear
+- the plan has three or more concrete implementation steps
+- the task is expected to need a review/correction loop after the first patch
+
+Use the repo-local skill `.agents/skills/55to53-orchestrator/SKILL.md` as the
+operational classifier and routing layer for this workflow.
+
 ### Required workflow
 
 1. The parent agent analyzes the task.
-2. For non-trivial code changes, the parent agent should use `code-mapper` first when file
+2. Before editing, the parent agent classifies the task through the `55to53-orchestrator`
+   rules as `trivial`, `bounded`, or `complex-orchestrated`.
+3. For non-trivial code changes, the parent agent should use `code-mapper` first when file
    ownership, execution flow, or branch behavior is not already clear.
-3. Before editing files, the parent agent creates a concise operational plan.
-4. The plan must include:
+4. If the task is `complex-orchestrated`, the parent agent must not implement it directly.
+5. Before editing files, the parent agent creates a concise operational plan.
+6. The plan must include:
    - goal of the change
    - files or functions likely involved
    - implementation strategy
    - risks or regressions to check
    - tests or checks to run
-5. The parent agent delegates implementation to `spark_implementer`.
-6. `spark_implementer` receives only closed, operational instructions, not the open-ended
+7. The parent agent delegates implementation to `spark_implementer`.
+8. `spark_implementer` receives only closed, operational instructions, not the open-ended
    user request.
-7. `spark_implementer` applies only the parent-approved plan.
-8. `spark_implementer` must keep the diff minimal.
-9. `spark_implementer` must avoid unrelated refactors, broad rewrites, speculative
-   improvements, and architectural changes.
-10. After implementation, the parent agent reviews the final diff.
-11. The parent review must check:
+9. `spark_implementer` applies only the parent-approved plan.
+10. `spark_implementer` must keep the diff minimal.
+11. `spark_implementer` must avoid unrelated refactors, broad rewrites, speculative
+    improvements, and architectural changes.
+12. After implementation, the parent agent reviews the final diff.
+13. The parent review must check:
     - whether the implementation matches the plan
     - unnecessary changes
     - regressions
     - style consistency
     - public behavior changes
     - test/check results
-12. If Spark deviates from the plan, introduces regressions, modifies too much, or leaves
+14. If Spark deviates from the plan, introduces regressions, modifies too much, or leaves
     incomplete work, the parent agent must correct the code directly or delegate a smaller
     corrective patch to `spark_implementer`.
-13. The task is not complete until the parent agent has reviewed the final code.
+15. The task is not complete until the parent agent has reviewed the final code.
 
 ### Final response requirements
 
@@ -88,6 +110,7 @@ The final response must include:
 ### Repo policy
 
 - Keep project-specific Codex workflow files under `.codex/` in the repository.
+- Keep project-specific orchestrator skills under `.agents/skills/` in the repository.
 - Treat `.codex/config.toml` and `.codex/agents/*` as project infrastructure, not personal
   machine-local preferences.
 - Do not move this workflow back to a global profile unless the user explicitly requests it.

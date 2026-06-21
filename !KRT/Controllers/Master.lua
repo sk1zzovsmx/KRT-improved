@@ -817,6 +817,14 @@ do
         return true
     end
 
+    local function copyMasterRollRowForList(source)
+        local copy = {}
+        for key, value in pairs(source) do
+            copy[key] = value
+        end
+        return copy
+    end
+
     local function copyVisibleRollRows(out)
         local model = module._rollUiState.model
         local visibleRows = model and model.visibleRows or {}
@@ -825,7 +833,7 @@ do
             local source = visibleRows[i]
             if source then
                 source.id = i
-                out[#out + 1] = source
+                out[#out + 1] = copyMasterRollRowForList(source)
             end
         end
     end
@@ -2425,6 +2433,22 @@ do
             module._dirtyFlags.buttons = true
         end
     end
+
+    local function updateRollListRefreshToken(rollModel)
+        rollModel = rollModel or {}
+        local token = tostring(rollModel.selectionAllowed == true)
+            .. "|"
+            .. tostring(rollModel.pickMode == true)
+            .. "|"
+            .. tostring(rollModel.highlightTarget or "")
+            .. "|"
+            .. tostring(tonumber(rollModel.msCount) or 0)
+        if module._lastUIState.rollListRefreshToken ~= token then
+            module._lastUIState.rollListRefreshToken = token
+            module._dirtyFlags.rolls = true
+        end
+    end
+
     -- Refreshes the UI once (event-driven; coalesced via module:RequestRefresh()).
     function uiState.Refresh()
         if not uiState.Localized then
@@ -2446,6 +2470,7 @@ do
         end
 
         local rollModel = buildRollUiModel(true) or {}
+        updateRollListRefreshToken(rollModel)
 
         local displayedWinner = getDisplayedWinnerName(rollModel)
         if module._lastUIState.winner ~= displayedWinner then

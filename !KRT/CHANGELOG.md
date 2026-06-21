@@ -8,6 +8,10 @@ Release-Version: 0.8.0-beta.1
 
 ### Fixes
 
+- **Loot Master roll list finalization** - Fixed roll rows disappearing or
+  staying non-clickable after countdown completion or interruption by isolating
+  displayed roll-list row data from shared list-controller recycling and
+  redrawing the list when winner selection becomes available.
 - **Group Loot inventory trades** - Loot Master inventory-item roll and trade
   actions now use a separate inventory-trade permission, so raid leaders,
   assistants, and the active Master Looter can trade already-held items while
