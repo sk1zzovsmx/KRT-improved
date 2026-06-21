@@ -11520,6 +11520,36 @@ test("loot service builds pure master award planning models", function()
     assertEqual(statePlan.state.congratsSent, false, "expected new multi-award state to start unsent")
 end)
 
+test("loot service builds multi-award slot candidates from matching loot links", function()
+    local h = newHarness()
+    local itemLink = "|cffa335ee|Hitem:19019:0:0:0:0:0:0:0|h[Thunderfury]|h|r"
+
+    _G.GetNumLootItems = function()
+        return 3
+    end
+    _G.GetLootSlotLink = function(slot)
+        if slot == 1 then
+            return itemLink
+        end
+        if slot == 2 then
+            return "|cffa335ee|Hitem:19019:1:0:0:0:0:0:0|h[Thunderfury]|h|r"
+        end
+        return "|cffa335ee|Hitem:18803:0:0:0:0:0:0:0|h[Finkle's Lava Dredger]|h|r"
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    local slots, slotMap = Loot:BuildMultiAwardSlotCandidates(itemLink)
+    assertEqual(#slots, 2, "expected matching multi-award loot slots")
+    assertTrue(slotMap[1] == true, "expected first slot in map")
+    assertTrue(slotMap[2] == true, "expected second matching item id in map")
+
+    Loot:AddItem(itemLink, 4)
+    local itemKey = h.addon.Item.GetItemStringFromLink(itemLink) or itemLink
+    assertEqual(Loot:GetLootWindowItemCountByKey(itemKey), 4, "expected current item count by item key")
+end)
+
 test("master loot award timeout leaves unconfirmed loot counter credit unapplied", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice" },

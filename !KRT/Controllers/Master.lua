@@ -1400,34 +1400,11 @@ do
     end
 
     local function buildMultiAwardSlotCandidates(itemLink)
-        local slots = {}
-        local slotMap = {}
-        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
-        local wantedId = Item.GetItemIdFromLink(itemLink)
-        for slot = 1, (GetNumLootItems() or 0) do
-            local link = GetLootSlotLink(slot)
-            if link then
-                local slotKey = Item.GetItemStringFromLink(link) or link
-                local slotId = Item.GetItemIdFromLink(link)
-                if slotKey == wantedKey or (wantedId and slotId and slotId == wantedId) then
-                    slots[#slots + 1] = slot
-                    slotMap[slot] = true
-                end
-            end
-        end
-        return slots, slotMap
+        return Loot:BuildMultiAwardSlotCandidates(itemLink)
     end
 
     local function getCurrentMultiAwardCount(itemKey)
-        local currentCount = 0
-        for i = 1, (lootState.lootCount or 0) do
-            local it = Loot.GetItem(i)
-            if it and it.itemKey == itemKey then
-                currentCount = tonumber(it.count) or 1
-                break
-            end
-        end
-        return currentCount
+        return Loot:GetLootWindowItemCountByKey(itemKey)
     end
 
     local function cancelMultiAwardTimeout(ma)

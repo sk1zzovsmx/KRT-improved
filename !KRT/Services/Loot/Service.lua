@@ -957,6 +957,41 @@ do
         }
     end
 
+    local function buildMultiAwardSlotCandidates(itemLink)
+        local slots = {}
+        local slotMap = {}
+        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        local wantedId = Item.GetItemIdFromLink(itemLink)
+
+        for slot = 1, (GetNumLootItems() or 0) do
+            local link = GetLootSlotLink(slot)
+            if link then
+                local slotKey = Item.GetItemStringFromLink(link) or link
+                local slotId = Item.GetItemIdFromLink(link)
+                if slotKey == wantedKey or (wantedId and slotId and slotId == wantedId) then
+                    slots[#slots + 1] = slot
+                    slotMap[slot] = true
+                end
+            end
+        end
+        return slots, slotMap
+    end
+
+    local function getLootWindowItemCountByKey(itemKey)
+        if not itemKey then
+            return 0
+        end
+
+        for i = 1, (tonumber(lootState.lootCount) or 0) do
+            local it = getItem(i)
+            local currentKey = it and (it.itemKey or (Item.GetItemStringFromLink(it.itemLink) or it.itemLink)) or nil
+            if currentKey == itemKey then
+                return tonumber(it.count) or 1
+            end
+        end
+        return 0
+    end
+
     local function isParsedGroupLootResult(parsedGroupLoot, msg, kind)
         if type(parsedGroupLoot) ~= "table" then
             return false
@@ -2041,6 +2076,14 @@ do
 
     function module:BuildMultiAwardState(args)
         return buildMultiAwardState(args)
+    end
+
+    function module:BuildMultiAwardSlotCandidates(itemLink)
+        return buildMultiAwardSlotCandidates(itemLink)
+    end
+
+    function module:GetLootWindowItemCountByKey(itemKey)
+        return getLootWindowItemCountByKey(itemKey)
     end
 end
 
