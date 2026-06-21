@@ -42,8 +42,8 @@ Server implementation: `tools/krt_mcp_server.py`.
 - `skills_sync`
   Sync vendored skills and optionally install them into local Codex skill paths.
 - `repo_quality_check`
-  Run one repo check: `toc_files`, `lua_syntax`, `ui_binding`, `layering`, `raid_hardening`,
-  or `lua_uniformity`.
+  Run one MCP-exposed repo check: `toc_files`, `lua_syntax`, `ui_binding`, `layering`,
+  `retired_aliases`, `raid_hardening`, or `lua_uniformity`.
 - `mechanic_call`
   Execute existing Mechanic wrapper flows (`env.status`, addon validate/lint/deadcode, etc.).
 - `mechanic_bootstrap`
@@ -74,6 +74,7 @@ Equivalent direct CLI path:
 ```bash
 python3 tools/krt.py dev-stack-status
 python3 tools/krt.py repo-quality-check --check layering
+python3 tools/krt.py api-catalog-check
 python3 tools/krt.py skills-sync --verify-only
 python3 tools/krt.py mech AddonValidate --json
 ```

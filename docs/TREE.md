@@ -248,9 +248,11 @@
 |   |   |   |-- 2026-06-12-master-controller-service-reduction.md
 |   |   |   |-- 2026-06-13-audit-cleanup-wave-2.md
 |   |   |   |-- 2026-06-13-spec-role-inspector.md
+|   |   |   |-- 2026-06-14-audit-cleanup-micro-wave-doc-test-alignment.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-3.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-4.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-5.md
+|   |   |   |-- 2026-06-14-audit-cleanup-wave-b1-bootstrap-follow-up.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-c1-syncer-store-boundary.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-c2-raid-store-runtime-boundaries.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-e1-slash-routing.md
@@ -258,9 +260,11 @@
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-q1-loot-get-raid-queries-owner-group.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-q2-raid-lootrecords-get-raid-queries-owner-group.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-q3-raid-state-get-raid-queries-owner-group.md
+|   |   |   |-- 2026-06-14-audit-cleanup-wave-r1-reserves-contract-review.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-s2-rolls-service.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-s3-reserves-service.md
-|   |   |   \\-- 2026-06-14-audit-cleanup-wave-u1-ui-scaffold-infrastructure.md
+|   |   |   |-- 2026-06-14-audit-cleanup-wave-u1-ui-scaffold-infrastructure.md
+|   |   |   \\-- 2026-06-14-docs-current-addon-state.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       |-- 2026-06-05-master-loot-grid-design.md
@@ -293,10 +297,12 @@
 |   |-- fixtures
 |   |   \\-- sv
 |   |       \\-- canonical-minimal-01.lua
+|   |-- audit_cleanup_micro_wave_doc_test_alignment_spec.lua
 |   |-- audit_cleanup_wave2_spec.lua
 |   |-- audit_cleanup_wave3_spec.lua
 |   |-- audit_cleanup_wave4_spec.lua
 |   |-- audit_cleanup_wave5_spec.lua
+|   |-- audit_cleanup_wave_b1_bootstrap_follow_up_spec.lua
 |   |-- audit_cleanup_wave_c1_syncer_store_boundary_spec.lua
 |   |-- audit_cleanup_wave_c2_raid_store_runtime_boundaries_spec.lua
 |   |-- audit_cleanup_wave_e1_slash_routing_spec.lua
@@ -304,6 +310,7 @@
 |   |-- audit_cleanup_wave_q1_loot_get_raid_queries_spec.lua
 |   |-- audit_cleanup_wave_q2_raid_lootrecords_get_raid_queries_spec.lua
 |   |-- audit_cleanup_wave_q3_raid_state_get_raid_queries_spec.lua
+|   |-- audit_cleanup_wave_r1_reserves_contract_review_spec.lua
 |   |-- audit_cleanup_wave_s2_rolls_spec.lua
 |   |-- audit_cleanup_wave_s3_reserves_spec.lua
 |   |-- audit_cleanup_wave_u1_ui_scaffold_infrastructure_spec.lua

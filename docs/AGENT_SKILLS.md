@@ -15,6 +15,9 @@ The current structured Codex workflow for KRT is split across:
   Read-only exploration subagent for ownership, call-path, and branch-point mapping.
 - `.codex/agents/spark-implementer.toml`
   Implementation-only subagent for parent-approved minimal diffs.
+- `.codex/agents/tooling-worker.toml`
+  Focused `gpt-4o` worker for tooling, helper scripts, transforms, reports, and
+  documentation-oriented technical work outside runtime-critical addon core.
 - `.agents/skills/55to53-orchestrator`
   Repo-local workflow gate that classifies task complexity and routes
   complex implementation work through Spark.
@@ -30,6 +33,13 @@ This project workflow base does not require Mechanic to be installed locally.
 `55to53-orchestrator` is repo-authored and local to this project. It is the
 operational layer that turns the delegated workflow from policy into a repeatable
 classification step before editing.
+
+Current model routing:
+
+- Parent reasoning, mapping, review, and behavior-sensitive runtime work: `gpt-5.5`.
+- `code-mapper`: read-only exploration on `gpt-5.5`.
+- `spark_implementer`: minimal parent-approved runtime micro-patches on `gpt-5.3-codex-spark`.
+- `tooling_worker`: docs, reports, transforms, scripts, and automation on `gpt-4o`.
 
 The active skill is a Codex adaptation of:
 

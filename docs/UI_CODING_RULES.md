@@ -253,12 +253,14 @@ Shared UI behavior belongs in the existing `Modules/UI/*` owners:
 
 | Owner | Responsibility |
 | --- | --- |
-| `Modules/UI/Frames.lua` | frame lifecycle, refs, editbox helpers, tooltips |
-| `Modules/UI/Visuals.lua` | row visuals, primitives, pixel sizing |
-| `Modules/UI/Effects.lua` | glow/effect internals |
-| `Modules/UI/ListController.lua` | repeated scroll/list/table refresh |
-| `Modules/UI/OptionsLayout.lua` | options panel row layout |
-| `Modules/UI/Facade.lua` | widget routing |
+| `Modules/UI/Frames.lua` | `UI.Frames/Scaffold/ModuleState/EditBoxes/Popups/Tooltips` |
+| `Modules/UI/Visuals.lua` | `UI.Rows`, row visuals, primitives, pixel sizing |
+| `Modules/UI/Effects.lua` | glow/effect internals and timed fades |
+| `Modules/UI/ListController.lua` | `UI.Lists` repeated scroll/list/table refresh |
+| `Modules/UI/MultiSelect.lua` | `UI.Selection` multi-select state, modifiers, ranges, anchors |
+| `Modules/UI/OptionsLayout.lua` | `UI.Layout` options panel row layout |
+| `Modules/UI/Facade.lua` | `UI.Widgets` optional widget registration and dispatch |
+| `Modules/UI/ScreenNotice.lua` | `UI.ScreenNotice` transient center-screen notices |
 
 Feature code may request visual state, but should not duplicate reusable border, spacing, highlight,
 glow, pixel-sizing, scrollbar, or options-row placement logic.
@@ -456,6 +458,7 @@ Before finishing a UI change, check:
 - Repeated tables/lists use `UI.Lists` unless the UI is static or documents an exception.
 - Table rows have fixed heights or one owner that calculates dynamic heights.
 - Selectable rows use `UI.Rows` for selected/focused visuals.
+- Multi-select behavior uses `UI.Selection` rather than feature-local modifier/range state.
 - Buttons sit in fixed command columns, not after wrapped text.
 - EditBoxes use KRT templates, `autoFocus=false`, and shared `Frames` editbox helpers.
 - User-facing strings are assigned from `addon.L`.

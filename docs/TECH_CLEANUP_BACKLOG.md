@@ -2,19 +2,19 @@
 
 Repo-wide cleanup program built on top of `docs/TECH_CLEANUP_WORKFLOW.md`.
 
-Status date: 2026-04-06
+Status date: 2026-06-14
 
-## 1.0 Lua Canonical Uniformity Snapshot (2026-06-02)
+## 1.0 Lua Canonical Uniformity Snapshot (2026-06-14)
 
-Final canonical Lua normalization status for KRT-owned addon files:
+Current canonical Lua normalization status for KRT-owned addon files:
 
-- `102` Lua files exist under `!KRT`.
-- `12` vendored Lua files under `!KRT/Libs/**` are excluded from KRT-owned normalization.
-- `90` KRT-owned Lua files are in scope and are represented in `!KRT/!KRT.toc`.
-- All `90` KRT-owned files use the KRT Lua Contract header, `local addon = select(2, ...)`,
+- `125` Lua files exist under `!KRT`.
+- `13` vendored Lua files under `!KRT/Libs/**` are excluded from KRT-owned normalization.
+- `112` KRT-owned Lua files are in scope and are represented in `!KRT/!KRT.toc`.
+- All `112` KRT-owned files use the KRT Lua Contract header, `local addon = select(2, ...)`,
   and `local feature = addon.Database.GetFeatureShared()`.
-- All `90` KRT-owned files have ordered `Internal state` and `Private helpers` sections.
-- `89/90` have `Public methods`; the sole exception is
+- All `112` KRT-owned files have ordered `Internal state` and `Private helpers` sections.
+- `111/112` have `Public methods`; the sole exception is
   `!KRT/Modules/Dataset/LootSourcesData.lua`, documented and tested as a static data-only dataset.
 - `feature.* or addon.*` and `addon.* or feature.*` double-binding fallbacks are closed out.
 - `addon.options` is confined to the read-only compatibility proxy in `Database/DBOptions.lua`.
@@ -29,12 +29,12 @@ Tooling now enforces the snapshot through:
 - `tools/krt.py repo-quality-check --check lua_uniformity`
 - `tools/krt.py repo-quality-check --check layering`
 
-## 1.1 Cleanup Snapshot (2026-04-06)
+## 1.1 Cleanup Snapshot (2026-06-14 current overlay)
 
 Completed in this pass:
 
 - Confirmed post-split `Raid` service topology:
-  `!KRT/Services/Raid/{State,Capabilities,Counts,Roster,Attendance,LootRecords,Session}.lua`
+  `!KRT/Services/Raid/{State,Capabilities,LootMethod,Counts,Roster,Attendance,LootRecords,Session}.lua`
   now owns `addon.Services.Raid` end-to-end.
 - Kept bootstrap ownership centralized: there is no standalone `!KRT/Services/Raid.lua`.
   The service table is anchored directly by the split modules.
@@ -230,7 +230,6 @@ Contract wave result snapshot (`2026-04-06`, Chat/Raid ownership):
     - `IsMasterOnlyBlocked`
   - migrated in-repo call sites to canonical service owners in:
     - `!KRT/Controllers/Master.lua`
-    - `!KRT/Controllers/Changes.lua`
     - `!KRT/Widgets/LootCounter.lua`
     - `!KRT/Services/Rolls/Service.lua`
     - `!KRT/EntryPoints/Minimap.lua`
@@ -394,20 +393,21 @@ What this means:
 - `!KRT/Controllers/Logger.lua`: Logger contract wave completed; public UI-local
   glue reduced, monitor only
 - `!KRT/Controllers/Warnings.lua`: closed for baseline UI normalization
-- `!KRT/Controllers/Changes.lua`: closed for baseline UI normalization
 - `!KRT/Controllers/Spammer.lua`: closed for baseline UI normalization
 
 ### 2.2 Widgets
 
 - `!KRT/Widgets/Config.lua`: closed for baseline UI normalization
 - `!KRT/Widgets/LootCounter.lua`: closed for baseline UI normalization
+- `!KRT/Widgets/LootHints.lua`: active child widget, monitor only
+- `!KRT/Widgets/RaidGrid.lua`: active child widget, monitor only
 - `!KRT/Widgets/ReservesUI.lua`: closed for baseline UI normalization
 
 ### 2.3 Services
 
 - `!KRT/Services/Raid/State.lua`: wave S1/S1b plus internal-surface ownership
   cleanup completed, monitor only
-- `!KRT/Services/Raid/{Capabilities,Counts,Roster,Attendance,LootRecords,Session}.lua`:
+- `!KRT/Services/Raid/{Capabilities,LootMethod,Counts,Roster,Attendance,LootRecords,Session}.lua`:
   split completed; Chat/Raid contract wave completed in `Capabilities`; `Roster`
   internal helper exposure reduced, monitor only
 - `!KRT/Services/Rolls/Service.lua`: reviewed in the ownership wave; no safe contract
@@ -418,6 +418,9 @@ What this means:
 - `!KRT/Services/Chat.lua`: contract wave completed, canonical announce/warn owner confirmed
 - `!KRT/Services/Logger/{Actions,Store,View}.lua`: Logger contract wave completed;
   file-local helper surfaces reduced; store-internal helpers moved to underscore APIs
+- `!KRT/Services/SpecInspect.lua`: active UI-free spec snapshot service, monitor only
+- `!KRT/Services/Spammer/Draft.lua`: active spammer draft store helper, monitor only
+- `!KRT/Services/Warnings/Store.lua`: active warning store helper, monitor only
 - `!KRT/Services/Debug.lua`: hold, low priority
 
 ### 2.4 EntryPoints
@@ -429,7 +432,7 @@ What this means:
 
 - `!KRT/Database/DBSyncer.lua`: contract wave completed, uses service-owned capability query
 - `!KRT/Database/DBRaidStore.lua`: cleanup wave C2 completed
-- `!KRT/Modules/UI/Frames.lua`: cleanup wave U1 in progress
+- `!KRT/Modules/UI/Frames.lua`: cleanup wave U1 completed, monitor only
 - `!KRT/Init.lua`: contract wave completed, root chat/capability facades removed
 
 ### 2.6 XML
@@ -440,7 +443,6 @@ What this means:
 - `!KRT/UI/LootCounter.xml`: closed for structural cleanup
 - `!KRT/UI/Reserves.xml`: closed for structural cleanup
 - `!KRT/UI/Warnings.xml`: closed for structural cleanup
-- `!KRT/UI/Changes.xml`: closed for structural cleanup
 - `!KRT/UI/Spammer.xml`: closed for structural cleanup
 - `!KRT/UI/Minimap.xml`: hold, low priority
 - `!KRT/UI/ReservesTemplates.xml`: hold, low priority
@@ -648,6 +650,23 @@ Smoke path:
 - reserve counts
 - list refresh after item info resolves
 
+### Wave R1: Reserves Contract Review
+
+Wave R1 completed the deeper Reserves facade review:
+- alias, collapse, readiness, display, import, sync, cache, and roll-facing
+  methods remain parent-facade contracts with current production call sites or
+  documented public compatibility.
+- no package-internal-only public Reserves method was proven safe to contract
+  in this pass.
+- future Reserves contraction requires a fresh owner-specific micro-plan backed
+  by a new call-site inventory.
+- hold further `!KRT/Services/Reserves.lua` contraction unless a fresh inventory proves a package-internal-only method.
+- deeper `!KRT/Services/Reserves.lua` review only for proven package-internal contracts is closed.
+- alias, collapse, readiness, and display methods are currently real slash/UI/controller contracts.
+
+Remaining Reserves contract review:
+- None without new inventory evidence.
+
 ### Wave E1: Slash Routing
 
 Owner files:
@@ -812,6 +831,10 @@ Current worktree progress:
 - raid-store access now shares one helper path across core schema and SavedVariables boundaries
 - raid and service lookups in WoW event handlers now share helpers and no
   longer route boss logging through retired `self.Raid`
+- Wave B1 completed the bootstrap residual-owner inventory.
+- no bootstrap block was proven safe to move out of `!KRT/Init.lua` in this pass.
+- future bootstrap contraction requires a fresh owner-specific micro-plan backed
+  by a new line-range inventory.
 
 Non-goals:
 - no speculative splitting
@@ -845,8 +868,8 @@ These are not strong cleanup candidates right now.
 
 If continuing the cleanup program immediately, start with:
 
-1. deeper `!KRT/Services/Reserves.lua` review only for proven package-internal contracts
-2. bootstrap follow-up in `!KRT/Init.lua` only if a later inventory proves a residual owner
+1. open a fresh inventory item only when a new owner-specific candidate is proven
+2. keep `!KRT/Init.lua` and `!KRT/Services/Reserves.lua` in hold without new call-site evidence
 
 That sequence gives the best technical ROI while keeping the already-stable UI
 owner layer closed.
@@ -886,6 +909,9 @@ This pass applied code changes and re-ran validation/catalog generation.
 
 1. No high-confidence `merge-now` duplicates remain after the stage-2 recatalog.
    Evidence: `docs/FN_CLUSTERS.md` merge-now table is empty.
+   Micro-wave documentation/test alignment classifies the duplicated
+   `callControllerMethod(...)` entrypoint helpers as intentional local routing
+   patterns, not merge-now candidates.
 
 2. Remaining follow-up is contract review only:
    - `name-collision` entries that represent different owners with similar names

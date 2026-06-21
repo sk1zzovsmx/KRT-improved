@@ -8,6 +8,11 @@ registry metadata-first esteso all'intero layer caricato prima di XML, cleanup A
 audit finale di readiness locale, e prossime attivita consigliate. Non sostituisce `AGENTS.md`:
 le regole binding di `AGENTS.md` restano prioritarie.
 
+Nota corrente 2026-06-14: questo file conserva il report storico del total rework. Per lo stato
+runtime attuale usare `docs/ARCHITECTURE.md`, `docs/OVERVIEW.md`, `docs/TREE.md` e i cataloghi
+generati; le citazioni storiche di `Controllers/Changes` o `UI/Changes.xml` non indicano una
+superficie runtime attiva.
+
 ## Diagnosi architetturale corrente
 
 - La verita runtime resta l'ordine statico in `!KRT/!KRT.toc`.

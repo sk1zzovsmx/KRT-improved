@@ -56,7 +56,8 @@ from `feature.X` and then export the same table back to `addon.X`.
 Use `PascalCase` for exported/public APIs:
 
 - `module:*` on Controllers/Services/Widgets/EntryPoints
-- infra namespaces (`Database`, `Bus`, `Frames`, `UI.Scaffold`, `UI`, `ListController`, ...)
+- infra namespaces (`Database`, `Bus`, `UI.Frames`, `UI.Scaffold`, `UI.Lists`,
+  `UI.Selection`, `UI.Widgets`, ...)
 - structured owners (`Store:*`, `View:*`, `Actions:*`, `Box:*`)
 
 Examples:
@@ -121,6 +122,8 @@ Prefer stable, scoped diffs over mass reformatting untouched code.
 - XML is layout-only: no inline `<Scripts>` / `<On...>` handlers.
 - For Controllers/Widgets, prefer `UI.Scaffold.DefineModule(cfg)` as canonical UI contract.
 - Keep module-local UI lifecycle state in `addon.UI.ModuleState`; local variables use `uiState`.
+- Optional Controller/EntryPoint -> Widget dispatch goes through `addon.UI.Widgets.Call(...)`.
+- Multi-select state goes through `addon.UI.Selection` instead of feature-local modifier/range stores.
 - Prefer event-driven redraw (`RequestRefresh`/`Refresh`) over polling `OnUpdate` loops.
 - `OnUpdate` is confined to minimap drag and shared UI driver/effect modules.
 - `addon.options` is confined to the read-only compatibility proxy in `Database/DBOptions.lua`.

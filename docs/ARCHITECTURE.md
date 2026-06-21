@@ -19,7 +19,8 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 4. `UI/Templates/Common.xml`
    Shared XML templates only.
 5. `Modules/*`
-   Shared infra (`Timer`, `Events`, `Bus`, `Item`, `Sort`, `Frames`, `UI.Scaffold`, `UI` facade, ...).
+   Shared infra (`Timer`, `Events`, `Bus`, `Item`, `Sort`, `UI.Scaffold`, `UI.Widgets`,
+   `UI.Selection`, static datasets, ...).
 6. `Database/DBRaid*.lua`, `Services/*`, `Controllers/*`, `Widgets/*`, `EntryPoints/*`
    Runtime feature implementation and entrypoints.
 7. `KRT.xml` -> `UI/*.xml`
@@ -42,7 +43,7 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   Own runtime model/service logic under `addon.Services.*`.
   `addon.Services.Raid` is split across `!KRT/Services/Raid/*.lua` and loaded by TOC order.
   `State.lua` is the state anchor file; the other files extend the same service table by domain
-  (`Capabilities`, `Counts`, `Roster`, `Attendance`, `LootRecords`, `Session`).
+  (`Capabilities`, `LootMethod`, `Counts`, `Roster`, `Attendance`, `LootRecords`, `Session`).
   `addon.Services.Rolls` keeps its public roll/session contract in `!KRT/Services/Rolls/Service.lua` and owns
   internal runtime helpers in `!KRT/Services/Rolls/*.lua` for countdown/session lifecycle,
   raw history/tracker state, response intake/eligibility, strategy policy, resolver policy, and display assembly
@@ -65,6 +66,10 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   `HandleSyncMessage`, `GetSyncPayload`, `SetSyncedData`, and cache APIs); `_Sync`
   remains package-internal.
   `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
+  `Services/Raid/LootMethod.lua` owns opt-in Master Loot automation and Group Loot restore prompts.
+  `Services/SpecInspect.lua` owns the UI-free runtime spec snapshot cache backed by LibGroupTalents.
+  `Services/Spammer/Draft.lua` owns PUG spammer draft persistence helpers.
+  `Services/Warnings/Store.lua` owns warning text storage.
   `Services/Chat.lua` owns announce/warn output contracts.
 - `!KRT/Database/DB.lua`
   Owns the canonical public accessor facade for DB-manager-backed services on
@@ -84,11 +89,19 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 - `!KRT/Modules/*.lua`
   Own reusable infra only, not parent feature logic.
   `Modules/Json.lua` owns the small native JSON decoder used by encoded SoftRes import parsing.
-  `Modules/LootSourcesData.lua` owns static raid item-source data and is the documented
+  `Modules/Dataset/LootSourcesData.lua` owns static raid item-source data and is the documented
   data-only exception to the otherwise required `Public methods` section.
+  `Modules/LootSourceCandidates.lua` owns shared-source labels, mode signatures, candidate copying,
+  and canonical loot-source display model construction helpers.
   `Modules/LootSources.lua` owns the itemId -> raid source resolver.
   `Modules/Dataset/IgnoredMobs.lua` owns raid add/phase-ignore lookup and the canonical generic trash-mob
   name helpers consumed by Raid state, Logger, and raid validation.
+  `Modules/UI/Frames.lua` owns `addon.UI.Frames`, `addon.UI.Scaffold`, `addon.UI.ModuleState`,
+  `addon.UI.EditBoxes`, `addon.UI.Popups`, and `addon.UI.Tooltips`.
+  `Modules/UI/ListController.lua` owns `addon.UI.Lists`; `Modules/UI/MultiSelect.lua` owns
+  `addon.UI.Selection`; `Modules/UI/Facade.lua` owns `addon.UI.Widgets`.
+  `Modules/UI/ScreenNotice.lua` owns the shared transient screen-notice frame and delegates fade
+  timing to `addon.UI.Effects`.
 
 Retired root aliases (`addon.Master`, `addon.Logger`, `addon.Raid`, ...) are blocked for new code.
 Call sites should use namespaced owners (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).

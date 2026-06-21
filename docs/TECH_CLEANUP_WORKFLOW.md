@@ -81,7 +81,9 @@ Useful repo checks:
 git status --short
 rg "UI.ModuleState|UI.Scaffold|MakeModuleFrameGetter|FrameName|RefreshUI|uiState" !KRT -g "*.lua"
 rg "addon\\.(Master|Logger|Warnings|Changes|Spammer)" !KRT -g "*.lua"
-rg "feature\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+addon\\.|addon\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+feature\\." !KRT -g "*.lua" -g "!Libs/**"
+rg "addon\\.UI\\.(Widgets|Selection|Lists|Rows|ScreenNotice)" !KRT -g "*.lua"
+rg "feature\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+addon\\.|addon\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+feature\\." `
+  !KRT -g "*.lua" -g "!Libs/**"
 rg "addon\\.options|OnUpdate" !KRT -g "*.lua" -g "!Libs/**"
 rg "<Scripts>|<OnLoad>|<OnShow>|<OnClick>" !KRT/UI -g "*.xml"
 ```
@@ -281,11 +283,12 @@ Recommended smoke scope by module type:
 
 - `Master`: select item, roll state, countdown, assign buttons, reroll, dropdowns
 - `Logger`: tab switch, list selection, popup add/edit, export
-- `Warnings` and `Changes`: message edit, announce path, list refresh
+- `Warnings`: message edit, announce path, list refresh
 - `Spammer`: preview, start, stop, pause, channels, duration
 - `ReservesUI`: list render, import, filters, reserve rows
 - `Config`: option toggles, localization, open-close persistence
 - `LootCounter`: toggle, count update, restore from persisted raid
+- `RaidGrid` and `LootHints`: owned widget render/refresh and facade dispatch
 
 ## 10. Done Definition
 

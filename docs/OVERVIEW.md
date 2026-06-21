@@ -61,11 +61,14 @@ Runtime data/model/service modules:
 - `addon.Services.Loot` (public API in `Services/Loot/Service.lua`; internal loot-context/rule helpers in
   `Services/Loot/*.lua`)
 - `addon.Services.Debug`
+- `addon.Services.SpecInspect` (UI-free cached raid talent/spec snapshots backed by LibGroupTalents)
 - `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import, alias,
   grouped-display, runtime sync, and whisper-response helpers in
   `Services/Reserves/{Import,Aliases,Display,Sync,Chat}.lua`)
 - `addon.Services.Logger` (Logger Store/View/Export/Helpers/Actions service tables consumed by
   `Controllers/Logger.lua`)
+- `addon.Services.Spammer.Draft` (PUG spammer draft store helpers)
+- `addon.Services.Warnings.Store` (warning text store helpers)
 
 `addon.Services.Raid` is composed by:
 - `Services/Raid/State.lua` (core raid state + raid-side loot/boss coordination contracts)
@@ -135,13 +138,16 @@ Entrypoints stay narrow:
 
 Common infra under `!KRT/Modules/`:
 
-- Data/utility: `Timer`, `Events`, `Strings`, `Item`, `LootSourcesData`, `LootSources`, `Time`,
-  `Sort`, `Comms`, `Base64`, `Json`, `Colors`, `IgnoredItems`, `IgnoredMobs`
-- `Modules/LootSourcesData.lua` - static raid item-source data
+- Data/utility: `Timer`, `Events`, `Strings`, `Item`, `LootSourceCandidates`, `LootSourcesData`,
+  `LootSources`, `Time`, `Sort`, `Comms`, `Base64`, `Json`, `Colors`, `IgnoredItems`, `IgnoredMobs`
+- `Modules/LootSourceCandidates.lua` - shared-source labels, mode signatures, candidate copies,
+  and loot-source display model helpers
+- `Modules/Dataset/LootSourcesData.lua` - static raid item-source data
 - `Modules/LootSources.lua` - itemId -> raid source resolver
 - `Modules/Dataset/IgnoredMobs.lua` - raid add/phase-ignore lookup plus canonical trash-mob name helpers
-- UI infra: `Frames`, `UI.Scaffold`, `ListController`, `Selection`, `UI` facade,
-  `UI.Effects`, `UI.ScreenNotice`
+- UI infra: `UI.Frames`, `UI.Scaffold`, `UI.ModuleState`, `UI.EditBoxes`, `UI.Popups`,
+  `UI.Tooltips`, `UI.Lists`, `UI.Selection`, `UI.Widgets`, `UI.Effects`, `UI.ScreenNotice`,
+  `UI.Layout`, and row visuals under `UI.Rows`
 - Messaging: `Bus`
 - Feature toggles: `Features`
 
@@ -188,6 +194,8 @@ changes first.
   `addon.Services.Reserves._...`) instead of public `*Internal` methods.
 - For `Master`, keep only explicitly consumed button handlers public. Dropdown, cursor,
   and other frame-local glue should stay private inside `Controllers/Master.lua`.
+- For spec icons/roles in UI rows, use `addon.Services.SpecInspect:GetPlayerSpecSnapshot(...)`
+  and refresh on `Internal.SpecInspectUpdated`; do not inspect talents from Controllers or Widgets.
 - Retired alias usage is blocked by local gates to prevent new root call sites.
 
 ## Event and Refresh Flow

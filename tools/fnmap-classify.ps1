@@ -240,6 +240,16 @@ foreach ($group in $groups) {
         }
 
         if (
+            $functionKey -eq "callControllerMethod" -and
+            $row.File -match "^!KRT/EntryPoints/"
+        ) {
+            $row.Class = "structural-pattern"
+            $row.Action = "keep"
+            $row.Cluster = "entrypoint.controller-dispatch"
+            continue
+        }
+
+        if (
             ($row.Type -eq "field_closure" -or $row.Type -eq "local_closure") -and
             $dupCount -gt 1
         ) {

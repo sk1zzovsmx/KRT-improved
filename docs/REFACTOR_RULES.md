@@ -65,5 +65,13 @@ Permanent guardrails for function mapping and unification work.
 - UI primitives: `!KRT/Modules/UI/Visuals.lua`
 - UI row visuals: `!KRT/Modules/UI/Visuals.lua`
 - UI scaffold orchestration: `!KRT/Modules/UI/Frames.lua` (`addon.UI.Scaffold.*`)
-- Widget facade ownership: `!KRT/Modules/UI/Facade.lua` (`addon.UI.*`)
+- UI lifecycle/cache ownership: `!KRT/Modules/UI/Frames.lua` (`addon.UI.ModuleState.*`)
+- UI editbox/popup/tooltip helpers: `!KRT/Modules/UI/Frames.lua`
+- UI multi-select ownership: `!KRT/Modules/UI/MultiSelect.lua` (`addon.UI.Selection.*`)
+- UI list/table ownership: `!KRT/Modules/UI/ListController.lua` (`addon.UI.Lists.*`)
+- Widget facade ownership: `!KRT/Modules/UI/Facade.lua` (`addon.UI.Widgets.*`)
+- Screen notice ownership: `!KRT/Modules/UI/ScreenNotice.lua` (`addon.UI.ScreenNotice.*`)
+- Loot-source candidate/display ownership: `!KRT/Modules/LootSourceCandidates.lua`
+- Static loot-source data ownership: `!KRT/Modules/Dataset/LootSourcesData.lua`
+- Spec snapshot ownership: `!KRT/Services/SpecInspect.lua`
 - Item link/tooltip helpers: `!KRT/Modules/Item.lua` (`addon.Item.*`)
