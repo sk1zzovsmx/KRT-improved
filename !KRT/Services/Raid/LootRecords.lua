@@ -24,17 +24,8 @@ do
     -- ----- Internal state ----- --
 
     -- ----- Private helpers ----- --
-    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
-
-    local function getRaidQueries()
-        if not RaidQueries and Database.GetRaidQueries then
-            RaidQueries = Database.GetRaidQueries()
-        end
-        return RaidQueries
-    end
-
     local function resolveLootLooterName(raid, entry)
-        local queries = getRaidQueries()
+        local queries = Database.GetRaidQueriesOrNil and Database.GetRaidQueriesOrNil()
         if queries and queries.ResolveLootLooterName then
             return queries:ResolveLootLooterName(raid, entry)
         end

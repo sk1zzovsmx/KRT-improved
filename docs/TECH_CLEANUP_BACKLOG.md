@@ -478,19 +478,50 @@ Wave 5 removed Logger-owned memoized query caches from:
 - `!KRT/Services/Logger/Store.lua`
 
 Remaining memoized wrappers:
-- `!KRT/Database/DBSyncer.lua`
-- `!KRT/Services/Loot/Service.lua`
+- None.
+
+Direct callers remain in `!KRT/Controllers/Logger.lua`, `!KRT/Database/DB.lua`,
+  and `!KRT/Database/DBManager.lua`.
+
+### Wave Q1: Loot owner group
+
+Wave Q1 completed Loot Service owner group:
+- `!KRT/Services/Loot/Service.lua` moved from cached query wrappers to
+  `Database.GetRaidQueriesOrNil()` calls and kept the explicit
+  `Database/DBRaidQueries` registry dependency.
+
+Remaining owner groups after Q1:
 - `!KRT/Services/Raid/LootRecords.lua`
 - `!KRT/Services/Raid/State.lua`
 
-- direct callers remain in `!KRT/Controllers/Logger.lua`, `!KRT/Database/DB.lua`,
-  and `!KRT/Database/DBManager.lua`.
+Already completed related owner groups:
+- `!KRT/Database/DBSyncer.lua` completed by Wave C1.
+
+### Wave Q2: Raid LootRecords owner group
+
+Wave Q2 completed Raid LootRecords owner group:
+- `!KRT/Services/Raid/LootRecords.lua` moved from cached query wrappers to
+  `Database.GetRaidQueriesOrNil()` calls and kept the explicit
+  `Database/DBRaidQueries` registry dependency.
+
+Remaining owner group:
+- `!KRT/Services/Raid/State.lua`
+
+### Wave Q3: Raid State owner group
+
+Wave Q3 completed Raid State owner group:
+- `!KRT/Services/Raid/State.lua` moved the final cached boss query wrapper to
+  `Database.GetRaidQueriesOrNil()` calls and kept the explicit
+  `Database/DBRaidQueries` registry dependency.
+
+Remaining owner groups:
+- None.
 
 Required before later implementation:
-- Map each remaining owner separately.
+- Treat any new `getRaidQueries` cleanup as a fresh inventory item, not as an
+  owner-group continuation.
 - Confirm whether late `Database.GetRaidQueries` assignment still needs cache
-  refresh behavior.
-- Split remaining cleanup into one owner group per task.
+  refresh behavior before changing bootstrap.
 
 ### P3: Bootstrap Follow-up
 
@@ -814,8 +845,8 @@ These are not strong cleanup candidates right now.
 
 If continuing the cleanup program immediately, start with:
 
-1. one remaining `getRaidQueries` owner group, starting with `!KRT/Services/Loot/Service.lua`
-2. deeper `!KRT/Services/Reserves.lua` review only for proven package-internal contracts
+1. deeper `!KRT/Services/Reserves.lua` review only for proven package-internal contracts
+2. bootstrap follow-up in `!KRT/Init.lua` only if a later inventory proves a residual owner
 
 That sequence gives the best technical ROI while keeping the already-stable UI
 owner layer closed.

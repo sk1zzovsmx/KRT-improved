@@ -80,17 +80,9 @@ do
     local Rules = assert(module._Rules, "Loot rules helpers are not initialized")
     local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
     local resolveRaidRecord = assert(ContextHelpers.ResolveRaidRecord, "Missing LootContext.ResolveRaidRecord")
-    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
-
-    local function getRaidQueries()
-        if not RaidQueries and Database.GetRaidQueries then
-            RaidQueries = Database.GetRaidQueries()
-        end
-        return RaidQueries
-    end
 
     local function resolveStoredLootLooterName(raid, raidNum, loot)
-        local queries = getRaidQueries()
+        local queries = Database.GetRaidQueriesOrNil and Database.GetRaidQueriesOrNil()
         if queries and queries.ResolveLootLooterName then
             return queries:ResolveLootLooterName(raid, loot)
         end

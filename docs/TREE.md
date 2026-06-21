@@ -255,6 +255,9 @@
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-c2-raid-store-runtime-boundaries.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-e1-slash-routing.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-e2-minimap-entrypoint.md
+|   |   |   |-- 2026-06-14-audit-cleanup-wave-q1-loot-get-raid-queries-owner-group.md
+|   |   |   |-- 2026-06-14-audit-cleanup-wave-q2-raid-lootrecords-get-raid-queries-owner-group.md
+|   |   |   |-- 2026-06-14-audit-cleanup-wave-q3-raid-state-get-raid-queries-owner-group.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-s2-rolls-service.md
 |   |   |   |-- 2026-06-14-audit-cleanup-wave-s3-reserves-service.md
 |   |   |   \\-- 2026-06-14-audit-cleanup-wave-u1-ui-scaffold-infrastructure.md
@@ -298,6 +301,9 @@
 |   |-- audit_cleanup_wave_c2_raid_store_runtime_boundaries_spec.lua
 |   |-- audit_cleanup_wave_e1_slash_routing_spec.lua
 |   |-- audit_cleanup_wave_e2_minimap_entrypoint_spec.lua
+|   |-- audit_cleanup_wave_q1_loot_get_raid_queries_spec.lua
+|   |-- audit_cleanup_wave_q2_raid_lootrecords_get_raid_queries_spec.lua
+|   |-- audit_cleanup_wave_q3_raid_state_get_raid_queries_spec.lua
 |   |-- audit_cleanup_wave_s2_rolls_spec.lua
 |   |-- audit_cleanup_wave_s3_reserves_spec.lua
 |   |-- audit_cleanup_wave_u1_ui_scaffold_infrastructure_spec.lua

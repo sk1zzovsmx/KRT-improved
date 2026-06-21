@@ -6942,6 +6942,64 @@ test("trade-only loot creates a reusable lootNid", function()
     assertEqual(raid.loot[1].rollValue, 77, "expected logger update to keep same entry")
 end)
 
+test("raid loot records resolve roll session looter through current query facade", function()
+    local h = newHarness()
+    local link = h.registerItem(9166, "LootRecordFacadeBlade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {
+                { playerNid = 1, name = "OtherRaider", countMS = 0 },
+            },
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {
+                {
+                    lootNid = 1,
+                    itemId = 9166,
+                    itemName = "LootRecordFacadeBlade",
+                    itemLink = link,
+                    itemString = h.addon.Item.GetItemStringFromLink(link),
+                    looterNid = 55,
+                    rollType = h.rollTypes.MAINSPEC,
+                    rollValue = 88,
+                    rollSessionId = "ROLL:Q2",
+                    bossNid = 10,
+                    targetLooter = "TargetRaider",
+                },
+            },
+            nextPlayerNid = 2,
+            nextBossNid = 11,
+            nextLootNid = 2,
+        },
+    })
+    h.Database.GetCurrentRaid = function()
+        return 1
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+
+    local queryCalls = 0
+    local currentQueries = {
+        ResolveLootLooterName = function(self, raid, entry)
+            queryCalls = queryCalls + 1
+            assertEqual(entry.lootNid, 1, "expected query facade to inspect seeded loot")
+            return entry.targetLooter
+        end,
+    }
+    h.Database.GetRaidQueriesOrNil = function()
+        return currentQueries
+    end
+
+    local Raid = h.addon.Services.Raid
+    local lootNid = Raid:GetLootNidByRollSessionId("ROLL:Q2", 1, "TargetRaider", 10)
+
+    assertEqual(lootNid, 1, "expected roll-session lookup to use current query facade")
+    assertEqual(queryCalls, 1, "expected current query facade to be called once")
+end)
+
 test("trade-only loot reuses matching fallback rows instead of duplicating", function()
     local h = newHarness()
     local link = h.registerItem(90012, "Trade Merge Blade")
@@ -7821,6 +7879,51 @@ test("trade-only loot reuses boss context captured for the award session", funct
     assertTrue((tonumber(lootNid) or 0) > 0, "expected the trade-only path to create a loot entry")
     assertEqual(#raid.loot, 1, "expected the trade-only path to create one loot entry")
     assertEqual(raid.loot[1].bossNid, 1, "expected the trade-only path to reuse the session boss context")
+end)
+
+test("raid state resolves loot session boss through current query facade", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 1, name = "OriginalBoss", time = 900 },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 2,
+            nextLootNid = 1,
+        },
+    })
+    h.Database.GetCurrentRaid = function()
+        return 1
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+
+    local queryCalls = 0
+    local currentQueries = {
+        FindBossByNid = function(self, raid, bossNid)
+            queryCalls = queryCalls + 1
+            assertEqual(bossNid, 99, "expected query facade to inspect the remembered boss nid")
+            return { bossNid = 99, name = "FacadeBoss" }
+        end,
+    }
+    h.Database.GetRaidQueriesOrNil = function()
+        return currentQueries
+    end
+
+    local Raid = h.addon.Services.Raid
+    Raid:SetBossContextForLootSession(1, "ROLL:Q3", 99, 60)
+
+    local bossNid = Raid:FindAndRememberBossContextForLootSession(1, "ROLL:Q3", {
+        ttlSeconds = 60,
+    })
+
+    assertEqual(bossNid, 99, "expected session lookup to use current query facade")
+    assertEqual(queryCalls, 1, "expected current query facade to be called once")
 end)
 
 test("reopening a partially looted boss corpse after trash reuses the original boss snapshot", function()
@@ -10242,6 +10345,82 @@ test("late self roll lines backfill rollValue on already logged passive winners"
     local raid = h.Database.EnsureRaidById(1)
     assertEqual(#raid.loot, 1, "expected backfill flow to keep a single loot entry")
     assertEqual(raid.loot[1].rollValue, 96, "expected late self roll line to backfill the missing roll value")
+end)
+
+test("loot service resolves stored looter through current query facade", function()
+    local h = newHarness()
+    local link = h.registerItem(9164, "FacadeBackfillNeedblade")
+    local newQueries = {
+        ResolveLootLooterName = function(self, _raid, loot)
+            return (loot and loot.targetLooter) or "TargetRaider"
+        end,
+    }
+    local queryCalls = 0
+
+    h.Database.GetCurrentRaid = function()
+        return 1
+    end
+    h.Database.GetLastBoss = function()
+        return 1
+    end
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {
+                { playerNid = 7, name = "LegacyTarget", countMS = 0 },
+            },
+            bossKills = {},
+            loot = {
+                {
+                    lootNid = 1,
+                    itemId = 9164,
+                    itemName = "FacadeBackfillNeedblade",
+                    itemLink = link,
+                    itemString = h.addon.Item.GetItemStringFromLink(link),
+                    itemCount = 1,
+                    looterNid = 55,
+                    rollType = h.rollTypes.MAINSPEC,
+                    rollValue = 0,
+                    rollSessionId = "GL:19",
+                    bossNid = 0,
+                    time = 1000,
+                    source = "CHAT_MSG_LOOT",
+                    targetLooter = "TargetRaider",
+                },
+            },
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 2,
+        },
+    })
+
+    h:load("!KRT/Services/Loot.lua")
+
+    h.Database.GetRaidQueriesOrNil = function()
+        queryCalls = queryCalls + 1
+        return newQueries
+    end
+
+    h.addon.Services.Raid = {
+        GetPlayerName = function()
+            return nil
+        end,
+    }
+
+    local Loot = h.addon.Services.Loot
+    local loot = h.Database.EnsureRaidById(1)
+    local before = #loot.loot
+
+    local result = Loot:UpgradeLoggedPassiveLootRoll(link, "TargetRaider", h.rollTypes.NEED, 77, "GL:19")
+
+    local after = #loot.loot
+    assertTrue(result == true, "expected the existing passive row to be upgraded through query facade resolution")
+    assertTrue(queryCalls == 1, "expected current query facade to be called once")
+    assertEqual(before, after, "expected existing row to be updated without duplicating")
+    assertEqual(loot.loot[1].rollType, h.rollTypes.NEED, "expected roll type to be updated during backfill")
+    assertEqual(loot.loot[1].rollValue, 77, "expected roll value to be backfilled")
 end)
 
 test("group loot raw need and won messages log passive NE history", function()

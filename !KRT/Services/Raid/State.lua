@@ -140,17 +140,8 @@ do
         return LootContextState.SyncActive(raidState)
     end
 
-    local RaidQueries = Database.GetRaidQueries and Database.GetRaidQueries() or nil
-
-    local function getRaidQueries()
-        if not RaidQueries and Database.GetRaidQueries then
-            RaidQueries = Database.GetRaidQueries()
-        end
-        return RaidQueries
-    end
-
     local function findBossByNid(raid, bossNid)
-        local queries = getRaidQueries()
+        local queries = Database.GetRaidQueriesOrNil and Database.GetRaidQueriesOrNil()
         if queries and queries.FindBossByNid then
             return queries:FindBossByNid(raid, bossNid)
         end
@@ -158,7 +149,7 @@ do
     end
 
     local function findBossByName(raid, bossName)
-        local queries = getRaidQueries()
+        local queries = Database.GetRaidQueriesOrNil and Database.GetRaidQueriesOrNil()
         if queries and queries.FindBossByName then
             return queries:FindBossByName(raid, bossName)
         end
@@ -166,7 +157,7 @@ do
     end
 
     local function findBossBySourceNpcId(raid, sourceNpcId)
-        local queries = getRaidQueries()
+        local queries = Database.GetRaidQueriesOrNil and Database.GetRaidQueriesOrNil()
         if queries and queries.FindBossBySourceNpcId then
             return queries:FindBossBySourceNpcId(raid, sourceNpcId)
         end
@@ -174,7 +165,7 @@ do
     end
 
     local function findBossBySourceKey(raid, sourceKey)
-        local queries = getRaidQueries()
+        local queries = Database.GetRaidQueriesOrNil and Database.GetRaidQueriesOrNil()
         if queries and queries.FindBossBySourceKey then
             return queries:FindBossBySourceKey(raid, sourceKey)
         end
