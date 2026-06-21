@@ -139,6 +139,30 @@
 					</Layer>
 				</Layers>
 			</Frame>
+			<Button name="$parentNameHotspot" enableMouse="true">
+				<Size>
+					<AbsDimension x="200" y="16" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentTextBlock" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="0" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentPlayersHotspot" enableMouse="true">
+				<Size>
+					<AbsDimension x="200" y="16" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" relativeTo="$parentTextBlock" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
 		</Frames>
 		<Layers>
 			<Layer level="BACKGROUND">

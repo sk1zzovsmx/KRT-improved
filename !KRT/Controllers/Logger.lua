@@ -479,7 +479,7 @@ local function getInspectStatusLabel(status, reason)
     return tostring(status)
 end
 
-local function ensureAttendanceInspectIcon(row, index, ui)
+local function getAttendanceInspectIcon(row, index, ui)
     if not row or not ui then
         return nil
     end
@@ -492,21 +492,16 @@ local function ensureAttendanceInspectIcon(row, index, ui)
 
     local rowName = row.GetName and row:GetName() or nil
     local iconName = rowName and (rowName .. "InspectItemIcon" .. tostring(index)) or nil
-    if iconName then
-        icon = _G[iconName]
-    end
+    icon = iconName and _G[iconName] or nil
     if not icon then
-        icon = CreateFrame("Button", iconName, row, "KRTLoggerInspectItemIconButtonTemplate")
-    end
-    if not icon then
-        icon = CreateFrame("Button", nil, row)
+        return nil
     end
     icon:EnableMouse(true)
     icon:SetSize(RAID_INSPECT_ICON_SIZE, RAID_INSPECT_ICON_SIZE)
     icon:SetID(index)
-    icon.texture = iconName and _G[iconName .. "Texture"] or icon.texture
+    icon.texture = iconName and _G[iconName .. "Texture"] or nil
     if not icon.texture then
-        icon.texture = icon:CreateTexture(nil, "ARTWORK")
+        return nil
     end
     icon.texture:SetAllPoints(icon)
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -562,7 +557,7 @@ local GetItemIcon = _G.GetItemIcon or function(itemId)
     return nil
 end
 
-local function ensureAttendanceSpecIcon(row)
+local function getAttendanceSpecIcon(row)
     if not row then
         return nil
     end
@@ -574,13 +569,13 @@ local function ensureAttendanceSpecIcon(row)
     local iconName = rowName and (rowName .. "SpecIcon") or nil
     local icon = iconName and _G[iconName] or nil
     if not icon then
-        icon = CreateFrame("Button", nil, row)
+        return nil
     end
     icon:EnableMouse(true)
     icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
-    icon.texture = iconName and _G[iconName .. "Texture"] or icon.texture
+    icon.texture = iconName and _G[iconName .. "Texture"] or nil
     if not icon.texture then
-        icon.texture = icon:CreateTexture(nil, "ARTWORK")
+        return nil
     end
     icon.texture:SetAllPoints(icon)
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -589,7 +584,7 @@ local function ensureAttendanceSpecIcon(row)
     return icon
 end
 
-local function ensureAttendanceSecondarySpecIcon(row)
+local function getAttendanceSecondarySpecIcon(row)
     if not row then
         return nil
     end
@@ -601,13 +596,13 @@ local function ensureAttendanceSecondarySpecIcon(row)
     local iconName = rowName and (rowName .. "SecondarySpecIcon") or nil
     local icon = iconName and _G[iconName] or nil
     if not icon then
-        icon = CreateFrame("Button", nil, row)
+        return nil
     end
     icon:EnableMouse(true)
     icon:SetSize(RAID_SPEC_ICON_SIZE, RAID_SPEC_ICON_SIZE)
-    icon.texture = iconName and _G[iconName .. "Texture"] or icon.texture
+    icon.texture = iconName and _G[iconName .. "Texture"] or nil
     if not icon.texture then
-        icon.texture = icon:CreateTexture(nil, "ARTWORK")
+        return nil
     end
     icon.texture:SetAllPoints(icon)
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -692,8 +687,8 @@ local function setAttendanceSpecIcon(row, ui, primarySpecIcon, secondarySpecIcon
         ui.Spec:SetText("")
     end
 
-    local primaryIcon = ensureAttendanceSpecIcon(row)
-    local secondaryIcon = ensureAttendanceSecondarySpecIcon(row)
+    local primaryIcon = getAttendanceSpecIcon(row)
+    local secondaryIcon = getAttendanceSecondarySpecIcon(row)
     if not primaryIcon or not secondaryIcon then
         return
     end
@@ -746,7 +741,7 @@ local function renderAttendanceInspectIcons(row, ui, playerNid, snapshot)
         local item = items[slot]
         if item and (item.texture or item.itemLink) then
             count = count + 1
-            local icon = ensureAttendanceInspectIcon(row, count, ui)
+            local icon = getAttendanceInspectIcon(row, count, ui)
             if not icon then
                 break
             end

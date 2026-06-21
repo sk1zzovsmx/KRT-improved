@@ -22,6 +22,18 @@ Lua owns runtime behavior:
 Do not put addon behavior in XML `<Scripts>`.
 Use XML for layout and Lua for state.
 
+## Lua fallback policy
+
+For XML-owned visual skeletons, Lua should resolve named XML children and apply runtime state only.
+
+Do not add Lua fallbacks that recreate XML-owned textures, fontstrings, buttons, or static child frames.
+
+Allowed Lua-created UI remains limited to:
+- data-driven repeated rows created from XML templates;
+- runtime-only effect frames under `Modules/UI/Effects.lua`;
+- hidden driver or tooltip frames required by the WotLK 3.3.5a API;
+- LootCounter internals while the temporary exception remains active.
+
 ## Temporary exceptions (LootCounter)
 
 LootCounter is intentionally excluded from the current XML skeleton migration.

@@ -272,7 +272,8 @@
 |   |   |   |-- 2026-06-15-tools-current-state-refresh.md
 |   |   |   |-- 2026-06-16-equipinspect-specinspect-canonicalization.md
 |   |   |   |-- 2026-06-16-krt-dead-ui-fallback-removal.md
-|   |   |   \\-- 2026-06-16-krt-ui-xml-lua-homogenization.md
+|   |   |   |-- 2026-06-16-krt-ui-xml-lua-homogenization.md
+|   |   |   \\-- 2026-06-17-krt-xml-visual-simplification.md
 |   |   \\-- specs
 |   |       |-- 2026-06-04-atlasloot-raid-dataset-design.md
 |   |       |-- 2026-06-05-master-loot-grid-design.md
@@ -286,6 +287,7 @@
 |   |-- DEV_CHECKS.md
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
+|   |-- INTERFACE_TEXTURE_CATALOG.md
 |   |-- KRT_MCP.md
 |   |-- LOOT_SOURCES.md
 |   |-- LUA_ALIGNMENT_MATRIX.md
@@ -350,6 +352,7 @@
 |   |-- api-contract-cleanup-wave.md
 |   |-- atlasloot_raid_sources.py
 |   |-- atlasloot_raid_source_map.py
+|   |-- build-interface-texture-catalog.py
 |   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1

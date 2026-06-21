@@ -649,6 +649,23 @@
 					</Layer>
 				</Layers>
 			</Button>
+			<Button name="$parentInspectItemIcon1" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon2" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon3" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon4" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon5" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon6" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon7" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon8" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon9" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon10" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon11" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon12" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon13" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon14" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon15" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon16" inherits="KRTLoggerInspectItemIconButtonTemplate" />
+			<Button name="$parentInspectItemIcon17" inherits="KRTLoggerInspectItemIconButtonTemplate" />
 			<Button name="$parentSecondarySpecIcon" enableMouse="true" hidden="true">
 				<Size>
 					<AbsDimension x="17" y="17" />
@@ -2283,7 +2300,7 @@
 			<AbsDimension x="312" y="22" />
 		</Size>
 		<Frames>
-			<Button name="$parentMS" inherits="UIPanelButtonTemplate">
+			<Button name="$parentMS" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="42" y="22" />
 				</Size>
@@ -2291,7 +2308,7 @@
 					<Anchor point="LEFT" />
 				</Anchors>
 			</Button>
-			<Button name="$parentOS" inherits="UIPanelButtonTemplate">
+			<Button name="$parentOS" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="42" y="22" />
 				</Size>
@@ -2303,7 +2320,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentSR" inherits="UIPanelButtonTemplate">
+			<Button name="$parentSR" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="42" y="22" />
 				</Size>
@@ -2315,7 +2332,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentFree" inherits="UIPanelButtonTemplate">
+			<Button name="$parentFree" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="42" y="22" />
 				</Size>
@@ -2327,7 +2344,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentBank" inherits="UIPanelButtonTemplate">
+			<Button name="$parentBank" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="42" y="22" />
 				</Size>
@@ -2339,7 +2356,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentDE" inherits="UIPanelButtonTemplate">
+			<Button name="$parentDE" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="42" y="22" />
 				</Size>
@@ -2351,7 +2368,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentHold" inherits="UIPanelButtonTemplate">
+			<Button name="$parentHold" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="42" y="22" />
 				</Size>

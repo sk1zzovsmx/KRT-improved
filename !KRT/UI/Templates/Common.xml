@@ -107,7 +107,13 @@
 			</Layer>
 		</Layers>
 		<HighlightTexture inherits="UIPanelButtonHighlightTexture" mod="ADD" />
-		<PushedTexture inherits="UIPanelButtonPushedTexture" mod="ADD" />
+		<PushedTexture file="Interface\Buttons\UI-Panel-Button-Down">
+			<Anchors>
+				<Anchor point="TOPLEFT" />
+				<Anchor point="BOTTOMRIGHT" />
+			</Anchors>
+			<TexCoords left="0" right="0.625" top="0" bottom="0.6875" />
+		</PushedTexture>
 		<DisabledTexture inherits="UIPanelButtonDisabledTexture" />
 	</Button>
 	<!-- Selectable list row visual skeleton -->

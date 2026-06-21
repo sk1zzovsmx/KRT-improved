@@ -3,7 +3,7 @@
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.UI.Primitives, addon.UI.Rows
 -- events: none
--- ui ownership: Lua applies row/panel visual state and keeps XML-template fallbacks only.
+-- ui ownership: XML owns row/header visual skeletons; Lua resolves named parts and applies runtime state.
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -21,12 +21,6 @@ UI.Primitives = Primitives
 
 local Rows = UI.Rows or {}
 UI.Rows = Rows
-Rows._fallbackStats = Rows._fallbackStats or {
-    selectable = 0,
-    loggerHeader = 0,
-    loggerRow = 0,
-    masterSpecIcon = 0,
-}
 
 -- ----- Internal state ----- --
 local LOGGER_HEADER_TAB_INSET = 1
@@ -57,7 +51,7 @@ local function setTextureColor(texture, r, g, b, a)
     end
 end
 
-local function ensureRowTextures(row)
+local function resolveRowTextures(row)
     if not row or row._krtVisualsResolved then
         return
     end
@@ -67,11 +61,6 @@ local function ensureRowTextures(row)
     row._krtSelTex = row._krtSelTex or (rowName and _G[rowName .. "SelectedTexture"])
     row._krtFocusTex = row._krtFocusTex or (rowName and _G[rowName .. "FocusTexture"])
 
-    local pushed = rowName and _G[rowName .. "PushedTexture"]
-    if pushed and row.SetPushedTexture then
-        row:SetPushedTexture(pushed)
-    end
-
     if row._krtSelTex and row._krtSelTex.Hide then
         row._krtSelTex:Hide()
     end
@@ -79,34 +68,6 @@ local function ensureRowTextures(row)
         row._krtFocusTex:Hide()
     end
 
-    if not row._krtSelTex and row.CreateTexture then
-        local sel = row:CreateTexture(nil, "BACKGROUND")
-        sel:SetAllPoints(row)
-        sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-        sel:SetBlendMode("ADD")
-        sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
-        sel:Hide()
-        row._krtSelTex = sel
-        Rows._fallbackStats.selectable = Rows._fallbackStats.selectable + 1
-    end
-
-    if not row._krtFocusTex and row.CreateTexture then
-        local focus = row:CreateTexture(nil, "ARTWORK")
-        focus:SetAllPoints(row)
-        focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-        focus:SetBlendMode("ADD")
-        focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
-        focus:Hide()
-        row._krtFocusTex = focus
-        Rows._fallbackStats.selectable = Rows._fallbackStats.selectable + 1
-    end
-
-    if not pushed and row.CreateTexture and row.SetPushedTexture then
-        pushed = row:CreateTexture(nil, "ARTWORK")
-        pushed:SetAllPoints(row)
-        pushed:SetTexture(1, 1, 1, 0.08)
-        row:SetPushedTexture(pushed)
-    end
     if row._krtSelTex and row._krtSelTex.SetDrawLayer then
         row._krtSelTex:SetDrawLayer("BORDER")
     end
@@ -121,59 +82,25 @@ local function isLoggerRow(row)
     return row and row._krtRowVisualStyle == "logger"
 end
 
-local function ensureLoggerHeaderTab(header)
+local function resolveLoggerHeaderTab(header)
     if not header or header._krtHeaderTab then
         return
     end
 
     local headerName = header.GetName and header:GetName() or nil
     local fill = headerName and _G[headerName .. "Fill"] or nil
-    if not fill then
-        fill = header:CreateTexture(nil, "BACKGROUND")
-        fill:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-        fill:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
-        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
-    end
     header._krtHeaderFill = fill
 
     local top = headerName and _G[headerName .. "Top"] or nil
-    if not top then
-        top = header:CreateTexture(nil, "BORDER")
-        top:SetHeight(1)
-        top:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-        top:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
-        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
-    end
     header._krtHeaderTop = top
 
     local bottom = headerName and _G[headerName .. "Bottom"] or nil
-    if not bottom then
-        bottom = header:CreateTexture(nil, "BORDER")
-        bottom:SetHeight(1)
-        bottom:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
-        bottom:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
-        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
-    end
     header._krtHeaderBottom = bottom
 
     local left = headerName and _G[headerName .. "Left"] or nil
-    if not left then
-        left = header:CreateTexture(nil, "BORDER")
-        left:SetWidth(1)
-        left:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-        left:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
-        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
-    end
     header._krtHeaderLeft = left
 
     local right = headerName and _G[headerName .. "Right"] or nil
-    if not right then
-        right = header:CreateTexture(nil, "BORDER")
-        right:SetWidth(1)
-        right:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
-        right:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
-        Rows._fallbackStats.loggerHeader = Rows._fallbackStats.loggerHeader + 1
-    end
     header._krtHeaderRight = right
 
     if fill and fill.SetDrawLayer then
@@ -200,7 +127,7 @@ local function styleLoggerHeader(header)
         return
     end
 
-    ensureLoggerHeaderTab(header)
+    resolveLoggerHeaderTab(header)
 
     local text = header.GetFontString and header:GetFontString() or nil
     if text and text.SetTextColor then
@@ -462,11 +389,11 @@ function Primitives.UpdateNamedPartModeText(frameName, suffix, str1, str2, mode,
 end
 
 function Rows.EnsureVisuals(row)
-    ensureRowTextures(row)
+    resolveRowTextures(row)
 end
 
 function Rows.SetSelected(row, cond)
-    ensureRowTextures(row)
+    resolveRowTextures(row)
     if not row or not row._krtSelTex then
         return
     end
@@ -483,7 +410,7 @@ function Rows.SetSelected(row, cond)
 end
 
 function Rows.SetFocused(row, cond)
-    ensureRowTextures(row)
+    resolveRowTextures(row)
     local texture = row and row._krtFocusTex
     if not texture then
         return
@@ -506,28 +433,9 @@ function Rows.StyleLoggerRow(row)
     end
 
     row._krtRowVisualStyle = "logger"
-    if not row._krtLoggerBg then
-        local rowName = row.GetName and row:GetName() or nil
-        local bg = rowName and _G[rowName .. "LoggerBg"] or nil
-        if not bg then
-            bg = row:CreateTexture(nil, "BACKGROUND")
-            bg:SetAllPoints(row)
-            Rows._fallbackStats.loggerRow = Rows._fallbackStats.loggerRow + 1
-        end
-        row._krtLoggerBg = bg
-    end
-    if not row._krtLoggerLine then
-        local rowName = row.GetName and row:GetName() or nil
-        local line = rowName and _G[rowName .. "LoggerBottomLine"] or nil
-        if not line then
-            line = row:CreateTexture(nil, "BORDER")
-            line:SetHeight(1)
-            line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
-            line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
-            Rows._fallbackStats.loggerRow = Rows._fallbackStats.loggerRow + 1
-        end
-        row._krtLoggerLine = line
-    end
+    local rowName = row.GetName and row:GetName() or nil
+    row._krtLoggerBg = row._krtLoggerBg or (rowName and _G[rowName .. "LoggerBg"])
+    row._krtLoggerLine = row._krtLoggerLine or (rowName and _G[rowName .. "LoggerBottomLine"])
     if row._krtLoggerBg and row._krtLoggerBg.SetDrawLayer then
         row._krtLoggerBg:SetDrawLayer("BACKGROUND")
     end
@@ -538,10 +446,6 @@ function Rows.StyleLoggerRow(row)
     if row._krtLoggerLine then
         row._krtLoggerLine:SetTexture(0.32, 0.30, 0.25, 0.42)
     end
-end
-
-function Rows.GetFallbackStats()
-    return Rows._fallbackStats
 end
 
 function Rows.SetLoggerRowIndex(row, index)
@@ -634,12 +538,7 @@ function Rows.DrawMasterRollRow(row, data, onClick)
         nameStr:Show()
     end
 
-    local specIcon = ui and (ui.specIcon or ui.SpecIcon) or row._krtSpecIcon
-    if hasSpecIcon and not specIcon and row.CreateTexture then
-        specIcon = row:CreateTexture(nil, "ARTWORK")
-        row._krtSpecIcon = specIcon
-        Rows._fallbackStats.masterSpecIcon = Rows._fallbackStats.masterSpecIcon + 1
-    end
+    local specIcon = ui and (ui.specIcon or ui.SpecIcon) or nil
     if specIcon then
         if hasSpecIcon then
             if specIcon.SetTexture then

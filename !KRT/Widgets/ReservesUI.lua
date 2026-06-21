@@ -145,31 +145,22 @@ do
 
         if row.textBlock then
             row.textBlock:EnableMouse(false)
+            local hotspotFrameLevel = row.textBlock and (row.textBlock:GetFrameLevel() + 2) or nil
 
-            if not row._nameHotspot then
-                local hs = CreateFrame("Button", nil, row.textBlock)
-                hs:ClearAllPoints()
-                hs:SetPoint("TOPLEFT", row.textBlock, "TOPLEFT", 0, 0)
-                hs:SetHeight(16)
-                hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
-                hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
-                hs:EnableMouse(true)
-                hs:SetScript("OnEnter", showItemTooltip)
-                hs:SetScript("OnLeave", Tooltips.Hide)
-                row._nameHotspot = hs
+            if row._nameHotspot then
+                if hotspotFrameLevel then
+                    row._nameHotspot:SetFrameLevel(hotspotFrameLevel)
+                end
+                row._nameHotspot:SetScript("OnEnter", showItemTooltip)
+                row._nameHotspot:SetScript("OnLeave", Tooltips.Hide)
             end
 
-            if not row._playersHotspot then
-                local hs = CreateFrame("Button", nil, row.textBlock)
-                hs:ClearAllPoints()
-                hs:SetPoint("BOTTOMLEFT", row.textBlock, "BOTTOMLEFT", 0, 0)
-                hs:SetHeight(16)
-                hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
-                hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
-                hs:EnableMouse(true)
-                hs:SetScript("OnEnter", showPlayersTooltip)
-                hs:SetScript("OnLeave", Tooltips.Hide)
-                row._playersHotspot = hs
+            if row._playersHotspot then
+                if hotspotFrameLevel then
+                    row._playersHotspot:SetFrameLevel(hotspotFrameLevel)
+                end
+                row._playersHotspot:SetScript("OnEnter", showPlayersTooltip)
+                row._playersHotspot:SetScript("OnLeave", Tooltips.Hide)
             end
         end
     end
@@ -405,6 +396,8 @@ do
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
             row.textBlock = _G[rowName .. "TextBlock"]
+            row._nameHotspot = _G[rowName .. "NameHotspot"]
+            row._playersHotspot = _G[rowName .. "PlayersHotspot"]
             setupReserveIcon(row)
             setupReserveRowDecor(row)
             if row.textBlock and row.iconBtn then
